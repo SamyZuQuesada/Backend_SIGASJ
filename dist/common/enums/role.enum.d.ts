@@ -1,0 +1,6 @@
+export declare enum Role {
+    ADMINISTRADORA = "ADMINISTRADORA",
+    SECRETARIA = "SECRETARIA",
+    FONTANERO = "FONTANERO",
+    ABONADO = "ABONADO"
+}
