@@ -1,0 +1,23 @@
+# compiled output
+/dist
+/node_modules
+
+# logs
+*.log
+npm-debug.log*
+
+# environment variables
+.env
+
+# IDE / OS
+.DS_Store
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# nest build
+tsconfig.build.tsbuildinfo
