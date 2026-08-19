@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
+import { APP_FILTER } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 import environmentConfig from './config/environment.config';
 import databaseConfig from './config/database.config';
@@ -45,6 +47,11 @@ import { ProyectosModule } from './modules/proyectos/proyectos.module';
   ],
 
   controllers: [],
-  providers: [],
+  providers: [
+    {
+      provide: APP_FILTER,
+      useClass: HttpExceptionFilter,
+    },
+  ],
 })
 export class AppModule {}
