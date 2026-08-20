@@ -14,15 +14,6 @@ export class ContenidoPublicoService {
     };
   }
 
-  getContacto() {
-    return {
-      telefono: '+506 2680-0000',
-      email: 'info@asadasanjuan.cr',
-      direccion: 'San Juan de Santa Cruz, Guanacaste, Costa Rica',
-      horarioAtencion: 'Lunes a Viernes: 8:00 AM - 4:00 PM',
-    };
-  }
-
   getTransparencia() {
     return [
       {
