@@ -112,6 +112,19 @@ El Landing Page en React consume información pública sin requerir token JWT:
 
 La modificación de este contenido se realiza mediante el panel administrativo utilizando rutas protegidas bajo `/api/v1/admin/*`.
 
+### Galería de fotografías
+
+- `GET /api/v1/public/galeria` — fotos activas (formato landing: `imageUrl`, `altText`, `title`, `description`)
+- `GET /api/v1/admin/galeria` — listado admin con filtros opcionales `titulo`, `activo`
+- `GET /api/v1/admin/galeria/:id` — detalle admin
+- `POST /api/v1/admin/galeria` — crear con `multipart/form-data` (campo `imagen`)
+- `PATCH /api/v1/admin/galeria/:id` — actualizar metadatos e imagen opcional
+- `PATCH /api/v1/admin/galeria/:id/activo` — activar/desactivar
+- `DELETE /api/v1/admin/galeria/:id` — eliminar foto y archivo asociado
+
+Persistencia: entidad TypeORM `GaleriaFoto` + migración `1724126400000-CreateGaleriaFoto`.
+Archivos locales en `uploads/galeria/` servidos bajo `/uploads/*`.
+
 ---
 
 ## 6. Documentación Swagger / OpenAPI
@@ -134,12 +147,12 @@ Copie el archivo `.env.example` a `.env` y ajuste las variables según el entorn
 PORT=3000
 NODE_ENV=development
 
-DB_TYPE=postgres
+DB_TYPE=mssql
 DB_HOST=localhost
-DB_PORT=5432
-DB_USERNAME=postgres
-DB_PASSWORD=postgres
-DB_DATABASE=sigasj_db
+DB_PORT=1434
+DB_USERNAME=sa
+DB_PASSWORD=Sigasj_Dev2026!
+DB_DATABASE=SIGASJ
 
 JWT_SECRET=super_secret_jwt_key_sigasj_2026
 JWT_EXPIRES_IN=24h

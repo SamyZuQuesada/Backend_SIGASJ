@@ -29,12 +29,6 @@ export class ContenidoPublicoController {
     return this.contenidoPublicoService.getContacto();
   }
 
-  @Get('public/galeria')
-  @ApiOperation({ summary: 'Obtener galería de fotografías (Público)' })
-  getPublicGaleria() {
-    return this.contenidoPublicoService.getGaleria();
-  }
-
   @Get('public/transparencia')
   @ApiOperation({ summary: 'Obtener documentos de transparencia (Público)' })
   getPublicTransparencia() {

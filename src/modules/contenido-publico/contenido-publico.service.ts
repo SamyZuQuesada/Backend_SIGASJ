@@ -23,23 +23,6 @@ export class ContenidoPublicoService {
     };
   }
 
-  getGaleria() {
-    return [
-      {
-        id: 1,
-        titulo: 'Tanque Principal',
-        url: '/images/tanque.jpg',
-        activa: true,
-      },
-      {
-        id: 2,
-        titulo: 'Oficina Central',
-        url: '/images/oficina.jpg',
-        activa: true,
-      },
-    ];
-  }
-
   getTransparencia() {
     return [
       {

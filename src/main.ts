@@ -1,12 +1,22 @@
+import { config as loadEnv } from 'dotenv';
+
+loadEnv({ override: true });
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { join } from 'path';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const configService = app.get(ConfigService);
+  const uploadsRoot = configService.get<string>('environment.uploadsRoot')!;
+
+  app.useStaticAssets(join(process.cwd(), uploadsRoot), {
+    prefix: '/uploads/',
+  });
 
   // Prefijo global de API
   app.setGlobalPrefix('api/v1');
@@ -25,7 +35,7 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
       transform: true,
       transformOptions: {
-        enableImplicitConversion: true,
+        enableImplicitConversion: false,
       },
     }),
   );
