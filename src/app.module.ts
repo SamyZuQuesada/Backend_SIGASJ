@@ -2,11 +2,10 @@ import { Module } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { FileStorageModule } from './common/storage/file-storage.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 import environmentConfig from './config/environment.config';
-import { buildTypeOrmOptions } from './config/database.config';
+import databaseConfig from './config/database.config';
 import jwtConfig from './config/jwt.config';
 import acueductosCrConfig from './config/acueductos-cr.config';
 
@@ -28,15 +27,13 @@ import { RecibosModule } from './modules/recibos/recibos.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env',
-      load: [environmentConfig, jwtConfig, acueductosCrConfig],
+      load: [environmentConfig, databaseConfig, jwtConfig, acueductosCrConfig],
     }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) =>
-        buildTypeOrmOptions(configService),
+        configService.get('database')!,
     }),
-    FileStorageModule,
     AuthModule,
     UsuariosModule,
     ContenidoPublicoModule,
