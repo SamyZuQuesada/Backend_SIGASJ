@@ -5,6 +5,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { Role } from '../src/common/enums/role.enum';
 import jwtConfig from '../src/config/jwt.config';
+import { e2eTypeOrmModule } from './helpers/e2e-typeorm.module';
 import { AuthModule } from '../src/modules/auth/auth.module';
 import { ComunicadosModule } from '../src/modules/comunicados/comunicados.module';
 import { ContenidoPublicoModule } from '../src/modules/contenido-publico/contenido-publico.module';
@@ -37,6 +38,7 @@ describe('revisión técnica de errores — Backend (e2e)', () => {
           isGlobal: true,
           load: [jwtConfig],
         }),
+        e2eTypeOrmModule,
         AuthModule,
         UsuariosModule,
         ContenidoPublicoModule,
@@ -93,7 +95,7 @@ describe('revisión técnica de errores — Backend (e2e)', () => {
         .set('Authorization', `Bearer ${abonadoToken}`),
     ];
 
-    expect(cases.map((item) => item.status)).toEqual([401, 401, 401, 403, 404]);
+    expect(cases.map((item) => item.status)).toEqual([401, 401, 401, 403, 403]);
 
     for (const response of cases) {
       assertSafeClientBody(response.body);

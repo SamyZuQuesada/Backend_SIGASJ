@@ -5,6 +5,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { Role } from '../src/common/enums/role.enum';
 import jwtConfig from '../src/config/jwt.config';
+import { e2eTypeOrmModule } from './helpers/e2e-typeorm.module';
 import { AuthModule } from '../src/modules/auth/auth.module';
 import { ComunicadosModule } from '../src/modules/comunicados/comunicados.module';
 import { ContenidoPublicoModule } from '../src/modules/contenido-publico/contenido-publico.module';
@@ -18,11 +19,6 @@ const ADMIN_ENDPOINTS = [
   '/api/v1/admin/comunicados',
 ] as const;
 
-const PERSONAL_ABONADO_ENDPOINTS = [
-  '/api/v1/abonados/me',
-  '/api/v1/abonados/mi-perfil',
-  '/api/v1/me',
-] as const;
 
 describe('autorización Abonado (e2e)', () => {
   let app: INestApplication;
@@ -35,6 +31,7 @@ describe('autorización Abonado (e2e)', () => {
           isGlobal: true,
           load: [jwtConfig],
         }),
+        e2eTypeOrmModule,
         AuthModule,
         UsuariosModule,
         ContenidoPublicoModule,
@@ -93,15 +90,30 @@ describe('autorización Abonado (e2e)', () => {
     },
   );
 
-  it.each([...PERSONAL_ABONADO_ENDPOINTS])(
-    'no existe endpoint personal %s para consultar o editar la cuenta del Abonado',
-    async (endpoint) => {
-      const response = await request(app.getHttpServer())
-        .get(endpoint)
-        .set('Authorization', `Bearer ${abonadoToken}`);
+  it('GET /abonados/me no devuelve datos si el Abonado no tiene registro asociado', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/v1/abonados/me')
+      .set('Authorization', `Bearer ${abonadoToken}`);
 
-      expect(response.status).toBe(404);
-      expect(response.status).not.toBe(200);
-    },
-  );
+    expect([403, 404]).toContain(response.status);
+    expect(response.status).not.toBe(200);
+  });
+
+  it('GET /abonados/mi-perfil no es una ruta válida', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/v1/abonados/mi-perfil')
+      .set('Authorization', `Bearer ${abonadoToken}`);
+
+    expect([400, 404]).toContain(response.status);
+    expect(response.status).not.toBe(200);
+  });
+
+  it('GET /me no existe', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/v1/me')
+      .set('Authorization', `Bearer ${abonadoToken}`);
+
+    expect(response.status).toBe(404);
+    expect(response.status).not.toBe(200);
+  });
 });

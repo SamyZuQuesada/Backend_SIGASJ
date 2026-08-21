@@ -5,6 +5,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { Role } from '../src/common/enums/role.enum';
 import jwtConfig from '../src/config/jwt.config';
+import { e2eTypeOrmModule } from './helpers/e2e-typeorm.module';
 import { AuthModule } from '../src/modules/auth/auth.module';
 import { ComunicadosModule } from '../src/modules/comunicados/comunicados.module';
 import { ContenidoPublicoModule } from '../src/modules/contenido-publico/contenido-publico.module';
@@ -16,7 +17,9 @@ import { AbonadosModule } from '../src/modules/abonados/abonados.module';
  *
  * Códigos esperados = contrato actual del backend:
  * - Rutas con JwtAuthGuard: 200 / 403 / 401 según rol y token.
- * - Rutas de Abonados sin controlador: 404 (Nest responde antes del guard).
+ * - GET /abonados/me: Abonado 403/404 si no hay registro; Administradora 403; sin token 401.
+ * - GET /abonados (listado) no existe: 404.
+ * - GET /abonados/:id: autenticado 403/404; sin token 401.
  */
 type Actor =
   | 'Administradora'
@@ -42,10 +45,9 @@ const ADMIN_ENDPOINTS = [
 
 const PERSONAL_ENDPOINTS = ['/api/v1/abonados/me'] as const;
 
-const MISSING_ABONADOS_ENDPOINTS = [
-  '/api/v1/abonados',
-  '/api/v1/abonados/11',
-] as const;
+const MISSING_ABONADOS_ENDPOINTS = ['/api/v1/abonados'] as const;
+
+const ABONADO_BY_ID_ENDPOINTS = ['/api/v1/abonados/11'] as const;
 
 const ACTORS: Actor[] = [
   'Administradora',
@@ -58,6 +60,26 @@ const ACTORS: Actor[] = [
 const expectedForAdmin = (role: Actor): number => {
   if (role === 'Administradora') {
     return 200;
+  }
+  if (role === 'Abonado') {
+    return 403;
+  }
+  return 401;
+};
+
+const expectedForPersonal = (role: Actor): number => {
+  if (role === 'Administradora') {
+    return 403;
+  }
+  if (role === 'Abonado') {
+    return 403;
+  }
+  return 401;
+};
+
+const expectedForAbonadoById = (role: Actor): number => {
+  if (role === 'Administradora') {
+    return 404;
   }
   if (role === 'Abonado') {
     return 403;
@@ -80,7 +102,7 @@ const MATRIX: MatrixRow[] = [
       endpoint,
       method: 'GET' as const,
       role,
-      expected: 404,
+      expected: expectedForPersonal(role),
       kind: 'personal' as const,
     })),
   ),
@@ -91,6 +113,15 @@ const MATRIX: MatrixRow[] = [
       role,
       expected: 404,
       kind: 'abonados-sin-ruta' as const,
+    })),
+  ),
+  ...ABONADO_BY_ID_ENDPOINTS.flatMap((endpoint) =>
+    ACTORS.map((role) => ({
+      endpoint,
+      method: 'GET' as const,
+      role,
+      expected: expectedForAbonadoById(role),
+      kind: 'personal' as const,
     })),
   ),
 ];
@@ -108,6 +139,7 @@ describe('autorización directa del Backend (sin Frontend)', () => {
           isGlobal: true,
           load: [jwtConfig],
         }),
+        e2eTypeOrmModule,
         AuthModule,
         UsuariosModule,
         ContenidoPublicoModule,

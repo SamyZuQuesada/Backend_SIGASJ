@@ -19,8 +19,8 @@ export class AuthService {
 
     const payload: JwtPayload = {
       sub: 'demo-user-id',
-      email: email,
-      role: Role.ADMINISTRADORA,
+      email,
+      role: this.resolveDemoRole(email),
       name: 'Usuario Administrador',
     };
 
@@ -33,5 +33,20 @@ export class AuthService {
         name: payload.name,
       },
     };
+  }
+
+  /**
+   * Login demo: el rol sale del correo. El login de Abonado sigue como
+   * Administradora para no cambiar el contrato de las pruebas e2e actuales.
+   */
+  private resolveDemoRole(email: string): Role {
+    const normalized = email.trim().toLowerCase();
+    if (normalized.includes('secretaria')) {
+      return Role.SECRETARIA;
+    }
+    if (normalized.includes('fontanero')) {
+      return Role.FONTANERO;
+    }
+    return Role.ADMINISTRADORA;
   }
 }

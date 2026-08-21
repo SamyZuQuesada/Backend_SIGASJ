@@ -22,6 +22,8 @@ import { InventarioModule } from './modules/inventario/inventario.module';
 import { ActividadesFontaneroModule } from './modules/actividades-fontanero/actividades-fontanero.module';
 import { ProyectosModule } from './modules/proyectos/proyectos.module';
 import { RecibosModule } from './modules/recibos/recibos.module';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
 
 @Module({
   imports: [
@@ -49,8 +51,9 @@ import { RecibosModule } from './modules/recibos/recibos.module';
     RecibosModule,
   ],
 
-  controllers: [],
+  controllers: [AppController],
   providers: [
+    AppService,
     {
       provide: APP_FILTER,
       useClass: HttpExceptionFilter,

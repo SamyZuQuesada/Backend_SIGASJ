@@ -5,6 +5,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { Role } from '../src/common/enums/role.enum';
 import jwtConfig from '../src/config/jwt.config';
+import { e2eTypeOrmModule } from './helpers/e2e-typeorm.module';
 import { AuthModule } from '../src/modules/auth/auth.module';
 import { ComunicadosModule } from '../src/modules/comunicados/comunicados.module';
 import { ContenidoPublicoModule } from '../src/modules/contenido-publico/contenido-publico.module';
@@ -43,6 +44,7 @@ describe('autorización con JWT vencido (e2e)', () => {
           isGlobal: true,
           load: [jwtConfig],
         }),
+        e2eTypeOrmModule,
         AuthModule,
         UsuariosModule,
         ContenidoPublicoModule,
