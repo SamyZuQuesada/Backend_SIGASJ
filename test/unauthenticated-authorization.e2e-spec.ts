@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import jwtConfig from '../src/config/jwt.config';
+import { e2eTypeOrmModule } from './helpers/e2e-typeorm.module';
 import { AuthModule } from '../src/modules/auth/auth.module';
 import { ComunicadosModule } from '../src/modules/comunicados/comunicados.module';
 import { ContenidoPublicoModule } from '../src/modules/contenido-publico/contenido-publico.module';
@@ -39,6 +40,7 @@ describe('autorización sin token (e2e)', () => {
           isGlobal: true,
           load: [jwtConfig],
         }),
+        e2eTypeOrmModule,
         AuthModule,
         UsuariosModule,
         ContenidoPublicoModule,
@@ -86,4 +88,28 @@ describe('autorización sin token (e2e)', () => {
       expect([401, 404]).toContain(response.status);
     },
   );
+
+  it.each([
+    ['post', '/api/v1/admin/comunicados'],
+    ['patch', '/api/v1/admin/comunicados/1'],
+    ['put', '/api/v1/admin/contacto'],
+    ['post', '/api/v1/admin/galeria'],
+    ['patch', '/api/v1/admin/galeria/1'],
+    ['delete', '/api/v1/admin/galeria/1'],
+  ] as const)(
+    'sin Authorization, %s %s responde 401',
+    async (method, endpoint) => {
+      const response = await request(app.getHttpServer())[method](endpoint);
+
+      expect(response.status).toBe(401);
+    },
+  );
+
+  it('mantiene públicas las consultas de landing', async () => {
+    await request(app.getHttpServer())
+      .get('/api/v1/public/comunicados')
+      .expect(200);
+    await request(app.getHttpServer()).get('/api/v1/public/galeria').expect(200);
+    await request(app.getHttpServer()).get('/api/v1/public/contacto').expect(200);
+  });
 });

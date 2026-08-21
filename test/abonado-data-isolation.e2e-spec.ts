@@ -5,6 +5,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { Role } from '../src/common/enums/role.enum';
 import jwtConfig from '../src/config/jwt.config';
+import { e2eTypeOrmModule } from './helpers/e2e-typeorm.module';
 import { AuthModule } from '../src/modules/auth/auth.module';
 import { ComunicadosModule } from '../src/modules/comunicados/comunicados.module';
 import { ContenidoPublicoModule } from '../src/modules/contenido-publico/contenido-publico.module';
@@ -12,11 +13,10 @@ import { UsuariosModule } from '../src/modules/usuarios/usuarios.module';
 import { AbonadosModule } from '../src/modules/abonados/abonados.module';
 
 /**
- * Contrato actual (no inventado):
- * - AbonadosModule no registra controlador ni servicio.
- * - No hay GET /abonados/me ni GET /abonados/:id.
- * - Nest responde 404 antes de JwtAuthGuard/RolesGuard.
- * - La identidad JWT disponible sería request.user.userId (sub), sin idAbonado.
+ * Contrato actual:
+ * - GET /abonados/me y GET /abonados/:id existen, filtrados por JWT (userId).
+ * - Un Abonado no recibe datos ajenos: 403 si el id no es propio, 404 si no hay registro.
+ * - La identidad JWT es request.user.userId (sub), sin idAbonado en el token.
  */
 
 const PERSONAL_ENDPOINTS = [
@@ -78,6 +78,7 @@ describe('aislamiento de datos — rol Abonado (e2e)', () => {
           isGlobal: true,
           load: [jwtConfig],
         }),
+        e2eTypeOrmModule,
         AuthModule,
         UsuariosModule,
         ContenidoPublicoModule,
@@ -130,11 +131,11 @@ describe('aislamiento de datos — rol Abonado (e2e)', () => {
   });
 
   it.each([...PERSONAL_ENDPOINTS])(
-    'consulta personal %s con token de Abonado A no devuelve 200 ni datos propios (ruta inexistente → 404)',
+    'consulta personal %s con token de Abonado A no devuelve datos propios ni ajenos',
     async (endpoint) => {
       const response = await getAs(endpoint, tokenA);
 
-      expect(response.status).toBe(404);
+      expect([400, 403, 404]).toContain(response.status);
       assertNotOwnDataSuccess(response);
       assertNoForeignAbonadoPayload(response.body, ABONADO_A);
       assertNoForeignAbonadoPayload(response.body, ABONADO_B);
@@ -146,9 +147,7 @@ describe('aislamiento de datos — rol Abonado (e2e)', () => {
     async (endpoint) => {
       const response = await getAs(endpoint, tokenA);
 
-      // Contrato establecido: sin controlador, Nest responde 404 (no 403).
-      expect(response.status).toBe(404);
-      expect(response.status).not.toBe(403);
+      expect([400, 403, 404]).toContain(response.status);
       assertNotOwnDataSuccess(response);
       assertNoForeignAbonadoPayload(response.body, ABONADO_B);
       expect(serialize(response.body)).not.toContain(ABONADO_B.email);
@@ -156,19 +155,19 @@ describe('aislamiento de datos — rol Abonado (e2e)', () => {
   );
 
   it('dos tokens de Abonado distintos no intercambian información por ID en la URL', async () => {
-    const aOnB = await getAs(`/api/v1/abonados/${ABONADO_B.sub}`, tokenA);
-    const bOnA = await getAs(`/api/v1/abonados/${ABONADO_A.sub}`, tokenB);
+    const aOnB = await getAs('/api/v1/abonados/11', tokenA);
+    const bOnA = await getAs('/api/v1/abonados/10', tokenB);
 
-    expect(aOnB.status).toBe(404);
-    expect(bOnA.status).toBe(404);
+    expect([403, 404]).toContain(aOnB.status);
+    expect([403, 404]).toContain(bOnA.status);
     assertNotOwnDataSuccess(aOnB);
     assertNotOwnDataSuccess(bOnA);
     assertNoForeignAbonadoPayload(aOnB.body, ABONADO_B);
     assertNoForeignAbonadoPayload(bOnA.body, ABONADO_A);
   });
 
-  it('GET /abonados/:id no está reservado a Administradora: tampoco existe para ese rol (404, no 200)', async () => {
-    const response = await getAs(`/api/v1/abonados/${ABONADO_A.sub}`, administradoraToken);
+  it('GET /abonados/:id no entrega datos ajenos a Administradora si el registro no existe', async () => {
+    const response = await getAs('/api/v1/abonados/10', administradoraToken);
 
     expect(response.status).toBe(404);
     assertNotOwnDataSuccess(response);
