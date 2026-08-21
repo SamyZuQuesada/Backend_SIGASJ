@@ -1,6 +1,8 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Put, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ContenidoPublicoService } from './contenido-publico.service';
+import { ContactoService } from './contacto.service';
+import { UpdateContactoDto } from './dto/update-contacto.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -11,6 +13,7 @@ import { Role } from '../../common/enums/role.enum';
 export class ContenidoPublicoController {
   constructor(
     private readonly contenidoPublicoService: ContenidoPublicoService,
+    private readonly contactoService: ContactoService,
   ) {}
 
   // ==================== ENDPOINTS PÚBLICOS ====================
@@ -26,13 +29,7 @@ export class ContenidoPublicoController {
     summary: 'Obtener información de contacto y ubicación (Público)',
   })
   getPublicContacto() {
-    return this.contenidoPublicoService.getContacto();
-  }
-
-  @Get('public/galeria')
-  @ApiOperation({ summary: 'Obtener galería de fotografías (Público)' })
-  getPublicGaleria() {
-    return this.contenidoPublicoService.getGaleria();
+    return this.contactoService.getContacto();
   }
 
   @Get('public/transparencia')
@@ -60,6 +57,15 @@ export class ContenidoPublicoController {
   @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
   @ApiOperation({ summary: 'Consultar datos de contacto para edición (Admin)' })
   getAdminContacto() {
-    return this.contenidoPublicoService.getContacto();
+    return this.contactoService.getContacto();
+  }
+
+  @Put('admin/contacto')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @ApiOperation({ summary: 'Actualizar datos de contacto y ubicación (Admin)' })
+  updateAdminContacto(@Body() dto: UpdateContactoDto) {
+    return this.contactoService.updateContacto(dto);
   }
 }

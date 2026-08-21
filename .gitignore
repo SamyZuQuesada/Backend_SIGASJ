@@ -21,3 +21,6 @@ npm-debug.log*
 
 # nest build
 tsconfig.build.tsbuildinfo
+
+# uploaded media (local dev)
+/uploads
