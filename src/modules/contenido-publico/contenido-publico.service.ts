@@ -7,14 +7,19 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
+  savePublicDocument,
   savePublicImage,
   type UploadedImageFile,
 } from '../../common/media/public-media';
+import { withDbRetry } from '../../common/persistence/with-db-retry';
 import { CreateGaleriaDto } from './dto/create-galeria.dto';
+import { CreateTransparenciaDto } from './dto/create-transparencia.dto';
 import { UpdateGaleriaDto } from './dto/update-galeria.dto';
+import { UpdateTransparenciaDto } from './dto/update-transparencia.dto';
 import { UpdateContactoDto } from './dto/update-contacto.dto';
 import { ContactoUbicacion } from './entities/contacto-ubicacion.entity';
 import { GaleriaFoto } from './entities/galeria-foto.entity';
+import { TransparenciaDocumento } from './entities/transparencia-documento.entity';
 
 export type ContactoRecord = {
   telefono: string;
@@ -34,6 +39,16 @@ export type GaleriaFotoRecord = {
   descripcion: string | null;
   url: string;
   textoAlternativo: string;
+  ordenVisualizacion: number;
+  activa: boolean;
+};
+
+export type TransparenciaRecord = {
+  id: number;
+  nombre: string;
+  descripcionBreve: string;
+  archivoUrl: string;
+  tipoArchivo: string;
   ordenVisualizacion: number;
   activa: boolean;
 };
@@ -60,20 +75,36 @@ const INFORMACION_SEED = {
   historia: 'Servicio de gestión de agua para la comunidad de San Juan.',
 };
 
-const TRANSPARENCIA_SEED = [
-  {
-    id: 1,
-    titulo: 'Informe Anual de Gestión',
-    ano: 2025,
-    documentoUrl: '/docs/informe-2025.pdf',
-  },
-  {
-    id: 2,
-    titulo: 'Reglamento de Prestación de Servicios',
-    ano: 2024,
-    documentoUrl: '/docs/reglamento.pdf',
-  },
-];
+const inferTipoArchivo = (
+  file?: UploadedImageFile,
+  fallback = 'pdf',
+): string => {
+  if (file?.mimetype === 'application/pdf') {
+    return 'pdf';
+  }
+  if (file?.mimetype === 'image/png') {
+    return 'png';
+  }
+  if (file?.originalname?.toLowerCase().endsWith('.jpeg')) {
+    return 'jpeg';
+  }
+  if (file?.mimetype === 'image/jpeg') {
+    return 'jpg';
+  }
+  return fallback;
+};
+
+const isActiveFlag = (value: unknown): boolean => {
+  if (value === false || value === 0 || value === '0' || value === 'false') {
+    return false;
+  }
+
+  if (typeof Buffer !== 'undefined' && Buffer.isBuffer(value)) {
+    return value.length > 0 && value[0] === 1;
+  }
+
+  return value === true || value === 1 || value === '1' || value === 'true';
+};
 
 const emptyToNull = (value?: string | null) => {
   if (value === undefined) {
@@ -91,7 +122,19 @@ const toGaleriaRecord = (foto: GaleriaFoto): GaleriaFotoRecord => ({
   url: foto.url,
   textoAlternativo: foto.textoAlternativo,
   ordenVisualizacion: foto.ordenVisualizacion,
-  activa: Boolean(foto.activa),
+  activa: isActiveFlag(foto.activa),
+});
+
+const toTransparenciaRecord = (
+  row: TransparenciaDocumento,
+): TransparenciaRecord => ({
+  id: row.id,
+  nombre: row.nombre,
+  descripcionBreve: row.descripcionBreve,
+  archivoUrl: row.archivoUrl,
+  tipoArchivo: row.tipoArchivo,
+  ordenVisualizacion: row.ordenVisualizacion,
+  activa: isActiveFlag(row.activa),
 });
 
 const toContactoRecord = (row: ContactoUbicacion): ContactoRecord => ({
@@ -113,9 +156,12 @@ export class ContenidoPublicoService implements OnModuleInit {
     private readonly contactoRepo: Repository<ContactoUbicacion>,
     @InjectRepository(GaleriaFoto)
     private readonly galeriaRepo: Repository<GaleriaFoto>,
+    @InjectRepository(TransparenciaDocumento)
+    private readonly transparenciaRepo: Repository<TransparenciaDocumento>,
   ) {}
 
   async onModuleInit() {
+    await withDbRetry(async () => {
     const contacto = await this.contactoRepo.findOne({ where: { id: 1 } });
     if (!contacto) {
       await this.contactoRepo.save(
@@ -147,6 +193,7 @@ export class ContenidoPublicoService implements OnModuleInit {
         }),
       ]);
     }
+    });
   }
 
   getInformacionInstitucional() {
@@ -154,11 +201,14 @@ export class ContenidoPublicoService implements OnModuleInit {
   }
 
   async getContacto() {
+    return withDbRetry(async () => {
     const row = await this.contactoRepo.findOne({ where: { id: 1 } });
     return row ? toContactoRecord(row) : CONTACTO_SEED;
+    });
   }
 
   async updateContacto(dto: UpdateContactoDto) {
+    return withDbRetry(async () => {
     const current =
       (await this.contactoRepo.findOne({ where: { id: 1 } })) ??
       this.contactoRepo.create({ id: 1, ...CONTACTO_SEED });
@@ -178,21 +228,27 @@ export class ContenidoPublicoService implements OnModuleInit {
     if (dto.zoomMapa !== undefined) current.zoomMapa = dto.zoomMapa;
 
     return toContactoRecord(await this.contactoRepo.save(current));
+    });
   }
 
   async getGaleria() {
+    return withDbRetry(async () => {
     const items = await this.galeriaRepo.find({
-      where: { activa: true },
       order: { ordenVisualizacion: 'ASC' },
     });
-    return items.map(toGaleriaRecord);
+    return items
+      .filter((item) => isActiveFlag(item.activa))
+      .map(toGaleriaRecord);
+    });
   }
 
   async getGaleriaAdmin() {
+    return withDbRetry(async () => {
     const items = await this.galeriaRepo.find({
       order: { ordenVisualizacion: 'ASC' },
     });
     return items.map(toGaleriaRecord);
+    });
   }
 
   async createGaleria(dto: CreateGaleriaDto, file?: UploadedImageFile) {
@@ -203,6 +259,7 @@ export class ContenidoPublicoService implements OnModuleInit {
       );
     }
 
+    return withDbRetry(async () => {
     const count = await this.galeriaRepo.count();
     const saved = await this.galeriaRepo.save(
       this.galeriaRepo.create({
@@ -219,9 +276,11 @@ export class ContenidoPublicoService implements OnModuleInit {
     );
 
     return toGaleriaRecord(saved);
+    });
   }
 
   async updateGaleria(id: number, dto: UpdateGaleriaDto, file?: UploadedImageFile) {
+    return withDbRetry(async () => {
     const current = await this.galeriaRepo.findOne({ where: { id } });
     if (!current) {
       throw new NotFoundException(`Fotografía con ID ${id} no encontrada`);
@@ -248,9 +307,11 @@ export class ContenidoPublicoService implements OnModuleInit {
       : dto.url?.trim() || current.url;
 
     return toGaleriaRecord(await this.galeriaRepo.save(current));
+    });
   }
 
   async removeGaleria(id: number) {
+    return withDbRetry(async () => {
     const current = await this.galeriaRepo.findOne({ where: { id } });
     if (!current) {
       throw new NotFoundException(`Fotografía con ID ${id} no encontrada`);
@@ -258,9 +319,129 @@ export class ContenidoPublicoService implements OnModuleInit {
 
     await this.galeriaRepo.remove(current);
     return { deleted: true };
+    });
   }
 
-  getTransparencia() {
-    return TRANSPARENCIA_SEED;
+  async setGaleriaActiva(id: number, activa: boolean) {
+    return withDbRetry(async () => {
+      const current = await this.galeriaRepo.findOne({ where: { id } });
+      if (!current) {
+        throw new NotFoundException(`Fotografía con ID ${id} no encontrada`);
+      }
+
+      current.activa = activa;
+      return toGaleriaRecord(await this.galeriaRepo.save(current));
+    });
+  }
+
+  async getTransparencia() {
+    return withDbRetry(async () => {
+      const items = await this.transparenciaRepo.find({
+        order: { ordenVisualizacion: 'ASC' },
+      });
+      return items
+        .filter((item) => isActiveFlag(item.activa))
+        .map(toTransparenciaRecord);
+    });
+  }
+
+  async getTransparenciaAdmin() {
+    return withDbRetry(async () => {
+      const items = await this.transparenciaRepo.find({
+        order: { ordenVisualizacion: 'ASC' },
+      });
+      return items.map(toTransparenciaRecord);
+    });
+  }
+
+  async createTransparencia(
+    dto: CreateTransparenciaDto,
+    file?: UploadedImageFile,
+  ) {
+    const archivoUrl = file
+      ? savePublicDocument('transparencia', file)
+      : dto.archivoUrl?.trim();
+    if (!archivoUrl) {
+      throw new BadRequestException(
+        'Debe adjuntar un archivo o indicar su URL.',
+      );
+    }
+
+    return withDbRetry(async () => {
+      const count = await this.transparenciaRepo.count();
+      const saved = await this.transparenciaRepo.save(
+        this.transparenciaRepo.create({
+          nombre: dto.nombre.trim(),
+          descripcionBreve: dto.descripcionBreve?.trim() || '',
+          archivoUrl,
+          tipoArchivo: dto.tipoArchivo || inferTipoArchivo(file),
+          ordenVisualizacion: dto.ordenVisualizacion ?? count,
+          activa: dto.activa !== false,
+        }),
+      );
+
+      return toTransparenciaRecord(saved);
+    });
+  }
+
+  async updateTransparencia(
+    id: number,
+    dto: UpdateTransparenciaDto,
+    file?: UploadedImageFile,
+  ) {
+    return withDbRetry(async () => {
+      const current = await this.transparenciaRepo.findOne({ where: { id } });
+      if (!current) {
+        throw new NotFoundException(`Publicación con ID ${id} no encontrada`);
+      }
+
+      if (dto.nombre !== undefined) {
+        current.nombre = dto.nombre.trim() || current.nombre;
+      }
+      if (dto.descripcionBreve !== undefined) {
+        current.descripcionBreve = dto.descripcionBreve.trim();
+      }
+      if (dto.ordenVisualizacion !== undefined) {
+        current.ordenVisualizacion = dto.ordenVisualizacion;
+      }
+      if (dto.activa !== undefined) {
+        current.activa = dto.activa;
+      }
+      if (file) {
+        current.archivoUrl = savePublicDocument('transparencia', file);
+        current.tipoArchivo = inferTipoArchivo(file, current.tipoArchivo);
+      } else if (dto.archivoUrl !== undefined) {
+        current.archivoUrl = dto.archivoUrl.trim() || current.archivoUrl;
+      }
+      if (dto.tipoArchivo !== undefined && !file) {
+        current.tipoArchivo = dto.tipoArchivo;
+      }
+
+      return toTransparenciaRecord(await this.transparenciaRepo.save(current));
+    });
+  }
+
+  async removeTransparencia(id: number) {
+    return withDbRetry(async () => {
+      const current = await this.transparenciaRepo.findOne({ where: { id } });
+      if (!current) {
+        throw new NotFoundException(`Publicación con ID ${id} no encontrada`);
+      }
+
+      await this.transparenciaRepo.remove(current);
+      return { deleted: true };
+    });
+  }
+
+  async setTransparenciaActiva(id: number, activa: boolean) {
+    return withDbRetry(async () => {
+      const current = await this.transparenciaRepo.findOne({ where: { id } });
+      if (!current) {
+        throw new NotFoundException(`Publicación con ID ${id} no encontrada`);
+      }
+
+      current.activa = activa;
+      return toTransparenciaRecord(await this.transparenciaRepo.save(current));
+    });
   }
 }

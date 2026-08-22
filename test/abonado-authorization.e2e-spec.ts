@@ -17,6 +17,7 @@ const ADMIN_ENDPOINTS = [
   '/api/v1/admin/informacion',
   '/api/v1/admin/contacto',
   '/api/v1/admin/comunicados',
+  '/api/v1/admin/transparencia',
 ] as const;
 
 

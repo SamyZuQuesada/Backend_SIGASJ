@@ -4,6 +4,21 @@ import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 
 const nodeRequire = createRequire(__filename);
 
+const mssqlPool = {
+  max: 8,
+  min: 0,
+  idleTimeoutMillis: 10_000,
+  acquireTimeoutMillis: 30_000,
+};
+
+const mssqlOptions = {
+  encrypt: false,
+  trustServerCertificate: true,
+  enableArithAbort: true,
+  connectTimeout: 30_000,
+  requestTimeout: 30_000,
+};
+
 export default registerAs('database', (): TypeOrmModuleOptions => {
   const dbType =
     (process.env.DB_TYPE as 'postgres' | 'mysql' | 'mariadb' | 'mssql') ||
@@ -24,6 +39,8 @@ export default registerAs('database', (): TypeOrmModuleOptions => {
     migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
     migrationsRun: false,
     logging: process.env.NODE_ENV === 'development',
+    retryAttempts: 8,
+    retryDelay: 2000,
   };
 
   if (isLocalDb) {
@@ -31,12 +48,13 @@ export default registerAs('database', (): TypeOrmModuleOptions => {
       ...base,
       driver: nodeRequire('mssql/msnodesqlv8'),
       extra: {
-        connectionString: `Driver={ODBC Driver 17 for SQL Server};Server=${host};Database=${database};Trusted_Connection=yes;TrustServerCertificate=yes;`,
+        connectionString: `Driver={ODBC Driver 17 for SQL Server};Server=${host};Database=${database};Trusted_Connection=yes;TrustServerCertificate=yes;Connection Timeout=30;Pooling=yes;Max Pool Size=8;Min Pool Size=0;`,
+        pool: mssqlPool,
+        options: mssqlOptions,
+        connectionTimeout: 30_000,
+        requestTimeout: 30_000,
       },
-      options: {
-        encrypt: false,
-        trustServerCertificate: true,
-      },
+      options: mssqlOptions,
     };
   }
 
@@ -45,9 +63,14 @@ export default registerAs('database', (): TypeOrmModuleOptions => {
     port: parseInt(process.env.DB_PORT || String(defaultPort), 10),
     username: process.env.DB_USERNAME || 'postgres',
     password: process.env.DB_PASSWORD || 'postgres',
-    options:
+    extra:
       dbType === 'mssql'
-        ? { encrypt: false, trustServerCertificate: true }
+        ? {
+            pool: mssqlPool,
+            connectionTimeout: 30_000,
+            requestTimeout: 30_000,
+          }
         : undefined,
+    options: dbType === 'mssql' ? mssqlOptions : undefined,
   };
 });
