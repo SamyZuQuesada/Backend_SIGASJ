@@ -13,6 +13,7 @@ import { AbonadosModule } from '../src/modules/abonados/abonados.module';
 const ADMIN_ENDPOINTS = [
   '/api/v1/usuarios',
   '/api/v1/admin/informacion',
+  '/api/v1/admin/transparencia',
 ] as const;
 
 const PERSONAL_ABONADO_ENDPOINTS = [
@@ -92,9 +93,16 @@ describe('autorización sin token (e2e)', () => {
   it.each([
     ['post', '/api/v1/admin/comunicados'],
     ['patch', '/api/v1/admin/comunicados/1'],
+    ['patch', '/api/v1/admin/comunicados/1/estado'],
+    ['delete', '/api/v1/admin/comunicados/1'],
     ['put', '/api/v1/admin/contacto'],
     ['post', '/api/v1/admin/galeria'],
     ['patch', '/api/v1/admin/galeria/1'],
+    ['patch', '/api/v1/admin/galeria/1/estado'],
+    ['post', '/api/v1/admin/transparencia'],
+    ['patch', '/api/v1/admin/transparencia/1'],
+    ['patch', '/api/v1/admin/transparencia/1/estado'],
+    ['delete', '/api/v1/admin/transparencia/1'],
     ['delete', '/api/v1/admin/galeria/1'],
   ] as const)(
     'sin Authorization, %s %s responde 401',
@@ -111,5 +119,8 @@ describe('autorización sin token (e2e)', () => {
       .expect(200);
     await request(app.getHttpServer()).get('/api/v1/public/galeria').expect(200);
     await request(app.getHttpServer()).get('/api/v1/public/contacto').expect(200);
+    await request(app.getHttpServer())
+      .get('/api/v1/public/transparencia')
+      .expect(200);
   });
 });

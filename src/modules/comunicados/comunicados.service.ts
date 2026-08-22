@@ -11,6 +11,7 @@ import {
   savePublicImage,
   type UploadedImageFile,
 } from '../../common/media/public-media';
+import { withDbRetry } from '../../common/persistence/with-db-retry';
 import { CreateComunicadoDto } from './dto/create-comunicado.dto';
 import { UpdateComunicadoDto } from './dto/update-comunicado.dto';
 import { Comunicado } from './entities/comunicado.entity';
@@ -27,6 +28,18 @@ export type ComunicadoRecord = {
   fechaPublicacion: string;
   fechaExpiracion: string | null;
   imagenUrl: string | null;
+};
+
+const isPublicFlag = (value: unknown): boolean => {
+  if (value === false || value === 0 || value === '0' || value === 'false') {
+    return false;
+  }
+
+  if (typeof Buffer !== 'undefined' && Buffer.isBuffer(value)) {
+    return value.length > 0 && value[0] === 1;
+  }
+
+  return value !== false;
 };
 
 const emptyToNull = (value?: string | null) => {
@@ -64,7 +77,7 @@ const toRecord = (entity: Comunicado): ComunicadoRecord => ({
   tipo: entity.tipo,
   prioridad: entity.prioridad,
   estado: entity.estado === 'Inactivo' ? 'Inactivo' : 'Activo',
-  esPublico: Boolean(entity.esPublico),
+  esPublico: isPublicFlag(entity.esPublico),
   fechaPublicacion: toIso(entity.fechaPublicacion) ?? new Date().toISOString(),
   fechaExpiracion: toIso(entity.fechaExpiracion),
   imagenUrl: entity.imagenUrl,
@@ -78,52 +91,36 @@ export class ComunicadosService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    const count = await this.comunicados.count();
-    if (count > 0) {
-      return;
-    }
+    await withDbRetry(async () => {
+      const demoTitles = new Set([
+        'Mantenimiento Programado de Red de Agua',
+        'Asamblea General Ordinaria de Abonados',
+      ]);
 
-    await this.comunicados.save([
-      this.comunicados.create({
-        id: '1',
-        titulo: 'Mantenimiento Programado de Red de Agua',
-        descripcion:
-          'Se realizará suspensión temporal del servicio por reparaciones en el sector principal.',
-        contenido:
-          'Se realizará suspensión temporal del servicio por reparaciones en el sector principal. El restablecimiento se comunicará al finalizar los trabajos.',
-        tipo: 'Mantenimiento',
-        prioridad: 'Alta',
-        estado: 'Activo',
-        esPublico: true,
-        fechaPublicacion: new Date(),
-        fechaExpiracion: null,
-        imagenUrl: null,
-      }),
-      this.comunicados.create({
-        id: '2',
-        titulo: 'Asamblea General Ordinaria de Abonados',
-        descripcion:
-          'Invitación a todos los abonados a la asamblea anual de la ASADA San Juan.',
-        contenido:
-          'Invitación a todos los abonados a la asamblea anual de la ASADA San Juan.',
-        tipo: 'Informativo',
-        prioridad: 'Media',
-        estado: 'Activo',
-        esPublico: true,
-        fechaPublicacion: new Date(),
-        fechaExpiracion: null,
-        imagenUrl: null,
-      }),
-    ]);
+      const demos = (await this.comunicados.find()).filter((item) =>
+        demoTitles.has(item.titulo),
+      );
+
+      for (const demo of demos) {
+        if (demo.estado !== 'Inactivo') {
+          demo.estado = 'Inactivo';
+          await this.comunicados.save(demo);
+        }
+      }
+    });
   }
 
   async findPublicos() {
+    return withDbRetry(async () => {
     const now = Date.now();
     const items = await this.comunicados.find();
 
     return items
       .filter((comunicado) => {
-        if (comunicado.estado !== 'Activo' || !comunicado.esPublico) {
+        if (
+          String(comunicado.estado ?? '').trim() !== 'Activo' ||
+          !isPublicFlag(comunicado.esPublico)
+        ) {
           return false;
         }
 
@@ -137,25 +134,36 @@ export class ComunicadosService implements OnModuleInit {
 
         return true;
       })
-      .map(toRecord);
+      .map(toRecord)
+      .sort((left, right) => {
+        const rightTime = Date.parse(right.fechaPublicacion) || 0;
+        const leftTime = Date.parse(left.fechaPublicacion) || 0;
+        return rightTime - leftTime;
+      });
+    });
   }
 
   async findAllAdmin() {
+    return withDbRetry(async () => {
     const items = await this.comunicados.find({
       order: { fechaPublicacion: 'DESC' },
     });
     return items.map(toRecord);
+    });
   }
 
   async findOne(id: string) {
+    return withDbRetry(async () => {
     const comunicado = await this.comunicados.findOne({ where: { id } });
     if (!comunicado) {
       throw new NotFoundException(`Comunicado con ID ${id} no encontrado`);
     }
     return toRecord(comunicado);
+    });
   }
 
   async create(dto: CreateComunicadoDto, file?: UploadedImageFile) {
+    return withDbRetry(async () => {
     const imagenUrl = file
       ? savePublicImage('comunicados', file)
       : (emptyToNull(dto.imagenUrl) ?? null);
@@ -169,7 +177,7 @@ export class ComunicadosService implements OnModuleInit {
         tipo: dto.tipo?.trim() || 'Informativo',
         prioridad: dto.prioridad || 'Media',
         estado: dto.estado === 'Inactivo' ? 'Inactivo' : 'Activo',
-        esPublico: dto.esPublico !== false,
+        esPublico: isPublicFlag(dto.esPublico),
         fechaPublicacion: toDate(dto.fechaPublicacion) ?? new Date(),
         fechaExpiracion: toDate(dto.fechaExpiracion ?? null),
         imagenUrl,
@@ -177,9 +185,11 @@ export class ComunicadosService implements OnModuleInit {
     );
 
     return toRecord(saved);
+    });
   }
 
   async update(id: string, dto: UpdateComunicadoDto, file?: UploadedImageFile) {
+    return withDbRetry(async () => {
     const current = await this.comunicados.findOne({ where: { id } });
     if (!current) {
       throw new NotFoundException(`Comunicado con ID ${id} no encontrado`);
@@ -199,7 +209,9 @@ export class ComunicadosService implements OnModuleInit {
         ? dto.estado
         : current.estado;
     current.esPublico =
-      dto.esPublico !== undefined ? dto.esPublico : current.esPublico;
+      dto.esPublico !== undefined
+        ? isPublicFlag(dto.esPublico)
+        : current.esPublico;
     current.fechaPublicacion =
       toDate(dto.fechaPublicacion) ?? current.fechaPublicacion;
     current.fechaExpiracion =
@@ -213,6 +225,7 @@ export class ComunicadosService implements OnModuleInit {
         : current.imagenUrl;
 
     return toRecord(await this.comunicados.save(current));
+    });
   }
 
   async setEstado(id: string, estado: 'Activo' | 'Inactivo') {
@@ -220,6 +233,26 @@ export class ComunicadosService implements OnModuleInit {
       throw new BadRequestException('El estado debe ser Activo o Inactivo');
     }
 
-    return this.update(id, { estado });
+    return withDbRetry(async () => {
+      const current = await this.comunicados.findOne({ where: { id } });
+      if (!current) {
+        throw new NotFoundException(`Comunicado con ID ${id} no encontrado`);
+      }
+
+      current.estado = estado;
+      return toRecord(await this.comunicados.save(current));
+    });
+  }
+
+  async remove(id: string) {
+    return withDbRetry(async () => {
+      const current = await this.comunicados.findOne({ where: { id } });
+      if (!current) {
+        throw new NotFoundException(`Comunicado con ID ${id} no encontrado`);
+      }
+
+      await this.comunicados.remove(current);
+      return { deleted: true };
+    });
   }
 }

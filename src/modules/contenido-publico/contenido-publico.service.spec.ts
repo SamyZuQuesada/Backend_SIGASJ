@@ -3,6 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { ContenidoPublicoService } from './contenido-publico.service';
 import { ContactoUbicacion } from './entities/contacto-ubicacion.entity';
 import { GaleriaFoto } from './entities/galeria-foto.entity';
+import { TransparenciaDocumento } from './entities/transparencia-documento.entity';
 
 const createContactoRepo = () => {
   const items: ContactoUbicacion[] = [];
@@ -70,6 +71,56 @@ const createGaleriaRepo = () => {
   };
 };
 
+const createTransparenciaRepo = () => {
+  const items: TransparenciaDocumento[] = [];
+  let nextId = 1;
+
+  return {
+    count: jest.fn(async () => items.length),
+    find: jest.fn(async (opts?: { where?: { activa?: boolean } }) => {
+      const filtered =
+        opts?.where?.activa === true
+          ? items.filter((item) => item.activa)
+          : [...items];
+      return filtered.sort(
+        (left, right) => left.ordenVisualizacion - right.ordenVisualizacion,
+      );
+    }),
+    findOne: jest.fn(async ({ where: { id } }: { where: { id: number } }) =>
+      items.find((item) => item.id === id),
+    ),
+    create: jest.fn(
+      (data: Partial<TransparenciaDocumento>) =>
+        ({ ...data }) as TransparenciaDocumento,
+    ),
+    save: jest.fn(
+      async (entity: TransparenciaDocumento | TransparenciaDocumento[]) => {
+        const list = Array.isArray(entity) ? entity : [entity];
+        for (const row of list) {
+          if (!row.id) {
+            row.id = nextId;
+            nextId += 1;
+          }
+          const index = items.findIndex((item) => item.id === row.id);
+          if (index >= 0) {
+            items[index] = row;
+          } else {
+            items.push(row);
+          }
+        }
+        return Array.isArray(entity) ? list : list[0];
+      },
+    ),
+    remove: jest.fn(async (entity: TransparenciaDocumento) => {
+      const index = items.findIndex((item) => item.id === entity.id);
+      if (index >= 0) {
+        items.splice(index, 1);
+      }
+      return entity;
+    }),
+  };
+};
+
 describe('ContenidoPublicoService', () => {
   let service: ContenidoPublicoService;
 
@@ -84,6 +135,10 @@ describe('ContenidoPublicoService', () => {
         {
           provide: getRepositoryToken(GaleriaFoto),
           useValue: createGaleriaRepo(),
+        },
+        {
+          provide: getRepositoryToken(TransparenciaDocumento),
+          useValue: createTransparenciaRepo(),
         },
       ],
     }).compile();
@@ -116,7 +171,7 @@ describe('ContenidoPublicoService', () => {
       true,
     );
 
-    await service.updateGaleria(created.id, { activa: false });
+    await service.setGaleriaActiva(created.id, false);
     expect((await service.getGaleria()).some((item) => item.id === created.id)).toBe(
       false,
     );
@@ -126,9 +181,37 @@ describe('ContenidoPublicoService', () => {
       ),
     ).toBe(true);
 
+    await service.setGaleriaActiva(created.id, true);
+    expect((await service.getGaleria()).some((item) => item.id === created.id)).toBe(
+      true,
+    );
+
     await service.removeGaleria(created.id);
     expect(
       (await service.getGaleriaAdmin()).some((item) => item.id === created.id),
     ).toBe(false);
+  });
+
+  it('crea, desactiva y oculta publicaciones de transparencia', async () => {
+    const created = await service.createTransparencia({
+      nombre: 'Informe de calidad del agua',
+      descripcionBreve: 'Resultados del último muestreo',
+      archivoUrl: '/api/v1/public/media/transparencia/informe.jpg',
+      tipoArchivo: 'jpg',
+    });
+
+    expect(
+      (await service.getTransparencia()).some((item) => item.id === created.id),
+    ).toBe(true);
+
+    await service.setTransparenciaActiva(created.id, false);
+    expect(
+      (await service.getTransparencia()).some((item) => item.id === created.id),
+    ).toBe(false);
+    expect(
+      (await service.getTransparenciaAdmin()).some(
+        (item) => item.id === created.id && !item.activa,
+      ),
+    ).toBe(true);
   });
 });
