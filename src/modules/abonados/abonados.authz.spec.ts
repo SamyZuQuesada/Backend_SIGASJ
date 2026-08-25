@@ -25,7 +25,7 @@ describe('Gestión de Abonados — pruebas de autenticación y autorización', (
   const abonado10 = { idAbonado: 10, idUsuario: 10 };
   const abonado11 = { idAbonado: 11, idUsuario: 11 };
 
-  const signAs = (role: Role, sub: string, expiresIn?: string | number) => {
+  const signAs = (role: Role, sub: string, expiresIn?: number) => {
     const payload: JwtPayload = {
       sub,
       email: 'usuario@asadasanjuan.cr',
@@ -53,11 +53,11 @@ describe('Gestión de Abonados — pruebas de autenticación y autorización', (
         RolesGuard,
         {
           provide: getRepositoryToken(Abonado),
-          useValue: { findOne, exist: jest.fn() },
+          useValue: { findOne, exists: jest.fn() },
         },
         {
           provide: getRepositoryToken(Servicio),
-          useValue: { exist: jest.fn() },
+          useValue: { exists: jest.fn() },
         },
         {
           provide: getRepositoryToken(SolicitudServicio),

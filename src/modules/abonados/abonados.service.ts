@@ -150,9 +150,9 @@ export class AbonadosService {
     const medidor = dto.servicio.medidor.trim();
 
     const [cedulaExistente, nisExistente, medidorExistente] = await Promise.all([
-      this.abonadoRepository.exist({ where: { cedula } }),
-      this.servicioRepository.exist({ where: { nis } }),
-      this.servicioRepository.exist({ where: { medidor } }),
+      this.abonadoRepository.exists({ where: { cedula } }),
+      this.servicioRepository.exists({ where: { nis } }),
+      this.servicioRepository.exists({ where: { medidor } }),
     ]);
 
     if (cedulaExistente) {

@@ -83,11 +83,11 @@ describe('Tarea #684 — proceso de registro de nuevos abonados', () => {
           AbonadosService,
           {
             provide: getRepositoryToken(Abonado),
-            useValue: { findOne: jest.fn(), exist: abonadoExist },
+            useValue: { findOne: jest.fn(), exists: abonadoExist },
           },
           {
             provide: getRepositoryToken(Servicio),
-            useValue: { exist: servicioExist },
+            useValue: { exists: servicioExist },
           },
           {
             provide: getRepositoryToken(SolicitudServicio),

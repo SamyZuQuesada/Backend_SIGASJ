@@ -46,11 +46,11 @@ describe('AbonadosService — IDOR / propiedad', () => {
         AbonadosService,
         {
           provide: getRepositoryToken(Abonado),
-          useValue: { findOne, exist: jest.fn() },
+          useValue: { findOne, exists: jest.fn() },
         },
         {
           provide: getRepositoryToken(Servicio),
-          useValue: { exist: jest.fn() },
+          useValue: { exists: jest.fn() },
         },
         {
           provide: getRepositoryToken(SolicitudServicio),
