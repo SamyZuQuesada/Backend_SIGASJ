@@ -1,10 +1,13 @@
 import { Module } from '@nestjs/common';
+import { APP_FILTER } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 import environmentConfig from './config/environment.config';
 import databaseConfig from './config/database.config';
 import jwtConfig from './config/jwt.config';
+import acueductosCrConfig from './config/acueductos-cr.config';
 
 import { AuthModule } from './modules/auth/auth.module';
 import { UsuariosModule } from './modules/usuarios/usuarios.module';
@@ -18,12 +21,15 @@ import { ConsumosModule } from './modules/consumos/consumos.module';
 import { InventarioModule } from './modules/inventario/inventario.module';
 import { ActividadesFontaneroModule } from './modules/actividades-fontanero/actividades-fontanero.module';
 import { ProyectosModule } from './modules/proyectos/proyectos.module';
+import { RecibosModule } from './modules/recibos/recibos.module';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [environmentConfig, databaseConfig, jwtConfig],
+      load: [environmentConfig, databaseConfig, jwtConfig, acueductosCrConfig],
     }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
@@ -42,9 +48,16 @@ import { ProyectosModule } from './modules/proyectos/proyectos.module';
     InventarioModule,
     ActividadesFontaneroModule,
     ProyectosModule,
+    RecibosModule,
   ],
 
-  controllers: [],
-  providers: [],
+  controllers: [AppController],
+  providers: [
+    AppService,
+    {
+      provide: APP_FILTER,
+      useClass: HttpExceptionFilter,
+    },
+  ],
 })
 export class AppModule {}

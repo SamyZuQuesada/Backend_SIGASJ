@@ -1,8 +1,19 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { ContenidoPublicoService } from './contenido-publico.service';
 import { ContenidoPublicoController } from './contenido-publico.controller';
+import { ContactoUbicacion } from './entities/contacto-ubicacion.entity';
+import { GaleriaFoto } from './entities/galeria-foto.entity';
+import { TransparenciaDocumento } from './entities/transparencia-documento.entity';
 
 @Module({
+  imports: [
+    TypeOrmModule.forFeature([
+      ContactoUbicacion,
+      GaleriaFoto,
+      TransparenciaDocumento,
+    ]),
+  ],
   controllers: [ContenidoPublicoController],
   providers: [ContenidoPublicoService],
   exports: [ContenidoPublicoService],
