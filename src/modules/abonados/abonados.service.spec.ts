@@ -1,10 +1,13 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import { Role } from '../../common/enums/role.enum';
 import { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { AbonadosService } from './abonados.service';
 import { Abonado } from './entities/abonado.entity';
+import { SolicitudServicio } from '../solicitudes/entities/solicitud-servicio.entity';
+import { Servicio } from '../servicios/entities/servicio.entity';
 
 describe('AbonadosService — IDOR / propiedad', () => {
   let service: AbonadosService;
@@ -43,7 +46,19 @@ describe('AbonadosService — IDOR / propiedad', () => {
         AbonadosService,
         {
           provide: getRepositoryToken(Abonado),
-          useValue: { findOne },
+          useValue: { findOne, exist: jest.fn() },
+        },
+        {
+          provide: getRepositoryToken(Servicio),
+          useValue: { exist: jest.fn() },
+        },
+        {
+          provide: getRepositoryToken(SolicitudServicio),
+          useValue: { findOne: jest.fn() },
+        },
+        {
+          provide: DataSource,
+          useValue: { transaction: jest.fn() },
         },
       ],
     }).compile();

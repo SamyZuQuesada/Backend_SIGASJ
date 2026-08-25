@@ -3,16 +3,19 @@ import { ConfigModule } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import request from 'supertest';
-import { App } from 'supertest/types';
+import { DataSource } from 'typeorm';
 import { Role } from '../../common/enums/role.enum';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import jwtConfig from '../../config/jwt.config';
 import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
 import { AuthModule } from '../auth/auth.module';
+import { SolicitudServicio } from '../solicitudes/entities/solicitud-servicio.entity';
+import { Servicio } from '../servicios/entities/servicio.entity';
 import { AbonadosController } from './abonados.controller';
 import { AbonadosService } from './abonados.service';
 import { Abonado } from './entities/abonado.entity';
+import request from 'supertest';
+import { App } from 'supertest/types';
 
 describe('Gestión de Abonados — pruebas de autenticación y autorización', () => {
   let app: INestApplication<App>;
@@ -50,7 +53,19 @@ describe('Gestión de Abonados — pruebas de autenticación y autorización', (
         RolesGuard,
         {
           provide: getRepositoryToken(Abonado),
-          useValue: { findOne },
+          useValue: { findOne, exist: jest.fn() },
+        },
+        {
+          provide: getRepositoryToken(Servicio),
+          useValue: { exist: jest.fn() },
+        },
+        {
+          provide: getRepositoryToken(SolicitudServicio),
+          useValue: { findOne: jest.fn() },
+        },
+        {
+          provide: DataSource,
+          useValue: { transaction: jest.fn() },
         },
       ],
     }).compile();
@@ -163,7 +178,7 @@ describe('Gestión de Abonados — pruebas de autenticación y autorización', (
   });
 
   describe('Prueba 8 — Abonado intenta operación administrativa', () => {
-    it('POST/PATCH administrativos no implementados; Abonado no crea ni edita el padrón', async () => {
+    it('Abonado recibe 403 al intentar registrar abonados', async () => {
       const token = signAs(Role.ABONADO, '10');
 
       const post = await request(app.getHttpServer())
@@ -176,7 +191,7 @@ describe('Gestión de Abonados — pruebas de autenticación y autorización', (
         .set('Authorization', `Bearer ${token}`)
         .send({ idUsuario: 11 });
 
-      expect(post.status).toBeGreaterThanOrEqual(400);
+      expect(post.status).toBe(403);
       expect(patch.status).toBeGreaterThanOrEqual(400);
       expect(findOne).not.toHaveBeenCalled();
     });
@@ -194,17 +209,23 @@ describe('Gestión de Abonados — pruebas de autenticación y autorización', (
   });
 
   describe('Prueba 10 — Otro rol', () => {
-    it.each([Role.FONTANERO, Role.SECRETARIA])(
-      '%s autenticado recibe 403 en Gestión de Abonados',
-      async (role) => {
-        const response = await request(app.getHttpServer())
-          .get('/abonados/10')
-          .set('Authorization', `Bearer ${signAs(role, '3')}`)
-          .expect(403);
+    it('FONTANERO autenticado recibe 403 en Gestión de Abonados', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/abonados/10')
+        .set('Authorization', `Bearer ${signAs(Role.FONTANERO, '3')}`)
+        .expect(403);
 
-        expect(response.body).toMatchObject({ message: 'Acceso denegado' });
-      },
-    );
+      expect(response.body).toMatchObject({ message: 'Acceso denegado' });
+    });
+
+    it('SECRETARIA puede consultar un abonado por id', async () => {
+      findOne.mockResolvedValue(abonado10);
+
+      await request(app.getHttpServer())
+        .get('/abonados/10')
+        .set('Authorization', `Bearer ${signAs(Role.SECRETARIA, '3')}`)
+        .expect(200);
+    });
   });
 
   describe('Prueba 11 — Manipulación del body', () => {
