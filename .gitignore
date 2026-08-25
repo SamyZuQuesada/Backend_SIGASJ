@@ -23,5 +23,5 @@ npm-debug.log*
 *.sln
 *.sw?
 
-# nest build
-tsconfig.build.tsbuildinfo
+# nest / typescript build cache
+*.tsbuildinfo
