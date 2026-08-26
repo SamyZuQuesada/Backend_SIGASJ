@@ -29,7 +29,4 @@ export class SolicitudServicio {
 
   @Column({ default: false })
   utilizada: boolean;
-
-  @Column({ type: 'int', nullable: true })
-  idAbonadoRegistrado: number | null;
 }

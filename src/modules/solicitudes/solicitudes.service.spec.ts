@@ -18,7 +18,6 @@ describe('SolicitudesService — Tarea #338', () => {
     direccion: 'San Juan, Desamparados',
     estado: SolicitudEstado.APROBADA,
     utilizada: false,
-    idAbonadoRegistrado: null,
   };
 
   beforeEach(async () => {

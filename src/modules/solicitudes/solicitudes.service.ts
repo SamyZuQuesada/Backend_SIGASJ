@@ -58,7 +58,6 @@ export class SolicitudesService implements OnModuleInit {
         direccion: 'Residencial Las Palmas',
         estado: SolicitudEstado.APROBADA,
         utilizada: true,
-        idAbonadoRegistrado: 1,
       }),
     ]);
 

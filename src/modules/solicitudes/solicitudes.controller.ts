@@ -18,7 +18,7 @@ export class SolicitudesController {
   @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
   @ApiOperation({
     summary:
-      'Listar solicitudes de servicio aprobadas pendientes de registro de abonado',
+      'Listar solicitudes de servicio aprobadas pendientes de procesamiento',
   })
   findAprobadasPendientes(): Promise<SolicitudesAprobadaPendientesResponseDto> {
     return this.solicitudesService.findAprobadasPendientes();

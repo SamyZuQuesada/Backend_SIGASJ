@@ -35,7 +35,7 @@ describe('RolesGuard — 401 vs 403', () => {
   });
 
   it('usuario autenticado sin rol autorizado responde ForbiddenException (403)', () => {
-    expect(() => guard.canActivate(ctx({ role: Role.ABONADO }))).toThrow(
+    expect(() => guard.canActivate(ctx({ role: Role.FONTANERO }))).toThrow(
       ForbiddenException,
     );
   });
