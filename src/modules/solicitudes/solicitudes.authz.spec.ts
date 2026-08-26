@@ -102,15 +102,6 @@ describe('Tarea #338 — Solicitudes aprobadas pendientes', () => {
       .expect(200);
   });
 
-  it('Abonado recibe 403 al consultar solicitudes pendientes', async () => {
-    const response = await request(app.getHttpServer())
-      .get('/solicitudes/aprobadas-pendientes')
-      .set('Authorization', `Bearer ${signAs(Role.ABONADO, '10')}`)
-      .expect(403);
-
-    expect(response.body).toMatchObject({ message: 'Acceso denegado' });
-  });
-
   it('Fontanero recibe 403 al consultar solicitudes pendientes', async () => {
     await request(app.getHttpServer())
       .get('/solicitudes/aprobadas-pendientes')

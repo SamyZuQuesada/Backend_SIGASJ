@@ -13,7 +13,6 @@ import { AuthModule } from './modules/auth/auth.module';
 import { UsuariosModule } from './modules/usuarios/usuarios.module';
 import { ContenidoPublicoModule } from './modules/contenido-publico/contenido-publico.module';
 import { ComunicadosModule } from './modules/comunicados/comunicados.module';
-import { AbonadosModule } from './modules/abonados/abonados.module';
 import { AveriasModule } from './modules/averias/averias.module';
 import { SolicitudesModule } from './modules/solicitudes/solicitudes.module';
 import { LecturasModule } from './modules/lecturas/lecturas.module';
@@ -40,7 +39,6 @@ import { AppService } from './app.service';
     UsuariosModule,
     ContenidoPublicoModule,
     ComunicadosModule,
-    AbonadosModule,
     AveriasModule,
     SolicitudesModule,
     LecturasModule,

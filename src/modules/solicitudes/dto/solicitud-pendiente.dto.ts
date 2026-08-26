@@ -24,7 +24,7 @@ export class SolicitudPendienteDto {
 
   @ApiProperty({
     example: false,
-    description: 'Indica si la solicitud ya fue utilizada para registrar un abonado',
+    description: 'Indica si la solicitud ya fue procesada/utilizada',
   })
   utilizada: boolean;
 }
