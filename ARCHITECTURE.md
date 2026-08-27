@@ -67,10 +67,10 @@ src/
     ├── usuarios/               # Gestión de usuarios del sistema
     ├── contenido-publico/      # Contenido dinámico del Landing Page (Información, Contacto, Galería, Transparencia)
     ├── comunicados/            # Gestión independiente de comunicados (Públicos y Administrativos)
-    ├── abonados/               # Gestión de abonados
+    ├── abonados/               # Gestión de asociados
     ├── averias/                # Reporte y seguimiento de averías
     ├── solicitudes/            # Solicitudes de servicios
-    ├── lecturas/               # Lecturas de medidores
+    ├── lecturas/               # Recursos Humanos
     ├── consumos/               # Gestión de consumos
     ├── inventario/             # Gestión de materiales e inventarios
     ├── actividades-fontanero/  # Registro de actividades de fontanería
@@ -84,7 +84,7 @@ src/
 El sistema utiliza autenticación basada en JWT y autorización granular mediante roles centralizados en el enum `Role`:
 
 - **`ADMINISTRADORA`**: Acceso total al panel administrativo y configuraciones.
-- **`SECRETARIA`**: Gestión administrativa de abonados, comunidacados, solicitudes y contenido público.
+- **`SECRETARIA`**: Gestión administrativa de asociados, comunidacados, solicitudes y contenido público.
 - **`FONTANERO`**: Registro de lecturas, actividades de campo y atención de averías.
 - **`ABONADO`**: Consulta de consumos, reportes de averías y solicitudes públicas/privadas.
 
