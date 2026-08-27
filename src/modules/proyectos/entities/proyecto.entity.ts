@@ -36,7 +36,8 @@ export class Proyecto {
   @Column({ type: 'varchar', length: 500, nullable: true })
   imagenPrincipal: string | null;
 
-  @Column({ default: true })
+  /** Visibilidad pública. Independiente de `estado` (ciclo de ejecución). Alta: no publicado. */
+  @Column({ default: false })
   activo: boolean;
 
   @CreateDateColumn()

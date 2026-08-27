@@ -66,7 +66,7 @@ export class CreateProyectosAndImagenProyectoTables1724684000000
           {
             name: 'activo',
             type: isMssql ? 'bit' : 'boolean',
-            default: isMssql ? 1 : true,
+            default: isMssql ? 0 : false,
             isNullable: false,
           },
           {

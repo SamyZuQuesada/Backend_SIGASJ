@@ -24,7 +24,7 @@ class ProyectosMemoryDatabase {
       duracion: datos.duracion ?? null,
       estado: datos.estado || EstadoProyecto.PENDIENTE,
       imagenPrincipal: datos.imagenPrincipal ?? null,
-      activo: datos.activo !== undefined ? datos.activo : true,
+      activo: datos.activo !== undefined ? datos.activo : false,
       createdAt: datos.createdAt || now,
       updatedAt: now,
       imagenes: [],
@@ -156,6 +156,16 @@ describe('Pruebas de Base de Datos e Integridad: Proyecto e ImagenProyecto', () 
       estadosInvalidos.forEach((estadoIncorrecto) => {
         expect(isEstadoProyectoValido(estadoIncorrecto)).toBe(false);
       });
+    });
+
+    it('debe crear el proyecto inactivo para publicación sin alterar el estado de ejecución', async () => {
+      const proyecto = await db.saveProyecto({
+        nombre: 'Proyecto recién registrado',
+        estado: EstadoProyecto.PENDIENTE,
+      });
+
+      expect(proyecto.estado).toBe(EstadoProyecto.PENDIENTE);
+      expect(proyecto.activo).toBe(false);
     });
   });
 
