@@ -1,13 +1,6 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, type TransformFnParams } from 'class-transformer';
-import {
-  IsEnum,
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-  MaxLength,
-} from 'class-validator';
-import { EstadoProyecto } from '../../../common/enums/estado-proyecto.enum';
+import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 const rawValue = ({ value, obj, key }: TransformFnParams): unknown => {
   if (obj && typeof obj === 'object' && key in obj) {
@@ -35,13 +28,14 @@ const trimOptionalString = (params: TransformFnParams): unknown => {
   return trimmed === '' ? undefined : trimmed;
 };
 
-export class CreateProyectoDto {
-  @ApiProperty({ example: 'Ampliación de Acueducto', maxLength: 200 })
+export class UpdateProyectoDto {
+  @ApiPropertyOptional({ example: 'Ampliación de Acueducto', maxLength: 200 })
   @Transform(trimString)
+  @IsOptional()
   @IsString()
   @IsNotEmpty({ message: 'El nombre del proyecto es obligatorio' })
   @MaxLength(200)
-  nombre: string;
+  nombre?: string;
 
   @ApiPropertyOptional()
   @Transform(trimOptionalString)
@@ -66,24 +60,4 @@ export class CreateProyectoDto {
   @IsString()
   @MaxLength(100)
   duracion?: string;
-
-  @ApiPropertyOptional({
-    enum: EstadoProyecto,
-    enumName: 'EstadoProyecto',
-    default: EstadoProyecto.PENDIENTE,
-    description:
-      'Ciclo de ejecución (9.1.4). No controla la publicación; visibilidad usa `activo` en el backend.',
-  })
-  @IsOptional()
-  @IsEnum(EstadoProyecto, {
-    message: 'El estado debe ser PENDIENTE, EN_PROCESO o COMPLETADO',
-  })
-  estado?: EstadoProyecto;
-
-  @ApiPropertyOptional({ maxLength: 500 })
-  @Transform(trimOptionalString)
-  @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  imagenPrincipal?: string;
 }

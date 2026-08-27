@@ -1,4 +1,6 @@
+import { existsSync, mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
 import { registerAs } from '@nestjs/config';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 
@@ -17,6 +19,44 @@ const mssqlOptions = {
   enableArithAbort: true,
   connectTimeout: 30_000,
   requestTimeout: 30_000,
+};
+
+const tryLoadMssqlNativeDriver = (): unknown | undefined => {
+  try {
+    return nodeRequire('mssql/msnodesqlv8');
+  } catch {
+    return undefined;
+  }
+};
+
+const sqlJsFallback = (
+  entities: TypeOrmModuleOptions['entities'],
+  logging: TypeOrmModuleOptions['logging'],
+): TypeOrmModuleOptions => {
+  const location = join(process.cwd(), 'data', 'sigasj-local.sqlite');
+  const folder = dirname(location);
+  if (!existsSync(folder)) {
+    mkdirSync(folder, { recursive: true });
+  }
+
+  console.warn(
+    '[SIGASJ] Windows bloqueó msnodesqlv8 (sqlserver.node). LocalDB no se puede usar.',
+  );
+  console.warn(
+    '[SIGASJ] Arranque temporal con SQL.js en data/sigasj-local.sqlite. No es la base SIGASJ.',
+  );
+  console.warn(
+    '[SIGASJ] Para SQL Server: permite ese .node en Smart App Control o usa DB_HOST=localhost con usuario/contraseña.',
+  );
+
+  return {
+    type: 'sqljs',
+    location,
+    autoSave: true,
+    entities,
+    synchronize: true,
+    logging,
+  };
 };
 
 export default registerAs('database', (): TypeOrmModuleOptions => {
@@ -44,9 +84,14 @@ export default registerAs('database', (): TypeOrmModuleOptions => {
   };
 
   if (isLocalDb) {
+    const driver = tryLoadMssqlNativeDriver();
+    if (!driver) {
+      return sqlJsFallback(base.entities, base.logging);
+    }
+
     return {
       ...base,
-      driver: nodeRequire('mssql/msnodesqlv8'),
+      driver,
       extra: {
         connectionString: `Driver={ODBC Driver 17 for SQL Server};Server=${host};Database=${database};Trusted_Connection=yes;TrustServerCertificate=yes;Connection Timeout=30;Pooling=yes;Max Pool Size=8;Min Pool Size=0;`,
         pool: mssqlPool,
