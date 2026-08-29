@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, type TransformFnParams } from 'class-transformer';
-import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsBoolean, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 const rawValue = ({ value, obj, key }: TransformFnParams): unknown => {
   if (obj && typeof obj === 'object' && key in obj) {
@@ -60,4 +60,14 @@ export class UpdateProyectoDto {
   @IsString()
   @MaxLength(100)
   duracion?: string;
+
+  @ApiPropertyOptional({
+    type: Boolean,
+    description: 'Si se envía en true, elimina la imagen principal física y establece el campo a NULL en BD.',
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  removeImagenPrincipal?: boolean;
 }
+

@@ -3,11 +3,15 @@ import {
   NotFoundException,
   StreamableFile,
 } from '@nestjs/common';
-import { createReadStream, existsSync, mkdirSync, writeFileSync } from 'fs';
+import { createReadStream, existsSync, mkdirSync, unlinkSync, writeFileSync } from 'fs';
 import { basename, extname, join } from 'path';
 import { randomUUID } from 'crypto';
 
-export type PublicMediaFolder = 'comunicados' | 'galeria' | 'transparencia';
+export type PublicMediaFolder =
+  | 'comunicados'
+  | 'galeria'
+  | 'transparencia'
+  | 'proyectos';
 
 export type UploadedImageFile = {
   originalname: string;
@@ -22,6 +26,7 @@ const ALLOWED_MIME_TYPES: Record<string, string> = {
   'image/jpeg': '.jpg',
   'image/png': '.png',
   'image/webp': '.webp',
+  'image/gif': '.gif',
 };
 
 const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
@@ -32,7 +37,10 @@ const TRANSPARENCIA_MIME_TYPES: Record<string, string> = {
 };
 
 const isAllowedFolder = (folder: string): folder is PublicMediaFolder =>
-  folder === 'comunicados' || folder === 'galeria' || folder === 'transparencia';
+  folder === 'comunicados' ||
+  folder === 'galeria' ||
+  folder === 'transparencia' ||
+  folder === 'proyectos';
 
 export function savePublicImage(
   folder: PublicMediaFolder,
@@ -41,11 +49,15 @@ export function savePublicImage(
   const extension = ALLOWED_MIME_TYPES[file.mimetype];
 
   if (!extension) {
-    throw new BadRequestException('Solo se permiten imágenes JPG, PNG o WebP.');
+    throw new BadRequestException(
+      'Solo se permiten imágenes JPG, PNG, WebP o GIF.',
+    );
   }
 
   if (file.size > MAX_IMAGE_BYTES) {
-    throw new BadRequestException('La imagen no puede superar 5 MB.');
+    throw new BadRequestException(
+      'El archivo supera el tamaño máximo permitido (5 MB).',
+    );
   }
 
   const directory = join(UPLOAD_ROOT, folder);
@@ -55,6 +67,60 @@ export function savePublicImage(
   writeFileSync(join(directory, filename), file.buffer);
 
   return `/api/v1/public/media/${folder}/${filename}`;
+}
+
+export function saveProyectoImage(
+  proyectoId: number,
+  file: UploadedImageFile,
+  prefix: 'cover' | 'galeria' = 'cover',
+): string {
+  const extension = ALLOWED_MIME_TYPES[file.mimetype];
+
+  if (!extension) {
+    throw new BadRequestException(
+      'Solo se permiten imágenes JPG, PNG, WebP o GIF.',
+    );
+  }
+
+  if (file.size > MAX_IMAGE_BYTES) {
+    throw new BadRequestException(
+      'El archivo supera el tamaño máximo permitido (5 MB).',
+    );
+  }
+
+  const folder: PublicMediaFolder = 'proyectos';
+  const directory = join(UPLOAD_ROOT, folder);
+  mkdirSync(directory, { recursive: true });
+
+  const filename = `${proyectoId}_${prefix}_${Date.now()}_${randomUUID().slice(0, 8)}${extension}`;
+  writeFileSync(join(directory, filename), file.buffer);
+
+  return `/api/v1/public/media/${folder}/${filename}`;
+}
+
+export function deletePhysicalMediaFile(
+  publicUrl: string | null | undefined,
+): void {
+  if (!publicUrl) return;
+  const prefix = '/api/v1/public/media/';
+  if (!publicUrl.startsWith(prefix)) return;
+
+  const relativePath = publicUrl.substring(prefix.length);
+  const parts = relativePath.split('/');
+  if (parts.length !== 2) return;
+
+  const [folder, filename] = parts;
+  const safeName = basename(filename);
+  if (!safeName || safeName !== filename || safeName.includes('..')) return;
+
+  const filePath = join(UPLOAD_ROOT, folder, safeName);
+  if (existsSync(filePath)) {
+    try {
+      unlinkSync(filePath);
+    } catch {
+      // Ignorar errores al eliminar si el archivo no se encuentra o está en uso
+    }
+  }
 }
 
 export function savePublicDocument(
@@ -106,10 +172,13 @@ export function streamPublicMedia(
         ? 'image/png'
         : extension === '.webp'
           ? 'image/webp'
-          : 'image/jpeg';
+          : extension === '.gif'
+            ? 'image/gif'
+            : 'image/jpeg';
 
   return new StreamableFile(createReadStream(filePath), {
     type: mimeType,
     disposition: `inline; filename="${safeName}"`,
   });
 }
+
