@@ -4,6 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { EstadoProyecto } from '../../common/enums/estado-proyecto.enum';
 import { CreateProyectoDto } from './dto/create-proyecto.dto';
 import { UpdateProyectoDto } from './dto/update-proyecto.dto';
+import { ImagenProyecto } from './entities/imagen-proyecto.entity';
 import { Proyecto } from './entities/proyecto.entity';
 import { ProyectosService } from './proyectos.service';
 
@@ -73,6 +74,20 @@ const createMemoryRepo = () => {
   };
 };
 
+const mockImagenRepo = {
+
+  create: jest.fn((data) => ({ id: 1, ...data })),
+  save: jest.fn((data) => Promise.resolve({ id: 1, ...data })),
+  findOne: jest.fn(),
+  remove: jest.fn((data) => Promise.resolve(data)),
+  update: jest.fn(() => Promise.resolve()),
+  createQueryBuilder: jest.fn(() => ({
+    select: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    getRawOne: jest.fn().mockResolvedValue({ max: 0 }),
+  })),
+};
+
 describe('ProyectosService', () => {
   let service: ProyectosService;
   let repo: ReturnType<typeof createMemoryRepo>;
@@ -83,11 +98,16 @@ describe('ProyectosService', () => {
       providers: [
         ProyectosService,
         { provide: getRepositoryToken(Proyecto), useValue: repo },
+        {
+          provide: getRepositoryToken(ImagenProyecto),
+          useValue: mockImagenRepo,
+        },
       ],
     }).compile();
 
     service = module.get(ProyectosService);
   });
+
 
   it('persiste un proyecto válido con visibilidad inicial inactiva', async () => {
     const dto: CreateProyectoDto = {
