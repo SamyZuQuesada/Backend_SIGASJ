@@ -7,9 +7,9 @@ import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 const nodeRequire = createRequire(__filename);
 
 const mssqlPool = {
-  max: 8,
-  min: 0,
-  idleTimeoutMillis: 10_000,
+  max: 10,
+  min: 1,
+  idleTimeoutMillis: 30_000,
   acquireTimeoutMillis: 30_000,
 };
 
@@ -93,7 +93,7 @@ export default registerAs('database', (): TypeOrmModuleOptions => {
       ...base,
       driver,
       extra: {
-        connectionString: `Driver={ODBC Driver 17 for SQL Server};Server=${host};Database=${database};Trusted_Connection=yes;TrustServerCertificate=yes;Connection Timeout=30;Pooling=yes;Max Pool Size=8;Min Pool Size=0;`,
+        connectionString: `Driver={ODBC Driver 17 for SQL Server};Server=${host};Database=${database};Trusted_Connection=yes;TrustServerCertificate=yes;Connection Timeout=30;Pooling=yes;Max Pool Size=10;Min Pool Size=1;`,
         pool: mssqlPool,
         options: mssqlOptions,
         connectionTimeout: 30_000,
