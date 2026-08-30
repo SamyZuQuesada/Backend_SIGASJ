@@ -312,14 +312,11 @@ export class ProyectosService {
         }
 
         if (file) {
+          const nextUrl = saveProyectoImage(proyecto.id, file, 'cover');
           if (proyecto.imagenPrincipal) {
             deletePhysicalMediaFile(proyecto.imagenPrincipal);
           }
-          proyecto.imagenPrincipal = saveProyectoImage(
-            proyecto.id,
-            file,
-            'cover',
-          );
+          proyecto.imagenPrincipal = nextUrl;
         }
 
         const saved = await this.proyectoRepository.save(proyecto);
@@ -430,11 +427,12 @@ export class ProyectosService {
           throw new NotFoundException('Proyecto no encontrado');
         }
 
+        const nextUrl = saveProyectoImage(id, file, 'cover');
         if (proyecto.imagenPrincipal) {
           deletePhysicalMediaFile(proyecto.imagenPrincipal);
         }
 
-        proyecto.imagenPrincipal = saveProyectoImage(id, file, 'cover');
+        proyecto.imagenPrincipal = nextUrl;
         const saved = await this.proyectoRepository.save(proyecto);
         return toProyectoAdminDetalle(saved);
       });
@@ -649,34 +647,21 @@ export class ProyectosService {
   }
 
   private async loadAdminById(id: number): Promise<Proyecto> {
-    const proyecto = await this.proyectoRepository
-      .createQueryBuilder('proyecto')
-      .select([
-        'proyecto.id',
-        'proyecto.nombre',
-        'proyecto.descripcion',
-        'proyecto.encargadoRealizacion',
-        'proyecto.duracion',
-        'proyecto.estado',
-        'proyecto.imagenPrincipal',
-        'proyecto.activo',
-        'proyecto.createdAt',
-        'proyecto.updatedAt',
-        'imagenes.id',
-        'imagenes.url',
-        'imagenes.descripcion',
-        'imagenes.orden',
-        'imagenes.createdAt',
-      ])
-      .leftJoinAndSelect('proyecto.imagenes', 'imagenes')
-      .where('proyecto.id = :id', { id })
-      .orderBy('imagenes.orden', 'ASC')
-      .addOrderBy('imagenes.id', 'ASC')
-      .getOne();
+    const proyecto = await this.proyectoRepository.findOne({
+      where: { id },
+      relations: { imagenes: true },
+    });
 
     if (!proyecto) {
       throw new NotFoundException('Proyecto no encontrado');
     }
+
+    proyecto.imagenes = [...(proyecto.imagenes ?? [])].sort((left, right) => {
+      if (left.orden !== right.orden) {
+        return left.orden - right.orden;
+      }
+      return left.id - right.id;
+    });
 
     return proyecto;
   }
