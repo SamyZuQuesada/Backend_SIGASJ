@@ -343,20 +343,11 @@ describe('ProyectosService', () => {
       estado: EstadoProyecto.EN_PROCESO,
       imagenPrincipal: 'https://ejemplo.com/tanque.jpg',
     });
-    repo.qb.getOne.mockResolvedValueOnce({
-      ...saved,
-      imagenes: [],
-    });
-
     const found = await service.findOneAdmin(saved.id);
 
-    expect(repo.createQueryBuilder).toHaveBeenCalledWith('proyecto');
-    expect(repo.qb.leftJoinAndSelect).toHaveBeenCalledWith(
-      'proyecto.imagenes',
-      'imagenes',
-    );
-    expect(repo.qb.where).toHaveBeenCalledWith('proyecto.id = :id', {
-      id: saved.id,
+    expect(repo.findOne).toHaveBeenCalledWith({
+      where: { id: saved.id },
+      relations: { imagenes: true },
     });
     expect(repo.qb.andWhere).not.toHaveBeenCalled();
     expect(found).toMatchObject({
@@ -376,10 +367,6 @@ describe('ProyectosService', () => {
 
   it('devuelve un proyecto inactivo y uno activo por id, sin exigir activo=true', async () => {
     const inactivo = await service.create({ nombre: 'Obra inactiva' });
-    repo.qb.getOne.mockResolvedValueOnce({
-      ...inactivo,
-      imagenes: [],
-    });
     await expect(service.findOneAdmin(inactivo.id)).resolves.toMatchObject({
       id: inactivo.id,
       activo: false,
@@ -387,30 +374,17 @@ describe('ProyectosService', () => {
 
     const publicado = await service.create({ nombre: 'Obra publicada' });
     publicado.activo = true;
-    repo.qb.getOne.mockResolvedValueOnce({
-      ...publicado,
-      imagenes: [],
-    });
+    await repo.save(publicado);
     const activo = await service.findOneAdmin(publicado.id);
     expect(activo).toMatchObject({
       id: publicado.id,
       nombre: 'Obra publicada',
       activo: true,
     });
-
-    expect(repo.qb.where.mock.calls).toEqual([
-      ['proyecto.id = :id', { id: inactivo.id }],
-      ['proyecto.id = :id', { id: publicado.id }],
-    ]);
   });
 
   it('devuelve galería vacía cuando el proyecto no tiene imágenes', async () => {
     const saved = await service.create({ nombre: 'Sin galería' });
-    repo.qb.getOne.mockResolvedValueOnce({
-      ...saved,
-      imagenes: undefined,
-    });
-
     const found = await service.findOneAdmin(saved.id);
 
     expect(found.imagenes).toEqual([]);
@@ -437,32 +411,26 @@ describe('ProyectosService', () => {
         proyecto: saved,
       },
     ];
-    repo.qb.getOne.mockResolvedValueOnce({
-      ...saved,
-      imagenes,
-    });
+    const stored = repo.items.find((item) => item.id === saved.id);
+    if (stored) {
+      stored.imagenes = imagenes as Proyecto['imagenes'];
+    }
 
     const found = await service.findOneAdmin(saved.id);
 
-    expect(repo.qb.leftJoinAndSelect).toHaveBeenCalledWith(
-      'proyecto.imagenes',
-      'imagenes',
-    );
-    expect(repo.qb.orderBy).toHaveBeenCalledWith('imagenes.orden', 'ASC');
-    expect(repo.qb.addOrderBy).toHaveBeenCalledWith('imagenes.id', 'ASC');
     expect(found.imagenes).toEqual([
-      {
-        id: 2,
-        url: 'https://ejemplo.com/b.jpg',
-        descripcion: 'Segunda',
-        orden: 2,
-        createdAt,
-      },
       {
         id: 1,
         url: 'https://ejemplo.com/a.jpg',
         descripcion: 'Primera',
         orden: 1,
+        createdAt,
+      },
+      {
+        id: 2,
+        url: 'https://ejemplo.com/b.jpg',
+        descripcion: 'Segunda',
+        orden: 2,
         createdAt,
       },
     ]);
@@ -477,10 +445,10 @@ describe('ProyectosService', () => {
       status: 404,
       message: 'Proyecto no encontrado',
     });
-    expect(repo.qb.where).toHaveBeenCalledWith('proyecto.id = :id', {
-      id: 999,
+    expect(repo.findOne).toHaveBeenCalledWith({
+      where: { id: 999 },
+      relations: { imagenes: true },
     });
-    expect(repo.qb.getOne).toHaveBeenCalled();
   });
 
   it('actualiza solo la información general enviada', async () => {
