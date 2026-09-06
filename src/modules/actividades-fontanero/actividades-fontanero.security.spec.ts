@@ -15,6 +15,8 @@ import jwtConfig from '../../config/jwt.config';
 import { AuthModule } from '../auth/auth.module';
 import { ActividadesFontaneroModule } from './actividades-fontanero.module';
 import { ActividadFontanero } from './entities/actividad-fontanero.entity';
+import { TipoActividadFontanero } from './entities/tipo-actividad-fontanero.entity';
+import { TIPOS_ACTIVIDAD_FONTANERO_INICIALES } from './tipo-actividad-fontanero.catalogo';
 
 /**
  * Suite de aceptación de seguridad Backend (independiente del Frontend).
@@ -24,6 +26,7 @@ describe('Seguridad Backend — módulo actividades Fontanero', () => {
   let app: INestApplication<App>;
   let jwtService: JwtService;
   let actividades: Repository<ActividadFontanero>;
+  let tipos: Repository<TipoActividadFontanero>;
 
   const FONTANERO_GET_PATHS = [
     '/fontanero/actividades',
@@ -83,7 +86,7 @@ describe('Seguridad Backend — módulo actividades Fontanero', () => {
           type: 'sqljs',
           autoSave: false,
           dropSchema: true,
-          entities: [ActividadFontanero],
+          entities: [ActividadFontanero, TipoActividadFontanero],
           synchronize: true,
         }),
         AuthModule,
@@ -111,6 +114,12 @@ describe('Seguridad Backend — módulo actividades Fontanero', () => {
 
     jwtService = moduleFixture.get(JwtService);
     actividades = moduleFixture.get(getRepositoryToken(ActividadFontanero));
+    tipos = moduleFixture.get(getRepositoryToken(TipoActividadFontanero));
+    await tipos.save(
+      TIPOS_ACTIVIDAD_FONTANERO_INICIALES.map((tipo) =>
+        tipos.create({ ...tipo, activo: true }),
+      ),
+    );
   });
 
   afterAll(async () => {
@@ -331,6 +340,55 @@ describe('Seguridad Backend — módulo actividades Fontanero', () => {
         'message',
         'statusCode',
       ]);
+    });
+  });
+
+  describe('GET /fontanero/actividades/tipos — catálogo', () => {
+    const tiposPath = '/fontanero/actividades/tipos';
+
+    it('Fontanero autenticado obtiene el catálogo', async () => {
+      const response = await get(
+        tiposPath,
+        signAs(Role.FONTANERO, 'fontanero-1'),
+      ).expect(200);
+      expect(response.body).toHaveProperty('data');
+      expect(response.body).toHaveProperty('total');
+    });
+
+    it('Administradora autenticada obtiene el catálogo', async () => {
+      const response = await get(
+        tiposPath,
+        signAs(Role.ADMINISTRADORA, 'admin-1'),
+      ).expect(200);
+      const body = response.body as { total: number };
+      expect(body.total).toBe(TIPOS_ACTIVIDAD_FONTANERO_INICIALES.length);
+    });
+
+    it('sin token responde 401', async () => {
+      const response = await get(tiposPath).expect(401);
+      expect(response.body).toMatchObject({
+        statusCode: 401,
+        message: 'No autenticado',
+      });
+    });
+
+    it('token inválido responde 401', async () => {
+      await get(tiposPath, 'token-invalido').expect(401);
+    });
+
+    it('token vencido responde 401', async () => {
+      await get(tiposPath, expiredToken()).expect(401);
+    });
+
+    it.each([
+      { label: 'Secretaria', role: Role.SECRETARIA },
+      { label: 'Abonado', role: 'ABONADO' },
+    ])('$label recibe 403', async ({ role }) => {
+      const response = await get(tiposPath, signAs(role, 'otro-1')).expect(403);
+      expect(response.body).toMatchObject({
+        statusCode: 403,
+        message: 'Acceso denegado',
+      });
     });
   });
 });
