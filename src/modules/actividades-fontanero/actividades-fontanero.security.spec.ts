@@ -17,6 +17,10 @@ import { ActividadesFontaneroModule } from './actividades-fontanero.module';
 import { ActividadFontanero } from './entities/actividad-fontanero.entity';
 import { TipoActividadFontanero } from './entities/tipo-actividad-fontanero.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
+import {
+  buildValidCreateActividadPayload,
+  seedTiposActividadFontanero,
+} from './testing/actividades-fontanero.test-helpers';
 
 /**
  * Suite de aceptación de seguridad Backend (independiente del Frontend).
@@ -26,6 +30,11 @@ describe('Seguridad Backend — módulo actividades Fontanero', () => {
   let app: INestApplication<App>;
   let jwtService: JwtService;
   let actividades: Repository<ActividadFontanero>;
+  let tiposActividad: Repository<TipoActividadFontanero>;
+  let validTipoActividadId: number;
+
+  const validPayload = (overrides: Record<string, unknown> = {}) =>
+    buildValidCreateActividadPayload(validTipoActividadId, overrides);
 
   const FONTANERO_GET_PATHS = [
     '/fontanero/actividades',
@@ -113,6 +122,7 @@ describe('Seguridad Backend — módulo actividades Fontanero', () => {
 
     jwtService = moduleFixture.get(JwtService);
     actividades = moduleFixture.get(getRepositoryToken(ActividadFontanero));
+    tiposActividad = moduleFixture.get(getRepositoryToken(TipoActividadFontanero));
   });
 
   afterAll(async () => {
@@ -121,21 +131,25 @@ describe('Seguridad Backend — módulo actividades Fontanero', () => {
 
   beforeEach(async () => {
     await actividades.clear();
+    await tiposActividad.clear();
+    const tipos = await seedTiposActividadFontanero(tiposActividad);
+    validTipoActividadId = tipos[0].id;
   });
 
   describe('Fontanero autenticado puede usar el módulo', () => {
     it('registra y consulta endpoints operativos', async () => {
       const token = signAs(Role.FONTANERO, 'fontanero-1');
 
+      const payload = validPayload();
       const created = await post(
         '/fontanero/actividades',
-        { titulo: 'Lectura de medidor sector norte' },
+        payload,
         token,
       ).expect(201);
 
       expect(created.body).toMatchObject({
-        titulo: 'Lectura de medidor sector norte',
-        estado: EstadoActividadFontanero.REPORTADA,
+        titulo: payload.titulo,
+        tipoActividadId: payload.tipoActividadId,
       });
 
       for (const path of FONTANERO_GET_PATHS) {
@@ -169,6 +183,7 @@ describe('Seguridad Backend — módulo actividades Fontanero', () => {
 
     it('POST registro sin token responde 401', async () => {
       const response = await post('/fontanero/actividades', {
+        ...validPayload(),
         titulo: 'No debe persistir',
       }).expect(401);
 
@@ -193,7 +208,7 @@ describe('Seguridad Backend — módulo actividades Fontanero', () => {
     it('POST con token inválido responde 401', async () => {
       await post(
         '/fontanero/actividades',
-        { titulo: 'Hack' },
+        { ...validPayload(), titulo: 'Hack' },
         'no-es-un-jwt',
       ).expect(401);
       expect(await actividades.count()).toBe(0);
@@ -213,7 +228,7 @@ describe('Seguridad Backend — módulo actividades Fontanero', () => {
     it('POST con token vencido responde 401', async () => {
       await post(
         '/fontanero/actividades',
-        { titulo: 'Vencido' },
+        { ...validPayload(), titulo: 'Vencido' },
         expiredToken(),
       ).expect(401);
       expect(await actividades.count()).toBe(0);
@@ -232,7 +247,7 @@ describe('Seguridad Backend — módulo actividades Fontanero', () => {
       async ({ role }) => {
         const response = await post(
           '/fontanero/actividades',
-          { titulo: 'Intento no autorizado' },
+          { ...validPayload(), titulo: 'Intento no autorizado' },
           signAs(role, 'otro-1'),
         ).expect(403);
 
@@ -287,7 +302,7 @@ describe('Seguridad Backend — módulo actividades Fontanero', () => {
     it('consumir endpoint restringido con Abonado sigue bloqueado aunque no pase por React', async () => {
       const response = await post(
         '/fontanero/actividades',
-        { titulo: 'Evasión por curl' },
+        { ...validPayload(), titulo: 'Evasión por curl' },
         signAs('ABONADO', 'abonado-99'),
       ).expect(403);
 

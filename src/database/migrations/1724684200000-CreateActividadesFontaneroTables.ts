@@ -126,17 +126,11 @@ export class CreateActividadesFontaneroTables1724684200000
     );
 
     for (const tipo of TIPOS_ACTIVIDAD_SEED) {
-      await queryRunner.manager
-        .createQueryBuilder()
-        .insert()
-        .into('TipoActividadFontanero')
-        .values({
-          codigo: tipo.codigo,
-          nombre: tipo.nombre,
-          descripcion: tipo.descripcion,
-          activo: boolTrue,
-        })
-        .execute();
+      await queryRunner.query(
+        `INSERT INTO TipoActividadFontanero (codigo, nombre, descripcion, activo)
+         VALUES (@0, @1, @2, 1)`,
+        [tipo.codigo, tipo.nombre, tipo.descripcion],
+      );
     }
 
     await queryRunner.createTable(

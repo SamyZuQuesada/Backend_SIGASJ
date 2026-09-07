@@ -17,12 +17,10 @@ import { ActividadesFontaneroModule } from './actividades-fontanero.module';
 import { ActividadFontanero } from './entities/actividad-fontanero.entity';
 import { TipoActividadFontanero } from './entities/tipo-actividad-fontanero.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
-
-const VALID_PAYLOAD = {
-  titulo: 'Reparación de tubería en Calle Principal',
-  descripcion: 'Se reemplazó tramo dañado de 2 metros',
-  ubicacion: 'Calle Principal, San Juan',
-};
+import {
+  buildValidCreateActividadPayload,
+  seedTiposActividadFontanero,
+} from './testing/actividades-fontanero.test-helpers';
 
 const assertSafeClientBody = (body: unknown) => {
   const serialized = JSON.stringify(body ?? '');
@@ -44,6 +42,11 @@ describe('Actividades Fontanero — autenticación y autorización', () => {
   let app: INestApplication<App>;
   let jwtService: JwtService;
   let actividades: Repository<ActividadFontanero>;
+  let tiposActividad: Repository<TipoActividadFontanero>;
+  let validTipoActividadId: number;
+
+  const validPayload = (overrides: Record<string, unknown> = {}) =>
+    buildValidCreateActividadPayload(validTipoActividadId, overrides);
 
   const signAs = (
     role: Role | string,
@@ -143,6 +146,7 @@ describe('Actividades Fontanero — autenticación y autorización', () => {
 
     jwtService = moduleFixture.get(JwtService);
     actividades = moduleFixture.get(getRepositoryToken(ActividadFontanero));
+    tiposActividad = moduleFixture.get(getRepositoryToken(TipoActividadFontanero));
   });
 
   afterAll(async () => {
@@ -151,34 +155,42 @@ describe('Actividades Fontanero — autenticación y autorización', () => {
 
   beforeEach(async () => {
     await actividades.clear();
+    await tiposActividad.clear();
+    const tipos = await seedTiposActividadFontanero(tiposActividad);
+    validTipoActividadId = tipos[0].id;
   });
 
   describe('POST /api/v1/fontanero/actividades', () => {
     it('Fontanero con token válido registra actividad y el dueño sale del JWT', async () => {
       const token = signAs(Role.FONTANERO, 'fontanero-1');
+      const payload = validPayload();
       const response = await authPost(
         '/fontanero/actividades',
-        VALID_PAYLOAD,
+        payload,
         token,
       ).expect(201);
 
       expect(response.body).toMatchObject({
-        titulo: VALID_PAYLOAD.titulo,
+        titulo: payload.titulo,
+        tipoActividadId: payload.tipoActividadId,
+        fechaActividad: payload.fechaActividad,
         estado: EstadoActividadFontanero.REPORTADA,
       });
       expect(response.body).not.toHaveProperty('fontaneroId');
       expect(await actividades.count()).toBe(1);
-      const saved = await actividades.findOneByOrFail({
-        id: (response.body as { id: number }).id,
+      const saved = await actividades.findOne({
+        where: { id: (response.body as { id: number }).id },
+        relations: { tipoActividad: true },
       });
-      expect(saved.fontaneroId).toBe('fontanero-1');
+      expect(saved?.fontaneroId).toBe('fontanero-1');
+      expect(saved?.tipoActividad?.id).toBe(payload.tipoActividadId);
       assertSafeClientBody(response.body);
     });
 
     it('sin token responde 401', async () => {
       const response = await authPost(
         '/fontanero/actividades',
-        VALID_PAYLOAD,
+        validPayload(),
       ).expect(401);
 
       expect(response.body).toMatchObject({
@@ -192,7 +204,7 @@ describe('Actividades Fontanero — autenticación y autorización', () => {
     it('token inválido responde 401', async () => {
       const response = await authPost(
         '/fontanero/actividades',
-        VALID_PAYLOAD,
+        validPayload(),
         'token-invalido',
       ).expect(401);
 
@@ -207,7 +219,7 @@ describe('Actividades Fontanero — autenticación y autorización', () => {
     it('token vencido responde 401', async () => {
       const response = await authPost(
         '/fontanero/actividades',
-        VALID_PAYLOAD,
+        validPayload(),
         expiredToken(Role.FONTANERO),
       ).expect(401);
 
@@ -222,7 +234,7 @@ describe('Actividades Fontanero — autenticación y autorización', () => {
     it('Administradora autenticada recibe 403', async () => {
       const response = await authPost(
         '/fontanero/actividades',
-        VALID_PAYLOAD,
+        validPayload(),
         signAs(Role.ADMINISTRADORA, 'admin-1'),
       ).expect(403);
 
@@ -237,7 +249,7 @@ describe('Actividades Fontanero — autenticación y autorización', () => {
     it('Secretaria autenticada recibe 403', async () => {
       const response = await authPost(
         '/fontanero/actividades',
-        VALID_PAYLOAD,
+        validPayload(),
         signAs(Role.SECRETARIA, 'sec-1'),
       ).expect(403);
 
@@ -252,7 +264,7 @@ describe('Actividades Fontanero — autenticación y autorización', () => {
     it('rol Abonado (no autorizado) recibe 403', async () => {
       const response = await authPost(
         '/fontanero/actividades',
-        VALID_PAYLOAD,
+        validPayload(),
         signAs('ABONADO', 'abonado-1'),
       ).expect(403);
 
@@ -268,11 +280,56 @@ describe('Actividades Fontanero — autenticación y autorización', () => {
       const response = await authPost(
         '/fontanero/actividades',
         {
-          ...VALID_PAYLOAD,
+          ...validPayload(),
           fontaneroId: 'fontanero-ajeno',
           userId: 'fontanero-ajeno',
           idUsuario: 99,
         },
+        signAs(Role.FONTANERO, 'fontanero-1'),
+      ).expect(400);
+
+      expect(response.body).toMatchObject({ statusCode: 400 });
+      expect(await actividades.count()).toBe(0);
+      assertSafeClientBody(response.body);
+    });
+
+    it('rechaza un tipo de actividad inexistente', async () => {
+      const response = await authPost(
+        '/fontanero/actividades',
+        buildValidCreateActividadPayload(9999),
+        signAs(Role.FONTANERO, 'fontanero-1'),
+      ).expect(404);
+
+      expect(response.body).toMatchObject({
+        statusCode: 404,
+        message: 'Tipo de actividad no encontrado',
+      });
+      expect(await actividades.count()).toBe(0);
+      assertSafeClientBody(response.body);
+    });
+
+    it('rechaza un tipo de actividad inactivo', async () => {
+      await tiposActividad.update({ id: validTipoActividadId }, { activo: false });
+
+      const response = await authPost(
+        '/fontanero/actividades',
+        validPayload(),
+        signAs(Role.FONTANERO, 'fontanero-1'),
+      ).expect(400);
+
+      expect(response.body).toMatchObject({
+        statusCode: 400,
+        message: 'El tipo de actividad no está activo',
+      });
+      expect(await actividades.count()).toBe(0);
+      assertSafeClientBody(response.body);
+    });
+
+    it('rechaza payload incompleto sin fecha de actividad', async () => {
+      const { fechaActividad: _fecha, ...incomplete } = validPayload();
+      const response = await authPost(
+        '/fontanero/actividades',
+        incomplete,
         signAs(Role.FONTANERO, 'fontanero-1'),
       ).expect(400);
 

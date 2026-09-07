@@ -1,10 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, type TransformFnParams } from 'class-transformer';
 import {
+  IsDateString,
+  IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
   MaxLength,
+  Min,
 } from 'class-validator';
 
 const rawValue = ({ value, obj, key }: TransformFnParams): unknown => {
@@ -32,6 +35,16 @@ const trimOptionalString = (params: TransformFnParams): unknown => {
 };
 
 export class CreateActividadDto {
+  @ApiProperty({ example: 1, description: 'ID del tipo de actividad del catálogo' })
+  @IsInt({ message: 'El tipo de actividad debe ser un número entero' })
+  @Min(1, { message: 'El tipo de actividad es obligatorio' })
+  tipoActividadId: number;
+
+  @ApiProperty({ example: '2026-09-07', description: 'Fecha en que se realizó la actividad (YYYY-MM-DD)' })
+  @Transform(trimString)
+  @IsDateString({}, { message: 'La fecha de la actividad debe tener formato YYYY-MM-DD' })
+  fechaActividad: string;
+
   @ApiProperty({ example: 'Reparación de tubería', maxLength: 200 })
   @Transform(trimString)
   @IsString()
@@ -51,4 +64,10 @@ export class CreateActividadDto {
   @IsString()
   @MaxLength(200)
   ubicacion?: string;
+
+  @ApiPropertyOptional()
+  @Transform(trimOptionalString)
+  @IsOptional()
+  @IsString()
+  observaciones?: string;
 }

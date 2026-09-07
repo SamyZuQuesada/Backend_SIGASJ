@@ -67,6 +67,7 @@ export default registerAs('database', (): TypeOrmModuleOptions => {
     dbType === 'mssql' ? 1433 : dbType === 'mysql' ? 3306 : 5432;
   const host = process.env.DB_HOST || 'localhost';
   const database = process.env.DB_DATABASE || 'sigasj_db';
+  const trustedConnection = process.env.DB_TRUSTED_CONNECTION === 'true';
   const isLocalDb =
     dbType === 'mssql' && host.toLowerCase().includes('localdb');
 
@@ -94,6 +95,28 @@ export default registerAs('database', (): TypeOrmModuleOptions => {
       driver,
       extra: {
         connectionString: `Driver={ODBC Driver 17 for SQL Server};Server=${host};Database=${database};Trusted_Connection=yes;TrustServerCertificate=yes;Connection Timeout=30;Pooling=yes;Max Pool Size=10;Min Pool Size=1;`,
+        pool: mssqlPool,
+        options: mssqlOptions,
+        connectionTimeout: 30_000,
+        requestTimeout: 30_000,
+      },
+      options: mssqlOptions,
+    };
+  }
+
+  if (dbType === 'mssql' && trustedConnection) {
+    const driver = tryLoadMssqlNativeDriver();
+    if (!driver) {
+      return sqlJsFallback(base.entities, base.logging);
+    }
+
+    const port = parseInt(process.env.DB_PORT || String(defaultPort), 10);
+
+    return {
+      ...base,
+      driver,
+      extra: {
+        connectionString: `Driver={ODBC Driver 17 for SQL Server};Server=${host},${port};Database=${database};Trusted_Connection=yes;TrustServerCertificate=yes;Connection Timeout=30;Pooling=yes;Max Pool Size=10;Min Pool Size=1;`,
         pool: mssqlPool,
         options: mssqlOptions,
         connectionTimeout: 30_000,
