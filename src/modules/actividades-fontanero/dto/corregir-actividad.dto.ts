@@ -1,7 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, type TransformFnParams } from 'class-transformer';
 import {
+  IsArray,
   IsNotEmpty,
+  IsNumber,
+  IsObject,
   IsOptional,
   IsString,
   MaxLength,
@@ -51,4 +54,41 @@ export class CorregirActividadDto {
   @IsString()
   @MaxLength(200)
   ubicacion?: string;
+
+  @ApiPropertyOptional({ description: 'Objeto de datos específicos del tipo de actividad' })
+  @IsOptional()
+  @IsObject({ message: 'Los datos específicos deben ser un objeto' })
+  datos?: Record<string, unknown>;
+
+  @ApiPropertyOptional({ description: 'Presión medida en PSI/bar para toma de presión' })
+  @IsOptional()
+  @IsNumber({}, { message: 'La presión medida debe ser un número' })
+  presionMedida?: number;
+
+  @ApiPropertyOptional({ description: 'Caudal medido para control operativo' })
+  @IsOptional()
+  @IsNumber({}, { message: 'El caudal debe ser un número' })
+  caudal?: number;
+
+  @ApiPropertyOptional({ description: 'Cantidad de cloro medida para control de cloros' })
+  @IsOptional()
+  @IsNumber({}, { message: 'La cantidad de cloro debe ser un número' })
+  cantidadCloro?: number;
+
+  @ApiPropertyOptional({ description: 'Ubicación detallada de la fuga para control de fugas' })
+  @Transform(trimOptionalString)
+  @IsOptional()
+  @IsString({ message: 'La ubicación de la fuga debe ser texto' })
+  ubicacionFuga?: string;
+
+  @ApiPropertyOptional({ description: 'Resultado de la visita de campo' })
+  @Transform(trimOptionalString)
+  @IsOptional()
+  @IsString({ message: 'El resultado de la visita debe ser texto' })
+  resultadoVisita?: string;
+
+  @ApiPropertyOptional({ description: 'Documentos adjuntos para incapacidades o vacaciones', type: [String] })
+  @IsOptional()
+  @IsArray({ message: 'Los documentos deben ser una lista' })
+  documentos?: string[];
 }

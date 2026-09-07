@@ -16,6 +16,7 @@ import { AuthModule } from '../auth/auth.module';
 import { ActividadesFontaneroModule } from './actividades-fontanero.module';
 import { ActividadFontanero } from './entities/actividad-fontanero.entity';
 import { TipoActividadFontanero } from './entities/tipo-actividad-fontanero.entity';
+import { DocumentoActividadFontanero } from './entities/documento-actividad-fontanero.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import {
   buildValidCreateActividadPayload,
@@ -95,7 +96,7 @@ describe('Seguridad Backend — módulo actividades Fontanero', () => {
           type: 'sqljs',
           autoSave: false,
           dropSchema: true,
-          entities: [ActividadFontanero, TipoActividadFontanero, Usuario],
+          entities: [ActividadFontanero, TipoActividadFontanero, DocumentoActividadFontanero, Usuario],
           synchronize: true,
         }),
         AuthModule,

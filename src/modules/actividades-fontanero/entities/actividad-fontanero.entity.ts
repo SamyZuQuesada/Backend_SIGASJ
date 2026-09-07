@@ -4,11 +4,13 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { EstadoActividadFontanero } from '../../../common/enums/estado-actividad-fontanero.enum';
 import { Usuario } from '../../usuarios/entities/usuario.entity';
+import { DocumentoActividadFontanero } from './documento-actividad-fontanero.entity';
 import { TipoActividadFontanero } from './tipo-actividad-fontanero.entity';
 
 /**
@@ -33,6 +35,12 @@ export class ActividadFontanero {
   })
   @JoinColumn({ name: 'idTipoActividad' })
   tipoActividad: TipoActividadFontanero | null;
+
+  @OneToMany(
+    () => DocumentoActividadFontanero,
+    (documento) => documento.actividad,
+  )
+  documentos: DocumentoActividadFontanero[];
 
   @Column({ type: 'date', nullable: true })
   fechaActividad: string | null;
@@ -62,6 +70,9 @@ export class ActividadFontanero {
 
   @Column({ type: 'varchar', length: 100, nullable: true })
   revisadoPorId: string | null;
+
+  @Column({ type: 'simple-json', nullable: true })
+  datosEspecificos: Record<string, unknown> | null;
 
   @CreateDateColumn()
   createdAt: Date;

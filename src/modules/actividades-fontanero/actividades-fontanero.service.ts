@@ -8,12 +8,17 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { EstadoActividadFontanero } from '../../common/enums/estado-actividad-fontanero.enum';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
+import {
+  saveActividadDocument,
+  type ActividadDocumentFile,
+} from '../../common/media/public-media';
 import { CorregirActividadDto } from './dto/corregir-actividad.dto';
 import { CreateActividadDto } from './dto/create-actividad.dto';
 import { RevisarActividadDto } from './dto/revisar-actividad.dto';
 import { SolicitarCorreccionDto } from './dto/solicitar-correccion.dto';
 import { validarDatosEspecificosActividad } from './validators/datos-especificos-actividad.validator';
 import { ActividadFontanero } from './entities/actividad-fontanero.entity';
+import { DocumentoActividadFontanero } from './entities/documento-actividad-fontanero.entity';
 import { TipoActividadFontanero } from './entities/tipo-actividad-fontanero.entity';
 
 export type ActividadFontaneroResponse = {
@@ -25,6 +30,7 @@ export type ActividadFontaneroResponse = {
   descripcion: string | null;
   ubicacion: string | null;
   observaciones: string | null;
+  datosEspecificos?: Record<string, unknown> | null;
   estado: EstadoActividadFontanero;
   observacionCorreccion: string | null;
   createdAt: Date;
@@ -63,6 +69,15 @@ export type ListadoTiposActividadResponse = {
   total: number;
 };
 
+export type DocumentoActividadResponse = {
+  id: number;
+  nombreOriginal: string;
+  tipoArchivo: string;
+  rutaReferenciaArchivo: string;
+  tamanio: number;
+  fechaCarga: Date;
+};
+
 @Injectable()
 export class ActividadesFontaneroService {
   constructor(
@@ -70,6 +85,8 @@ export class ActividadesFontaneroService {
     private readonly actividadRepository: Repository<ActividadFontanero>,
     @InjectRepository(TipoActividadFontanero)
     private readonly tipoActividadRepository: Repository<TipoActividadFontanero>,
+    @InjectRepository(DocumentoActividadFontanero)
+    private readonly documentoRepository: Repository<DocumentoActividadFontanero>,
   ) {}
 
   async listarTipos(): Promise<ListadoTiposActividadResponse> {
@@ -96,8 +113,10 @@ export class ActividadesFontaneroService {
     const tipoActividad = await this.requireTipoActividadActivo(
       dto.tipoActividadId,
     );
+    const datosEspecificos = this.extractDatosEspecificos(dto);
     const erroresEspecificos = validarDatosEspecificosActividad({
       codigo: tipoActividad.codigo,
+      datos: datosEspecificos,
     });
     if (erroresEspecificos.length > 0) {
       throw new BadRequestException(erroresEspecificos);
@@ -109,6 +128,8 @@ export class ActividadesFontaneroService {
       descripcion: dto.descripcion ?? null,
       ubicacion: dto.ubicacion ?? null,
       observaciones: dto.observaciones ?? null,
+      datosEspecificos:
+        Object.keys(datosEspecificos).length > 0 ? datosEspecificos : null,
       fechaActividad: dto.fechaActividad,
       tipoActividad,
       fontanero: idUsuario ? { idUsuario } : null,
@@ -185,6 +206,35 @@ export class ActividadesFontaneroService {
     return this.toFontaneroResponse(actividad);
   }
 
+  async adjuntarDocumento(
+    actividadId: number,
+    file: ActividadDocumentFile,
+    user: AuthenticatedUser,
+  ): Promise<DocumentoActividadResponse> {
+    const actividad = await this.requireOwnedActividad(actividadId, user.userId);
+
+    const { rutaReferenciaArchivo } = saveActividadDocument(actividadId, file);
+
+    const documento = this.documentoRepository.create({
+      nombreOriginal: file.originalname,
+      tipoArchivo: file.mimetype,
+      rutaReferenciaArchivo,
+      tamanio: file.size,
+      actividad,
+    });
+
+    const saved = await this.documentoRepository.save(documento);
+
+    return {
+      id: saved.id,
+      nombreOriginal: saved.nombreOriginal,
+      tipoArchivo: saved.tipoArchivo,
+      rutaReferenciaArchivo: saved.rutaReferenciaArchivo,
+      tamanio: saved.tamanio,
+      fechaCarga: saved.fechaCarga,
+    };
+  }
+
   async corregirPropia(
     id: number,
     dto: CorregirActividadDto,
@@ -196,9 +246,23 @@ export class ActividadesFontaneroService {
       throw new ForbiddenException('Acceso denegado');
     }
 
+    const datosEspecificos = this.extractDatosEspecificos(dto);
+    if (actividad.tipoActividad) {
+      const erroresEspecificos = validarDatosEspecificosActividad({
+        codigo: actividad.tipoActividad.codigo,
+        datos: datosEspecificos,
+      });
+      if (erroresEspecificos.length > 0) {
+        throw new BadRequestException(erroresEspecificos);
+      }
+    }
+
     actividad.titulo = dto.titulo;
     actividad.descripcion = dto.descripcion ?? null;
     actividad.ubicacion = dto.ubicacion ?? null;
+    if (Object.keys(datosEspecificos).length > 0) {
+      actividad.datosEspecificos = datosEspecificos;
+    }
     actividad.estado = EstadoActividadFontanero.CORREGIDA;
     actividad.observacionCorreccion = null;
 
@@ -336,6 +400,19 @@ export class ActividadesFontaneroService {
     return actividad;
   }
 
+  private extractDatosEspecificos(
+    dto: CreateActividadDto | CorregirActividadDto,
+  ): Record<string, unknown> {
+    const datos: Record<string, unknown> = { ...(dto.datos ?? {}) };
+    if (dto.presionMedida !== undefined) datos.presionMedida = dto.presionMedida;
+    if (dto.caudal !== undefined) datos.caudal = dto.caudal;
+    if (dto.cantidadCloro !== undefined) datos.cantidadCloro = dto.cantidadCloro;
+    if (dto.ubicacionFuga !== undefined) datos.ubicacionFuga = dto.ubicacionFuga;
+    if (dto.resultadoVisita !== undefined) datos.resultadoVisita = dto.resultadoVisita;
+    if (dto.documentos !== undefined) datos.documentos = dto.documentos;
+    return datos;
+  }
+
   private toFontaneroResponse(
     actividad: ActividadFontanero,
     tipoActividad?: TipoActividadFontanero | null,
@@ -351,6 +428,7 @@ export class ActividadesFontaneroService {
       descripcion: actividad.descripcion,
       ubicacion: actividad.ubicacion,
       observaciones: actividad.observaciones,
+      datosEspecificos: actividad.datosEspecificos ?? null,
       estado: actividad.estado,
       observacionCorreccion: actividad.observacionCorreccion,
       createdAt: actividad.createdAt,

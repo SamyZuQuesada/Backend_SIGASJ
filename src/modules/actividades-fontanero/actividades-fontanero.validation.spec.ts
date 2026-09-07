@@ -16,6 +16,7 @@ import { Usuario } from '../usuarios/entities/usuario.entity';
 import { ActividadesFontaneroModule } from './actividades-fontanero.module';
 import { ActividadFontanero } from './entities/actividad-fontanero.entity';
 import { TipoActividadFontanero } from './entities/tipo-actividad-fontanero.entity';
+import { DocumentoActividadFontanero } from './entities/documento-actividad-fontanero.entity';
 import {
   buildValidCreateActividadPayload,
   seedTiposActividadFontanero,
@@ -33,7 +34,7 @@ const assertReadableValidationError = (body: unknown) => {
     }
   } else {
     expect(typeof message).toBe('string');
-    expect(message.length).toBeGreaterThan(0);
+    expect((message as string).length).toBeGreaterThan(0);
   }
 };
 
@@ -74,7 +75,7 @@ describe('POST /api/v1/fontanero/actividades — validación (#931)', () => {
           type: 'sqljs',
           autoSave: false,
           dropSchema: true,
-          entities: [ActividadFontanero, TipoActividadFontanero, Usuario],
+          entities: [ActividadFontanero, TipoActividadFontanero, DocumentoActividadFontanero, Usuario],
           synchronize: true,
         }),
         AuthModule,
@@ -251,5 +252,34 @@ describe('POST /api/v1/fontanero/actividades — validación (#931)', () => {
       message: 'El tipo de actividad no está activo',
     });
     expect(await actividades.count()).toBe(0);
+  });
+
+  it('valida datos específicos obligatorios según el tipo de actividad', async () => {
+    const tipos = await tiposActividad.find({ order: { id: 'ASC' } });
+    const tipoTomaPresion = tipos.find((t) => t.codigo === 'TOMA_PRESION');
+    expect(tipoTomaPresion).toBeDefined();
+
+    const invalido = await postActividad({
+      tipoActividadId: tipoTomaPresion!.id,
+      fechaActividad: '2026-09-07',
+      titulo: 'Medición en tanque principal',
+    }).expect(400);
+
+    assertReadableValidationError(invalido.body);
+    expect(JSON.stringify(invalido.body)).toContain('presión medida');
+    expect(await actividades.count()).toBe(0);
+
+    const valido = await postActividad({
+      tipoActividadId: tipoTomaPresion!.id,
+      fechaActividad: '2026-09-07',
+      titulo: 'Medición en tanque principal',
+      presionMedida: 45.0,
+    }).expect(201);
+
+    expect(valido.body).toMatchObject({
+      tipoActividadId: tipoTomaPresion!.id,
+      datosEspecificos: { presionMedida: 45.0 },
+    });
+    expect(await actividades.count()).toBe(1);
   });
 });

@@ -18,6 +18,7 @@ import type { ListadoTiposActividadResponse } from './actividades-fontanero.serv
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { ActividadFontanero } from './entities/actividad-fontanero.entity';
 import { TipoActividadFontanero } from './entities/tipo-actividad-fontanero.entity';
+import { DocumentoActividadFontanero } from './entities/documento-actividad-fontanero.entity';
 import { seedTiposActividadFontanero } from './testing/actividades-fontanero.test-helpers';
 import { TIPOS_ACTIVIDAD_FONTANERO_INICIALES } from './tipo-actividad-fontanero.catalogo';
 
@@ -47,7 +48,7 @@ describe('Catálogo de tipos de actividad del fontanero', () => {
           type: 'sqljs',
           autoSave: false,
           dropSchema: true,
-          entities: [ActividadFontanero, TipoActividadFontanero, Usuario],
+          entities: [ActividadFontanero, TipoActividadFontanero, DocumentoActividadFontanero, Usuario],
           synchronize: true,
         }),
         AuthModule,

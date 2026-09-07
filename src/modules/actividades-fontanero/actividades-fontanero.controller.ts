@@ -8,9 +8,17 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import {
+  ApiBearerAuth,
+  ApiConsumes,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/enums/role.enum';
@@ -22,6 +30,7 @@ import { CorregirActividadDto } from './dto/corregir-actividad.dto';
 import { CreateActividadDto } from './dto/create-actividad.dto';
 import { RevisarActividadDto } from './dto/revisar-actividad.dto';
 import { SolicitarCorreccionDto } from './dto/solicitar-correccion.dto';
+import { UploadedImageFile } from '../../common/media/public-media';
 
 @ApiTags('Actividades Fontanero')
 @ApiBearerAuth()
@@ -99,6 +108,31 @@ export class ActividadesFontaneroController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.actividadesFontaneroService.detallePropio(id, user);
+  }
+
+  @Post('fontanero/actividades/:id/documentos')
+  @HttpCode(HttpStatus.CREATED)
+  @Roles(Role.FONTANERO)
+  @UseInterceptors(FileInterceptor('archivo'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Adjuntar documento a una actividad propia (Fontanero)',
+  })
+  adjuntarDocumento(
+    @Param('id', ParseIntPipe) id: number,
+    @UploadedFile() file: UploadedImageFile,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.actividadesFontaneroService.adjuntarDocumento(
+      id,
+      {
+        originalname: file.originalname,
+        mimetype: file.mimetype,
+        size: file.size,
+        buffer: file.buffer,
+      },
+      user,
+    );
   }
 
   @Patch('fontanero/actividades/:id/corregir')

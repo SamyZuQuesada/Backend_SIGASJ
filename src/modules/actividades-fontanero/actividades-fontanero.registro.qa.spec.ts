@@ -16,6 +16,7 @@ import { Usuario } from '../usuarios/entities/usuario.entity';
 import { ActividadesFontaneroModule } from './actividades-fontanero.module';
 import { ActividadFontanero } from './entities/actividad-fontanero.entity';
 import { TipoActividadFontanero } from './entities/tipo-actividad-fontanero.entity';
+import { DocumentoActividadFontanero } from './entities/documento-actividad-fontanero.entity';
 import {
   buildValidCreateActividadPayload,
   seedTiposActividadFontanero,
@@ -58,7 +59,7 @@ describe('QA #933 — registro y validación de actividades Fontanero', () => {
           type: 'sqljs',
           autoSave: false,
           dropSchema: true,
-          entities: [ActividadFontanero, TipoActividadFontanero, Usuario],
+          entities: [ActividadFontanero, TipoActividadFontanero, DocumentoActividadFontanero, Usuario],
           synchronize: true,
         }),
         AuthModule,
