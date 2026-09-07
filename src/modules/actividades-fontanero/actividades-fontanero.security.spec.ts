@@ -15,6 +15,8 @@ import jwtConfig from '../../config/jwt.config';
 import { AuthModule } from '../auth/auth.module';
 import { ActividadesFontaneroModule } from './actividades-fontanero.module';
 import { ActividadFontanero } from './entities/actividad-fontanero.entity';
+import { TipoActividadFontanero } from './entities/tipo-actividad-fontanero.entity';
+import { Usuario } from '../usuarios/entities/usuario.entity';
 
 /**
  * Suite de aceptación de seguridad Backend (independiente del Frontend).
@@ -83,7 +85,7 @@ describe('Seguridad Backend — módulo actividades Fontanero', () => {
           type: 'sqljs',
           autoSave: false,
           dropSchema: true,
-          entities: [ActividadFontanero],
+          entities: [ActividadFontanero, TipoActividadFontanero, Usuario],
           synchronize: true,
         }),
         AuthModule,

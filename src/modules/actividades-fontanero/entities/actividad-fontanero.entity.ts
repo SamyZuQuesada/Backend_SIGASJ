@@ -2,20 +2,45 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  JoinColumn,
+  ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { EstadoActividadFontanero } from '../../../common/enums/estado-actividad-fontanero.enum';
+import { Usuario } from '../../usuarios/entities/usuario.entity';
+import { TipoActividadFontanero } from './tipo-actividad-fontanero.entity';
 
+/**
+ * Registro principal de una actividad realizada por un fontanero.
+ * Los detalles específicos de cada formulario se modelan en entidades aparte.
+ */
 @Entity('ActividadFontanero')
 export class ActividadFontanero {
   @PrimaryGeneratedColumn()
   id: number;
 
-  /** Identidad del fontanero dueño; siempre proviene del JWT, nunca del cliente. */
+  /** Identidad del fontanero dueño; proviene del JWT hasta enlazar idUsuario. */
   @Column({ type: 'varchar', length: 100 })
   fontaneroId: string;
 
+  @ManyToOne(() => Usuario, { nullable: true })
+  @JoinColumn({ name: 'idUsuario' })
+  fontanero: Usuario | null;
+
+  @ManyToOne(() => TipoActividadFontanero, (tipo) => tipo.actividades, {
+    nullable: true,
+  })
+  @JoinColumn({ name: 'idTipoActividad' })
+  tipoActividad: TipoActividadFontanero | null;
+
+  @Column({ type: 'date', nullable: true })
+  fechaActividad: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  observaciones: string | null;
+
+  /** Resumen breve usado por el flujo operativo actual (endpoint Wuipy). */
   @Column({ type: 'varchar', length: 200 })
   titulo: string;
 

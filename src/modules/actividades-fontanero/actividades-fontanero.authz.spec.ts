@@ -15,6 +15,8 @@ import jwtConfig from '../../config/jwt.config';
 import { AuthModule } from '../auth/auth.module';
 import { ActividadesFontaneroModule } from './actividades-fontanero.module';
 import { ActividadFontanero } from './entities/actividad-fontanero.entity';
+import { TipoActividadFontanero } from './entities/tipo-actividad-fontanero.entity';
+import { Usuario } from '../usuarios/entities/usuario.entity';
 
 const VALID_PAYLOAD = {
   titulo: 'Reparación de tubería en Calle Principal',
@@ -111,7 +113,7 @@ describe('Actividades Fontanero — autenticación y autorización', () => {
           type: 'sqljs',
           autoSave: false,
           dropSchema: true,
-          entities: [ActividadFontanero],
+          entities: [ActividadFontanero, TipoActividadFontanero, Usuario],
           synchronize: true,
         }),
         AuthModule,
