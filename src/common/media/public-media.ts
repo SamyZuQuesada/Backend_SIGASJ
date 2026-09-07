@@ -182,3 +182,41 @@ export function streamPublicMedia(
   });
 }
 
+export type ActividadDocumentFile = UploadedImageFile;
+
+const ACTIVIDAD_DOCUMENT_MIME_TYPES: Record<string, string> = {
+  'application/pdf': '.pdf',
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+};
+
+const MAX_ACTIVIDAD_DOCUMENT_BYTES = 10 * 1024 * 1024; // 10 MB
+
+/**
+ * Guarda un documento asociado a una actividad del fontanero.
+ * Acepta PDF, JPG o PNG. Máximo 10 MB.
+ * Devuelve la ruta de referencia relativa persistida en base de datos.
+ */
+export function saveActividadDocument(
+  actividadId: number,
+  file: ActividadDocumentFile,
+): { rutaReferenciaArchivo: string; filename: string } {
+  const extension = ACTIVIDAD_DOCUMENT_MIME_TYPES[file.mimetype];
+
+  if (!extension) {
+    throw new BadRequestException('Solo se permiten archivos PDF, JPG o PNG.');
+  }
+
+  if (file.size > MAX_ACTIVIDAD_DOCUMENT_BYTES) {
+    throw new BadRequestException('El archivo no puede superar 10 MB.');
+  }
+
+  const folder = join(UPLOAD_ROOT, 'actividades-fontanero', String(actividadId));
+  mkdirSync(folder, { recursive: true });
+
+  const filename = `${Date.now()}-${randomUUID()}${extension}`;
+  writeFileSync(join(folder, filename), file.buffer);
+
+  const rutaReferenciaArchivo = `/api/v1/fontanero/actividades/${actividadId}/documentos/${filename}`;
+  return { rutaReferenciaArchivo, filename };
+}

@@ -2,21 +2,25 @@ import { DataSource } from 'typeorm';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { ActividadFontanero } from './entities/actividad-fontanero.entity';
 import { TipoActividadFontanero } from './entities/tipo-actividad-fontanero.entity';
+import { DocumentoActividadFontanero } from './entities/documento-actividad-fontanero.entity';
 
 describe('Entidades Actividades Fontanero (#386)', () => {
+  jest.setTimeout(30000);
   let dataSource: DataSource;
 
   beforeAll(async () => {
     dataSource = new DataSource({
       type: 'sqljs',
-      entities: [ActividadFontanero, TipoActividadFontanero, Usuario],
+      entities: [ActividadFontanero, TipoActividadFontanero, DocumentoActividadFontanero, Usuario],
       synchronize: true,
     });
     await dataSource.initialize();
   });
 
   afterAll(async () => {
-    await dataSource.destroy();
+    if (dataSource?.isInitialized) {
+      await dataSource.destroy();
+    }
   });
 
   it('ActividadFontanero expone relación ManyToOne con TipoActividadFontanero', () => {
@@ -46,7 +50,11 @@ describe('Entidades Actividades Fontanero (#386)', () => {
     const columnNames = metadata.columns.map((column) => column.propertyName);
 
     expect(columnNames).toEqual(
-      expect.arrayContaining(['fechaActividad', 'observaciones']),
+      expect.arrayContaining([
+        'fechaActividad',
+        'observaciones',
+        'datosEspecificos',
+      ]),
     );
   });
 

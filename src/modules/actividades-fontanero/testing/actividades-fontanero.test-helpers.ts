@@ -78,5 +78,11 @@ export const buildValidCreateActividadPayload = (
   descripcion: 'Se reemplazó tramo dañado de 2 metros',
   ubicacion: 'Calle Principal, San Juan',
   observaciones: 'Sin novedad adicional',
+  ubicacionFuga: 'Calle Principal, San Juan',
+  presionMedida: 45.5,
+  resultadoVisita: 'Inspección realizada en sitio',
+  cantidadCloro: 1.2,
+  caudal: 25.0,
+  documentos: ['comprobante_medico.pdf'],
   ...overrides,
 });
