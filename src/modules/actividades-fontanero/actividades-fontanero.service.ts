@@ -12,6 +12,7 @@ import { CorregirActividadDto } from './dto/corregir-actividad.dto';
 import { CreateActividadDto } from './dto/create-actividad.dto';
 import { RevisarActividadDto } from './dto/revisar-actividad.dto';
 import { SolicitarCorreccionDto } from './dto/solicitar-correccion.dto';
+import { validarDatosEspecificosActividad } from './validators/datos-especificos-actividad.validator';
 import { ActividadFontanero } from './entities/actividad-fontanero.entity';
 import { TipoActividadFontanero } from './entities/tipo-actividad-fontanero.entity';
 
@@ -66,6 +67,12 @@ export class ActividadesFontaneroService {
     const tipoActividad = await this.requireTipoActividadActivo(
       dto.tipoActividadId,
     );
+    const erroresEspecificos = validarDatosEspecificosActividad({
+      codigo: tipoActividad.codigo,
+    });
+    if (erroresEspecificos.length > 0) {
+      throw new BadRequestException(erroresEspecificos);
+    }
     const idUsuario = this.parseOptionalUsuarioId(user.userId);
 
     const actividad = this.actividadRepository.create({

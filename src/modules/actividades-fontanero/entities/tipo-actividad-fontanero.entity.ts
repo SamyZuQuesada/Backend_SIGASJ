@@ -6,6 +6,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { TipoActividadFontaneroCodigo } from '../../../common/enums/tipo-actividad-fontanero-codigo.enum';
 import { ActividadFontanero } from './actividad-fontanero.entity';
 
 @Entity('TipoActividadFontanero')
@@ -14,7 +15,7 @@ export class TipoActividadFontanero {
   id: number;
 
   @Column({ type: 'varchar', length: 50, unique: true })
-  codigo: string;
+  codigo: TipoActividadFontaneroCodigo;
 
   @Column({ type: 'varchar', length: 150 })
   nombre: string;
