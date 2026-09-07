@@ -6,37 +6,44 @@ const CATALOGO_TIPOS: Array<{
   codigo: TipoActividadFontaneroCodigo;
   nombre: string;
   descripcion: string;
+  orden: number;
   activo?: boolean;
 }> = [
   {
     codigo: TipoActividadFontaneroCodigo.CONTROL_FUGAS,
     nombre: 'Control de Fugas',
     descripcion: 'Registro de control de fugas en la red de distribución.',
+    orden: 1,
   },
   {
     codigo: TipoActividadFontaneroCodigo.TOMA_PRESION,
     nombre: 'Toma de presión',
     descripcion: 'Medición de presión en puntos operativos de la red.',
+    orden: 2,
   },
   {
     codigo: TipoActividadFontaneroCodigo.VISITA_CAMPO,
     nombre: 'Visita de Campo',
     descripcion: 'Visita operativa en campo para seguimiento o atención.',
+    orden: 3,
   },
   {
     codigo: TipoActividadFontaneroCodigo.CONTROL_CLOROS,
     nombre: 'Control de Cloros',
     descripcion: 'Control de niveles de cloro en el sistema de tratamiento.',
+    orden: 4,
   },
   {
     codigo: TipoActividadFontaneroCodigo.CONTROL_OPERATIVO,
     nombre: 'Control Operativo',
     descripcion: 'Registro de actividades operativas generales.',
+    orden: 5,
   },
   {
     codigo: TipoActividadFontaneroCodigo.INCAPACIDAD_VACACIONES,
     nombre: 'Incapacidad o vacaciones',
     descripcion: 'Registro de incapacidad o periodo de vacaciones del fontanero.',
+    orden: 6,
   },
 ];
 
@@ -53,6 +60,7 @@ export async function seedTiposActividadFontanero(
       codigo: item.codigo,
       nombre: item.nombre,
       descripcion: item.descripcion,
+      orden: item.orden,
       activo: item.activo ?? true,
     }),
   );

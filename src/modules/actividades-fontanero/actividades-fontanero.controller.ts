@@ -77,6 +77,17 @@ export class ActividadesFontaneroController {
     return this.actividadesFontaneroService.correccionesPendientes(user);
   }
 
+  @Get('fontanero/actividades/tipos')
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.FONTANERO, Role.ADMINISTRADORA)
+  @ApiOperation({
+    summary:
+      'Consultar catálogo de tipos de actividad (Fontanero y Administradora)',
+  })
+  listarTipos() {
+    return this.actividadesFontaneroService.listarTipos();
+  }
+
   @Get('fontanero/actividades/:id')
   @HttpCode(HttpStatus.OK)
   @Roles(Role.FONTANERO)

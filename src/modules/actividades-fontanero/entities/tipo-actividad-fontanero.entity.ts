@@ -26,6 +26,9 @@ export class TipoActividadFontanero {
   @Column({ default: true })
   activo: boolean;
 
+  @Column({ type: 'int', default: 0 })
+  orden: number;
+
   @OneToMany(() => ActividadFontanero, (actividad) => actividad.tipoActividad)
   actividades: ActividadFontanero[];
 

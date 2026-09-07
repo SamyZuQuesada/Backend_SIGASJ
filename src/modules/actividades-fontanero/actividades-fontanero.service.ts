@@ -51,6 +51,18 @@ export type ReporteActividadesResponse = {
   porEstado: Record<EstadoActividadFontanero, number>;
 };
 
+export type TipoActividadFontaneroResponse = {
+  id: number;
+  codigo: string;
+  nombre: string;
+  orden: number;
+};
+
+export type ListadoTiposActividadResponse = {
+  data: TipoActividadFontaneroResponse[];
+  total: number;
+};
+
 @Injectable()
 export class ActividadesFontaneroService {
   constructor(
@@ -59,6 +71,23 @@ export class ActividadesFontaneroService {
     @InjectRepository(TipoActividadFontanero)
     private readonly tipoActividadRepository: Repository<TipoActividadFontanero>,
   ) {}
+
+  async listarTipos(): Promise<ListadoTiposActividadResponse> {
+    const tipos = await this.tipoActividadRepository.find({
+      where: { activo: true },
+      order: { orden: 'ASC', id: 'ASC' },
+    });
+
+    return {
+      data: tipos.map((tipo) => ({
+        id: tipo.id,
+        codigo: tipo.codigo,
+        nombre: tipo.nombre,
+        orden: tipo.orden,
+      })),
+      total: tipos.length,
+    };
+  }
 
   async registrar(
     dto: CreateActividadDto,

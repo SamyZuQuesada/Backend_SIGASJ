@@ -14,6 +14,7 @@ import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
 import jwtConfig from '../../config/jwt.config';
 import { AuthModule } from '../auth/auth.module';
 import { ActividadesFontaneroModule } from './actividades-fontanero.module';
+import type { ListadoTiposActividadResponse } from './actividades-fontanero.service';
 import { ActividadFontanero } from './entities/actividad-fontanero.entity';
 import { TipoActividadFontanero } from './entities/tipo-actividad-fontanero.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
@@ -21,6 +22,7 @@ import {
   buildValidCreateActividadPayload,
   seedTiposActividadFontanero,
 } from './testing/actividades-fontanero.test-helpers';
+import { TIPOS_ACTIVIDAD_FONTANERO_INICIALES } from './tipo-actividad-fontanero.catalogo';
 
 const assertSafeClientBody = (body: unknown) => {
   const serialized = JSON.stringify(body ?? '');
@@ -335,6 +337,96 @@ describe('Actividades Fontanero — autenticación y autorización', () => {
 
       expect(response.body).toMatchObject({ statusCode: 400 });
       expect(await actividades.count()).toBe(0);
+      assertSafeClientBody(response.body);
+    });
+  });
+
+  describe('GET /api/v1/fontanero/actividades/tipos', () => {
+    it('Fontanero consulta el catálogo activo', async () => {
+      const response = await authGet(
+        '/fontanero/actividades/tipos',
+        signAs(Role.FONTANERO, 'fontanero-1'),
+      ).expect(200);
+
+      const body = response.body as ListadoTiposActividadResponse;
+      expect(body.total).toBe(TIPOS_ACTIVIDAD_FONTANERO_INICIALES.length);
+      expect(body.data).toHaveLength(TIPOS_ACTIVIDAD_FONTANERO_INICIALES.length);
+      expect(body.data[0]).toMatchObject({
+        codigo: 'CONTROL_FUGAS',
+        nombre: 'Control de Fugas',
+        orden: 1,
+      });
+      expect(body.data[0]).not.toHaveProperty('activo');
+      assertSafeClientBody(response.body);
+    });
+
+    it('Administradora consulta el mismo catálogo', async () => {
+      const response = await authGet(
+        '/fontanero/actividades/tipos',
+        signAs(Role.ADMINISTRADORA, 'admin-1'),
+      ).expect(200);
+
+      const body = response.body as ListadoTiposActividadResponse;
+      expect(body.total).toBe(TIPOS_ACTIVIDAD_FONTANERO_INICIALES.length);
+      assertSafeClientBody(response.body);
+    });
+
+    it('sin token responde 401', async () => {
+      const response = await authGet(
+        '/fontanero/actividades/tipos',
+      ).expect(401);
+      expect(response.body).toMatchObject({
+        statusCode: 401,
+        message: 'No autenticado',
+      });
+      assertSafeClientBody(response.body);
+    });
+
+    it('token inválido responde 401', async () => {
+      const response = await authGet(
+        '/fontanero/actividades/tipos',
+        'token-invalido',
+      ).expect(401);
+      expect(response.body).toMatchObject({
+        statusCode: 401,
+        message: 'No autenticado',
+      });
+      assertSafeClientBody(response.body);
+    });
+
+    it('token vencido responde 401', async () => {
+      const response = await authGet(
+        '/fontanero/actividades/tipos',
+        expiredToken(Role.FONTANERO),
+      ).expect(401);
+      expect(response.body).toMatchObject({
+        statusCode: 401,
+        message: 'No autenticado',
+      });
+      assertSafeClientBody(response.body);
+    });
+
+    it('Secretaria autenticada recibe 403', async () => {
+      const response = await authGet(
+        '/fontanero/actividades/tipos',
+        signAs(Role.SECRETARIA, 'sec-1'),
+      ).expect(403);
+      expect(response.body).toMatchObject({
+        statusCode: 403,
+        message: 'Acceso denegado',
+      });
+      assertSafeClientBody(response.body);
+    });
+
+    it('rol Abonado recibe 403', async () => {
+      const response = await authGet(
+        '/fontanero/actividades/tipos',
+        signAs('ABONADO', 'abonado-1'),
+      ).expect(403);
+      expect(response.body).toMatchObject({
+        statusCode: 403,
+        message: 'Acceso denegado',
+      });
       assertSafeClientBody(response.body);
     });
   });
