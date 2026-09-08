@@ -5,9 +5,7 @@ export type ValidacionDatosEspecificosInput = {
   datos?: Record<string, unknown>;
 };
 
-type ValidadorDatosEspecificos = (
-  datos?: Record<string, unknown>,
-) => string[];
+type ValidadorDatosEspecificos = (datos?: Record<string, unknown>) => string[];
 
 const getString = (
   datos: Record<string, unknown> | undefined,
@@ -30,7 +28,12 @@ const getPositiveNumber = (
   if (!datos) return undefined;
   for (const key of keys) {
     const val = datos[key];
-    if (typeof val === 'number' && !Number.isNaN(val) && Number.isFinite(val) && val > 0) {
+    if (
+      typeof val === 'number' &&
+      !Number.isNaN(val) &&
+      Number.isFinite(val) &&
+      val > 0
+    ) {
       return val;
     }
     if (typeof val === 'string' && val.trim() !== '') {

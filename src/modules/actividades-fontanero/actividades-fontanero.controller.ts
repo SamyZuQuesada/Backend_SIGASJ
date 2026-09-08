@@ -9,10 +9,11 @@ import {
   Patch,
   Post,
   UploadedFile,
+  UploadedFiles,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
   ApiConsumes,
@@ -30,7 +31,11 @@ import { CorregirActividadDto } from './dto/corregir-actividad.dto';
 import { CreateActividadDto } from './dto/create-actividad.dto';
 import { RevisarActividadDto } from './dto/revisar-actividad.dto';
 import { SolicitarCorreccionDto } from './dto/solicitar-correccion.dto';
-import { UploadedImageFile } from '../../common/media/public-media';
+import {
+  MAX_ACTIVIDAD_DOCUMENT_BYTES,
+  MAX_ACTIVIDAD_DOCUMENT_FILES,
+  type UploadedImageFile,
+} from '../../common/media/public-media';
 
 @ApiTags('Actividades Fontanero')
 @ApiBearerAuth()
@@ -46,14 +51,24 @@ export class ActividadesFontaneroController {
   @Post('fontanero/actividades')
   @HttpCode(HttpStatus.CREATED)
   @Roles(Role.FONTANERO)
+  @UseInterceptors(
+    FilesInterceptor('documentos', MAX_ACTIVIDAD_DOCUMENT_FILES, {
+      limits: {
+        fileSize: MAX_ACTIVIDAD_DOCUMENT_BYTES,
+        files: MAX_ACTIVIDAD_DOCUMENT_FILES,
+      },
+    }),
+  )
+  @ApiConsumes('application/json', 'multipart/form-data')
   @ApiOperation({
     summary: 'Registrar una actividad propia (Fontanero)',
   })
   registrar(
     @Body() dto: CreateActividadDto,
+    @UploadedFiles() files: UploadedImageFile[] | undefined,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.actividadesFontaneroService.registrar(dto, user);
+    return this.actividadesFontaneroService.registrar(dto, user, files);
   }
 
   @Get('fontanero/actividades')
@@ -113,26 +128,21 @@ export class ActividadesFontaneroController {
   @Post('fontanero/actividades/:id/documentos')
   @HttpCode(HttpStatus.CREATED)
   @Roles(Role.FONTANERO)
-  @UseInterceptors(FileInterceptor('archivo'))
+  @UseInterceptors(
+    FileInterceptor('archivo', {
+      limits: { fileSize: MAX_ACTIVIDAD_DOCUMENT_BYTES, files: 1 },
+    }),
+  )
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
     summary: 'Adjuntar documento a una actividad propia (Fontanero)',
   })
   adjuntarDocumento(
     @Param('id', ParseIntPipe) id: number,
-    @UploadedFile() file: UploadedImageFile,
+    @UploadedFile() file: UploadedImageFile | undefined,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.actividadesFontaneroService.adjuntarDocumento(
-      id,
-      {
-        originalname: file.originalname,
-        mimetype: file.mimetype,
-        size: file.size,
-        buffer: file.buffer,
-      },
-      user,
-    );
+    return this.actividadesFontaneroService.adjuntarDocumento(id, file, user);
   }
 
   @Patch('fontanero/actividades/:id/corregir')

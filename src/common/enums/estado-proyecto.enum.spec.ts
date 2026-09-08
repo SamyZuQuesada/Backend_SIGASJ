@@ -40,7 +40,11 @@ describe('EstadoProyecto Enum', () => {
 
   it('debe mapear correctamente las etiquetas legibles para el usuario', () => {
     expect(ESTADO_PROYECTO_LABELS[EstadoProyecto.PENDIENTE]).toBe('Pendiente');
-    expect(ESTADO_PROYECTO_LABELS[EstadoProyecto.EN_PROCESO]).toBe('En proceso');
-    expect(ESTADO_PROYECTO_LABELS[EstadoProyecto.COMPLETADO]).toBe('Completado');
+    expect(ESTADO_PROYECTO_LABELS[EstadoProyecto.EN_PROCESO]).toBe(
+      'En proceso',
+    );
+    expect(ESTADO_PROYECTO_LABELS[EstadoProyecto.COMPLETADO]).toBe(
+      'Completado',
+    );
   });
 });

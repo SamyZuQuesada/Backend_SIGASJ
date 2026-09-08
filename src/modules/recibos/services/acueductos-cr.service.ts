@@ -1,4 +1,8 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()
@@ -11,10 +15,15 @@ export class AcueductosCrService {
    * Ejecuta la consulta de recibo en la plataforma AcueductosCR mediante simulación de flujo ASP.NET Web Forms.
    */
   async consultarReciboRaw(numeroPaja: number): Promise<string> {
-    const baseUrl = this.configService.get<string>('acueductosCr.baseUrl') || 'https://acueductoscr.com';
-    const provincia = this.configService.get<number>('acueductosCr.provincia') || 5;
-    const acueducto = this.configService.get<number>('acueductosCr.acueducto') || 207;
-    const timeoutMs = this.configService.get<number>('acueductosCr.timeout') || 15000;
+    const baseUrl =
+      this.configService.get<string>('acueductosCr.baseUrl') ||
+      'https://acueductoscr.com';
+    const provincia =
+      this.configService.get<number>('acueductosCr.provincia') || 5;
+    const acueducto =
+      this.configService.get<number>('acueductosCr.acueducto') || 207;
+    const timeoutMs =
+      this.configService.get<number>('acueductosCr.timeout') || 15000;
 
     const targetUrl = `${baseUrl.replace(/\/$/, '')}/Recibos`;
 
@@ -38,7 +47,9 @@ export class AcueductosCrService {
       clearTimeout(timer1);
 
       if (!getRes.ok) {
-        throw new Error(`Respuesta HTTP no exitosa en GET inicial: ${getRes.status}`);
+        throw new Error(
+          `Respuesta HTTP no exitosa en GET inicial: ${getRes.status}`,
+        );
       }
 
       let cookieHeader = getRes.headers.get('set-cookie');
@@ -65,7 +76,10 @@ export class AcueductosCrService {
 
       // Step 2: Postback seleccionar Provincia
       const body2 = new URLSearchParams();
-      body2.append(scriptManagerId, 'ctl00$MainContent$UpdatePanel1|ctl00$MainContent$ddlProvincia');
+      body2.append(
+        scriptManagerId,
+        'ctl00$MainContent$UpdatePanel1|ctl00$MainContent$ddlProvincia',
+      );
       body2.append('__EVENTTARGET', 'ctl00$MainContent$ddlProvincia');
       body2.append('__EVENTARGUMENT', '');
       body2.append('__LASTFOCUS', '');
@@ -95,12 +109,17 @@ export class AcueductosCrService {
 
       const respText2 = await res2.text();
       viewState = this.getDeltaValue(respText2, '__VIEWSTATE') || viewState;
-      viewStateGen = this.getDeltaValue(respText2, '__VIEWSTATEGENERATOR') || viewStateGen;
-      eventValidation = this.getDeltaValue(respText2, '__EVENTVALIDATION') || eventValidation;
+      viewStateGen =
+        this.getDeltaValue(respText2, '__VIEWSTATEGENERATOR') || viewStateGen;
+      eventValidation =
+        this.getDeltaValue(respText2, '__EVENTVALIDATION') || eventValidation;
 
       // Step 3: Postback seleccionar Acueducto
       const body3 = new URLSearchParams();
-      body3.append(scriptManagerId, 'ctl00$MainContent$UpdatePanel1|ctl00$MainContent$ddlAcueducto');
+      body3.append(
+        scriptManagerId,
+        'ctl00$MainContent$UpdatePanel1|ctl00$MainContent$ddlAcueducto',
+      );
       body3.append('__EVENTTARGET', 'ctl00$MainContent$ddlAcueducto');
       body3.append('__EVENTARGUMENT', '');
       body3.append('__LASTFOCUS', '');
@@ -130,12 +149,17 @@ export class AcueductosCrService {
 
       const respText3 = await res3.text();
       viewState = this.getDeltaValue(respText3, '__VIEWSTATE') || viewState;
-      viewStateGen = this.getDeltaValue(respText3, '__VIEWSTATEGENERATOR') || viewStateGen;
-      eventValidation = this.getDeltaValue(respText3, '__EVENTVALIDATION') || eventValidation;
+      viewStateGen =
+        this.getDeltaValue(respText3, '__VIEWSTATEGENERATOR') || viewStateGen;
+      eventValidation =
+        this.getDeltaValue(respText3, '__EVENTVALIDATION') || eventValidation;
 
       // Step 4: Postback Consultar Recibo
       const body4 = new URLSearchParams();
-      body4.append(scriptManagerId, 'ctl00$MainContent$UpdatePanel1|ctl00$MainContent$btnConsultar');
+      body4.append(
+        scriptManagerId,
+        'ctl00$MainContent$UpdatePanel1|ctl00$MainContent$btnConsultar',
+      );
       body4.append('__EVENTTARGET', '');
       body4.append('__EVENTARGUMENT', '');
       body4.append('__LASTFOCUS', '');
@@ -160,15 +184,18 @@ export class AcueductosCrService {
       clearTimeout(timer4);
 
       if (!res4.ok) {
-        throw new Error(`Respuesta HTTP no exitosa en consulta final: ${res4.status}`);
+        throw new Error(
+          `Respuesta HTTP no exitosa en consulta final: ${res4.status}`,
+        );
       }
 
       const finalHtmlOrDelta = await res4.text();
       return finalHtmlOrDelta;
-
     } catch (error: any) {
       // Diagnóstico técnico sin registrar PII ni números de paja ni datos de abonados
-      this.logger.error(`Error de comunicación con el servicio externo de AcueductosCR: ${error?.message}`);
+      this.logger.error(
+        `Error de comunicación con el servicio externo de AcueductosCR: ${error?.message}`,
+      );
       throw new ServiceUnavailableException(
         'El servicio externo de AcueductosCR no está disponible temporalmente. Por favor intente más tarde.',
       );
@@ -186,7 +213,9 @@ export class AcueductosCrService {
       return matchInit[1];
     }
 
-    const matchInput = htmlStr.match(/<input[^>]*name="(ctl00\$ctl\d+)"[^>]*>/i);
+    const matchInput = htmlStr.match(
+      /<input[^>]*name="(ctl00\$ctl\d+)"[^>]*>/i,
+    );
     if (matchInput && matchInput[1]) {
       return matchInput[1];
     }
@@ -205,7 +234,9 @@ export class AcueductosCrService {
   }
 
   private getDeltaValue(text: string, id: string): string | null {
-    const match = text.match(new RegExp(`\\|hiddenField\\|${id.replace(/\$/g, '\\$')}\\|([^\\|]*)`));
+    const match = text.match(
+      new RegExp(`\\|hiddenField\\|${id.replace(/\$/g, '\\$')}\\|([^\\|]*)`),
+    );
     return match ? match[1] : null;
   }
 }

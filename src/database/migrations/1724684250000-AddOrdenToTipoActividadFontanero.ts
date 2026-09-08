@@ -1,9 +1,7 @@
 import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
 import { TIPOS_ACTIVIDAD_FONTANERO_INICIALES } from '../../modules/actividades-fontanero/tipo-actividad-fontanero.catalogo';
 
-export class AddOrdenToTipoActividadFontanero1724684250000
-  implements MigrationInterface
-{
+export class AddOrdenToTipoActividadFontanero1724684250000 implements MigrationInterface {
   name = 'AddOrdenToTipoActividadFontanero1724684250000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

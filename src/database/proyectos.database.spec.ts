@@ -1,4 +1,7 @@
-import { EstadoProyecto, isEstadoProyectoValido } from '../common/enums/estado-proyecto.enum';
+import {
+  EstadoProyecto,
+  isEstadoProyectoValido,
+} from '../common/enums/estado-proyecto.enum';
 import { CreateProyectosAndImagenProyectoTables1724684000000 } from './migrations/1724684000000-CreateProyectosAndImagenProyectoTables';
 import { ImagenProyecto } from '../modules/proyectos/entities/imagen-proyecto.entity';
 import { Proyecto } from '../modules/proyectos/entities/proyecto.entity';
@@ -11,7 +14,9 @@ class ProyectosMemoryDatabase {
   private nextImagenId = 1;
 
   async saveProyecto(
-    datos: Omit<Partial<Proyecto>, 'imagenes'> & { imagenes?: Partial<ImagenProyecto>[] },
+    datos: Omit<Partial<Proyecto>, 'imagenes'> & {
+      imagenes?: Partial<ImagenProyecto>[];
+    },
   ): Promise<Proyecto> {
     const now = new Date();
     const id = datos.id || this.nextProyectoId++;
@@ -50,8 +55,14 @@ class ProyectosMemoryDatabase {
     const now = new Date();
     const id = datos.id || this.nextImagenId++;
 
-    if (!datos.proyecto || !datos.proyecto.id || !this.proyectos.has(datos.proyecto.id)) {
-      throw new Error('FK Constraint Error: No existe el proyecto referenciado');
+    if (
+      !datos.proyecto ||
+      !datos.proyecto.id ||
+      !this.proyectos.has(datos.proyecto.id)
+    ) {
+      throw new Error(
+        'FK Constraint Error: No existe el proyecto referenciado',
+      );
     }
 
     const imagen: ImagenProyecto = {
@@ -76,7 +87,9 @@ class ProyectosMemoryDatabase {
   }
 
   getImagenesPorProyecto(proyectoId: number): ImagenProyecto[] {
-    return Array.from(this.imagenes.values()).filter((img) => img.proyecto.id === proyectoId);
+    return Array.from(this.imagenes.values()).filter(
+      (img) => img.proyecto.id === proyectoId,
+    );
   }
 
   async deleteProyectoCascade(id: number): Promise<boolean> {
@@ -105,7 +118,8 @@ describe('Pruebas de Base de Datos e Integridad: Proyecto e ImagenProyecto', () 
     it('debe crear un proyecto de prueba y guardar todos sus campos requeridos u opcionales', async () => {
       const datosNuevoProyecto = {
         nombre: 'Construcción Tanque de Almacenamiento',
-        descripcion: 'Construcción de tanque de 500,000 litros para contingencias.',
+        descripcion:
+          'Construcción de tanque de 500,000 litros para contingencias.',
         encargadoRealizacion: 'Ing. María Rodríguez',
         duracion: '8 meses',
         estado: EstadoProyecto.EN_PROCESO,
@@ -116,12 +130,20 @@ describe('Pruebas de Base de Datos e Integridad: Proyecto e ImagenProyecto', () 
       const proyectoGuardado = await db.saveProyecto(datosNuevoProyecto);
 
       expect(proyectoGuardado.id).toBeDefined();
-      expect(proyectoGuardado.nombre).toBe('Construcción Tanque de Almacenamiento');
-      expect(proyectoGuardado.descripcion).toBe('Construcción de tanque de 500,000 litros para contingencias.');
-      expect(proyectoGuardado.encargadoRealizacion).toBe('Ing. María Rodríguez');
+      expect(proyectoGuardado.nombre).toBe(
+        'Construcción Tanque de Almacenamiento',
+      );
+      expect(proyectoGuardado.descripcion).toBe(
+        'Construcción de tanque de 500,000 litros para contingencias.',
+      );
+      expect(proyectoGuardado.encargadoRealizacion).toBe(
+        'Ing. María Rodríguez',
+      );
       expect(proyectoGuardado.duracion).toBe('8 meses');
       expect(proyectoGuardado.estado).toBe(EstadoProyecto.EN_PROCESO);
-      expect(proyectoGuardado.imagenPrincipal).toBe('https://ejemplo.com/tanque.jpg');
+      expect(proyectoGuardado.imagenPrincipal).toBe(
+        'https://ejemplo.com/tanque.jpg',
+      );
       expect(proyectoGuardado.activo).toBe(true);
       expect(proyectoGuardado.createdAt).toBeInstanceOf(Date);
       expect(proyectoGuardado.updatedAt).toBeInstanceOf(Date);
@@ -151,7 +173,13 @@ describe('Pruebas de Base de Datos e Integridad: Proyecto e ImagenProyecto', () 
     });
 
     it('debe detectar y rechazar el uso de estados inválidos o improvisados', () => {
-      const estadosInvalidos = ['Terminado', 'Finalizado', 'Trabajando', 'Iniciado', 'Por hacer'];
+      const estadosInvalidos = [
+        'Terminado',
+        'Finalizado',
+        'Trabajando',
+        'Iniciado',
+        'Por hacer',
+      ];
 
       estadosInvalidos.forEach((estadoIncorrecto) => {
         expect(isEstadoProyectoValido(estadoIncorrecto)).toBe(false);
@@ -205,9 +233,21 @@ describe('Pruebas de Base de Datos e Integridad: Proyecto e ImagenProyecto', () 
         nombre: 'Proyecto con Galería',
         estado: EstadoProyecto.COMPLETADO,
         imagenes: [
-          { url: 'https://ejemplo.com/f1.jpg', descripcion: 'Paso 1', orden: 1 },
-          { url: 'https://ejemplo.com/f2.jpg', descripcion: 'Paso 2', orden: 2 },
-          { url: 'https://ejemplo.com/f3.jpg', descripcion: 'Paso 3', orden: 3 },
+          {
+            url: 'https://ejemplo.com/f1.jpg',
+            descripcion: 'Paso 1',
+            orden: 1,
+          },
+          {
+            url: 'https://ejemplo.com/f2.jpg',
+            descripcion: 'Paso 2',
+            orden: 2,
+          },
+          {
+            url: 'https://ejemplo.com/f3.jpg',
+            descripcion: 'Paso 3',
+            orden: 3,
+          },
         ],
       });
 
@@ -252,8 +292,11 @@ describe('Pruebas de Base de Datos e Integridad: Proyecto e ImagenProyecto', () 
 
   describe('5. Pruebas de Definición de Migración SQL Server', () => {
     it('debe contar con la migración para crear las tablas Proyecto e ImagenProyecto', () => {
-      const migration = new CreateProyectosAndImagenProyectoTables1724684000000();
-      expect(migration.name).toBe('CreateProyectosAndImagenProyectoTables1724684000000');
+      const migration =
+        new CreateProyectosAndImagenProyectoTables1724684000000();
+      expect(migration.name).toBe(
+        'CreateProyectosAndImagenProyectoTables1724684000000',
+      );
       expect(typeof migration.up).toBe('function');
       expect(typeof migration.down).toBe('function');
     });

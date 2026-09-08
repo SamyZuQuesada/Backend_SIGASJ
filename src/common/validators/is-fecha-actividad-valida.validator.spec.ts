@@ -23,7 +23,9 @@ describe('isFechaActividadValida', () => {
   });
 
   it('rechaza fechas de calendario inválidas', () => {
-    expect(getFechaActividadValidationError('2026-02-31', now)).toBe('calendario');
+    expect(getFechaActividadValidationError('2026-02-31', now)).toBe(
+      'calendario',
+    );
     expect(parseFechaActividad('2026-02-31')).toBeNull();
   });
 });

@@ -13,7 +13,12 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiConsumes,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ContenidoPublicoService } from './contenido-publico.service';
 import { CreateGaleriaDto } from './dto/create-galeria.dto';
 import { CreateTransparenciaDto } from './dto/create-transparencia.dto';

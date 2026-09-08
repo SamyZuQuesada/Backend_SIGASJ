@@ -28,7 +28,6 @@ import { UpdateProyectoEstadoDto } from './dto/update-proyecto-estado.dto';
 import { UpdateProyectoVisibilidadDto } from './dto/update-proyecto-visibilidad.dto';
 import { ImagenProyecto } from './entities/imagen-proyecto.entity';
 
-
 import { Proyecto } from './entities/proyecto.entity';
 
 export type ProyectosAdminListado = {
@@ -48,7 +47,6 @@ export type ProyectoPublicoCard = {
 };
 
 export type ImagenProyectoAdminDetalle = {
-
   id: number;
   url: string;
   descripcion: string | null;
@@ -475,9 +473,7 @@ export class ProyectosService {
         throw error;
       }
 
-      this.logger.error(
-        'No se pudo eliminar la imagen principal del proyecto',
-      );
+      this.logger.error('No se pudo eliminar la imagen principal del proyecto');
       throw new InternalServerErrorException(
         'No se pudo eliminar la imagen principal del proyecto',
       );
@@ -666,4 +662,3 @@ export class ProyectosService {
     return proyecto;
   }
 }
-

@@ -6,10 +6,7 @@ import {
 
 const FECHA_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 
-export type FechaActividadValidationError =
-  | 'formato'
-  | 'calendario'
-  | 'futura';
+export type FechaActividadValidationError = 'formato' | 'calendario' | 'futura';
 
 export const parseFechaActividad = (
   value: string,
@@ -57,11 +54,7 @@ export const getFechaActividadValidationError = (
     return 'calendario';
   }
 
-  const todayUtc = Date.UTC(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate(),
-  );
+  const todayUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
   const valueUtc = Date.UTC(parsed.year, parsed.month - 1, parsed.day);
   if (valueUtc > todayUtc) {
     return 'futura';
@@ -103,7 +96,9 @@ export const IsFechaActividadValida = (
         },
         defaultMessage(args: ValidationArguments) {
           const error = getFechaActividadValidationError(args.value);
-          return error ? defaultMessage(error) : 'La fecha de la actividad no es válida';
+          return error
+            ? defaultMessage(error)
+            : 'La fecha de la actividad no es válida';
         },
       },
     });

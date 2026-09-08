@@ -13,4 +13,3 @@ export const ESTADO_PROYECTO_LABELS: Record<EstadoProyecto, string> = {
 export function isEstadoProyectoValido(estado: string): boolean {
   return Object.values(EstadoProyecto).includes(estado as EstadoProyecto);
 }
-

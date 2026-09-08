@@ -42,7 +42,8 @@ const CATALOGO_TIPOS: Array<{
   {
     codigo: TipoActividadFontaneroCodigo.INCAPACIDAD_VACACIONES,
     nombre: 'Incapacidad o vacaciones',
-    descripcion: 'Registro de incapacidad o periodo de vacaciones del fontanero.',
+    descripcion:
+      'Registro de incapacidad o periodo de vacaciones del fontanero.',
     orden: 6,
   },
 ];

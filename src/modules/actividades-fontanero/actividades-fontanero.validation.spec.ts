@@ -75,7 +75,12 @@ describe('POST /api/v1/fontanero/actividades — validación (#931)', () => {
           type: 'sqljs',
           autoSave: false,
           dropSchema: true,
-          entities: [ActividadFontanero, TipoActividadFontanero, DocumentoActividadFontanero, Usuario],
+          entities: [
+            ActividadFontanero,
+            TipoActividadFontanero,
+            DocumentoActividadFontanero,
+            Usuario,
+          ],
           synchronize: true,
         }),
         AuthModule,
@@ -105,7 +110,9 @@ describe('POST /api/v1/fontanero/actividades — validación (#931)', () => {
 
     jwtService = moduleFixture.get(JwtService);
     actividades = moduleFixture.get(getRepositoryToken(ActividadFontanero));
-    tiposActividad = moduleFixture.get(getRepositoryToken(TipoActividadFontanero));
+    tiposActividad = moduleFixture.get(
+      getRepositoryToken(TipoActividadFontanero),
+    );
   });
 
   afterAll(async () => {
@@ -140,9 +147,9 @@ describe('POST /api/v1/fontanero/actividades — validación (#931)', () => {
   });
 
   it('rechaza título vacío o solo espacios', async () => {
-    const response = await postActividad(validPayload({ titulo: '   ' })).expect(
-      400,
-    );
+    const response = await postActividad(
+      validPayload({ titulo: '   ' }),
+    ).expect(400);
 
     assertReadableValidationError(response.body);
     expect(JSON.stringify(response.body)).toContain('obligatorio');
@@ -198,9 +205,9 @@ describe('POST /api/v1/fontanero/actividades — validación (#931)', () => {
   });
 
   it('rechaza tipoActividadId inválido o menor a 1', async () => {
-    const cero = await postActividad(validPayload({ tipoActividadId: 0 })).expect(
-      400,
-    );
+    const cero = await postActividad(
+      validPayload({ tipoActividadId: 0 }),
+    ).expect(400);
     assertReadableValidationError(cero.body);
     expect(await actividades.count()).toBe(0);
 
@@ -243,7 +250,10 @@ describe('POST /api/v1/fontanero/actividades — validación (#931)', () => {
   });
 
   it('rechaza tipo de actividad inactivo sin persistir', async () => {
-    await tiposActividad.update({ id: validTipoActividadId }, { activo: false });
+    await tiposActividad.update(
+      { id: validTipoActividadId },
+      { activo: false },
+    );
 
     const response = await postActividad(validPayload()).expect(400);
 

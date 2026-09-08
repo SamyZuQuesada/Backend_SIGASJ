@@ -162,37 +162,37 @@ export class ContenidoPublicoService implements OnModuleInit {
 
   async onModuleInit() {
     await withDbRetry(async () => {
-    const contacto = await this.contactoRepo.findOne({ where: { id: 1 } });
-    if (!contacto) {
-      await this.contactoRepo.save(
-        this.contactoRepo.create({
-          id: 1,
-          ...CONTACTO_SEED,
-        }),
-      );
-    }
+      const contacto = await this.contactoRepo.findOne({ where: { id: 1 } });
+      if (!contacto) {
+        await this.contactoRepo.save(
+          this.contactoRepo.create({
+            id: 1,
+            ...CONTACTO_SEED,
+          }),
+        );
+      }
 
-    const galleryCount = await this.galeriaRepo.count();
-    if (galleryCount === 0) {
-      await this.galeriaRepo.save([
-        this.galeriaRepo.create({
-          titulo: 'Tanque Principal',
-          descripcion: 'Infraestructura principal del acueducto comunal.',
-          url: '/images/tanque.jpg',
-          textoAlternativo: 'Tanque elevado de la ASADA San Juan',
-          ordenVisualizacion: 0,
-          activa: true,
-        }),
-        this.galeriaRepo.create({
-          titulo: 'Oficina Central',
-          descripcion: 'Instalaciones de atención al abonado.',
-          url: '/images/oficina.jpg',
-          textoAlternativo: 'Oficina central de la ASADA San Juan',
-          ordenVisualizacion: 1,
-          activa: true,
-        }),
-      ]);
-    }
+      const galleryCount = await this.galeriaRepo.count();
+      if (galleryCount === 0) {
+        await this.galeriaRepo.save([
+          this.galeriaRepo.create({
+            titulo: 'Tanque Principal',
+            descripcion: 'Infraestructura principal del acueducto comunal.',
+            url: '/images/tanque.jpg',
+            textoAlternativo: 'Tanque elevado de la ASADA San Juan',
+            ordenVisualizacion: 0,
+            activa: true,
+          }),
+          this.galeriaRepo.create({
+            titulo: 'Oficina Central',
+            descripcion: 'Instalaciones de atención al abonado.',
+            url: '/images/oficina.jpg',
+            textoAlternativo: 'Oficina central de la ASADA San Juan',
+            ordenVisualizacion: 1,
+            activa: true,
+          }),
+        ]);
+      }
     });
   }
 
@@ -202,52 +202,52 @@ export class ContenidoPublicoService implements OnModuleInit {
 
   async getContacto() {
     return withDbRetry(async () => {
-    const row = await this.contactoRepo.findOne({ where: { id: 1 } });
-    return row ? toContactoRecord(row) : CONTACTO_SEED;
+      const row = await this.contactoRepo.findOne({ where: { id: 1 } });
+      return row ? toContactoRecord(row) : CONTACTO_SEED;
     });
   }
 
   async updateContacto(dto: UpdateContactoDto) {
     return withDbRetry(async () => {
-    const current =
-      (await this.contactoRepo.findOne({ where: { id: 1 } })) ??
-      this.contactoRepo.create({ id: 1, ...CONTACTO_SEED });
+      const current =
+        (await this.contactoRepo.findOne({ where: { id: 1 } })) ??
+        this.contactoRepo.create({ id: 1, ...CONTACTO_SEED });
 
-    if (dto.telefono !== undefined) current.telefono = dto.telefono.trim();
-    if (dto.email !== undefined) current.email = dto.email.trim();
-    if (dto.direccion !== undefined) current.direccion = dto.direccion.trim();
-    if (dto.horarioAtencion !== undefined) {
-      current.horarioAtencion = dto.horarioAtencion.trim();
-    }
-    if (dto.referenciaUbicacion !== undefined) {
-      current.referenciaUbicacion = dto.referenciaUbicacion.trim();
-    }
-    if (dto.mapaUrl !== undefined) current.mapaUrl = dto.mapaUrl.trim();
-    if (dto.latitud !== undefined) current.latitud = dto.latitud;
-    if (dto.longitud !== undefined) current.longitud = dto.longitud;
-    if (dto.zoomMapa !== undefined) current.zoomMapa = dto.zoomMapa;
+      if (dto.telefono !== undefined) current.telefono = dto.telefono.trim();
+      if (dto.email !== undefined) current.email = dto.email.trim();
+      if (dto.direccion !== undefined) current.direccion = dto.direccion.trim();
+      if (dto.horarioAtencion !== undefined) {
+        current.horarioAtencion = dto.horarioAtencion.trim();
+      }
+      if (dto.referenciaUbicacion !== undefined) {
+        current.referenciaUbicacion = dto.referenciaUbicacion.trim();
+      }
+      if (dto.mapaUrl !== undefined) current.mapaUrl = dto.mapaUrl.trim();
+      if (dto.latitud !== undefined) current.latitud = dto.latitud;
+      if (dto.longitud !== undefined) current.longitud = dto.longitud;
+      if (dto.zoomMapa !== undefined) current.zoomMapa = dto.zoomMapa;
 
-    return toContactoRecord(await this.contactoRepo.save(current));
+      return toContactoRecord(await this.contactoRepo.save(current));
     });
   }
 
   async getGaleria() {
     return withDbRetry(async () => {
-    const items = await this.galeriaRepo.find({
-      order: { ordenVisualizacion: 'ASC' },
-    });
-    return items
-      .filter((item) => isActiveFlag(item.activa))
-      .map(toGaleriaRecord);
+      const items = await this.galeriaRepo.find({
+        order: { ordenVisualizacion: 'ASC' },
+      });
+      return items
+        .filter((item) => isActiveFlag(item.activa))
+        .map(toGaleriaRecord);
     });
   }
 
   async getGaleriaAdmin() {
     return withDbRetry(async () => {
-    const items = await this.galeriaRepo.find({
-      order: { ordenVisualizacion: 'ASC' },
-    });
-    return items.map(toGaleriaRecord);
+      const items = await this.galeriaRepo.find({
+        order: { ordenVisualizacion: 'ASC' },
+      });
+      return items.map(toGaleriaRecord);
     });
   }
 
@@ -260,65 +260,69 @@ export class ContenidoPublicoService implements OnModuleInit {
     }
 
     return withDbRetry(async () => {
-    const count = await this.galeriaRepo.count();
-    const saved = await this.galeriaRepo.save(
-      this.galeriaRepo.create({
-        titulo: emptyToNull(dto.titulo) ?? null,
-        descripcion: emptyToNull(dto.descripcion) ?? null,
-        url,
-        textoAlternativo:
-          dto.textoAlternativo?.trim() ||
-          dto.titulo?.trim() ||
-          'Fotografía institucional',
-        ordenVisualizacion: dto.ordenVisualizacion ?? count,
-        activa: dto.activa !== false,
-      }),
-    );
+      const count = await this.galeriaRepo.count();
+      const saved = await this.galeriaRepo.save(
+        this.galeriaRepo.create({
+          titulo: emptyToNull(dto.titulo) ?? null,
+          descripcion: emptyToNull(dto.descripcion) ?? null,
+          url,
+          textoAlternativo:
+            dto.textoAlternativo?.trim() ||
+            dto.titulo?.trim() ||
+            'Fotografía institucional',
+          ordenVisualizacion: dto.ordenVisualizacion ?? count,
+          activa: dto.activa !== false,
+        }),
+      );
 
-    return toGaleriaRecord(saved);
+      return toGaleriaRecord(saved);
     });
   }
 
-  async updateGaleria(id: number, dto: UpdateGaleriaDto, file?: UploadedImageFile) {
+  async updateGaleria(
+    id: number,
+    dto: UpdateGaleriaDto,
+    file?: UploadedImageFile,
+  ) {
     return withDbRetry(async () => {
-    const current = await this.galeriaRepo.findOne({ where: { id } });
-    if (!current) {
-      throw new NotFoundException(`Fotografía con ID ${id} no encontrada`);
-    }
+      const current = await this.galeriaRepo.findOne({ where: { id } });
+      if (!current) {
+        throw new NotFoundException(`Fotografía con ID ${id} no encontrada`);
+      }
 
-    if (dto.titulo !== undefined) {
-      current.titulo = emptyToNull(dto.titulo) ?? null;
-    }
-    if (dto.descripcion !== undefined) {
-      current.descripcion = emptyToNull(dto.descripcion) ?? null;
-    }
-    if (dto.textoAlternativo !== undefined) {
-      current.textoAlternativo =
-        dto.textoAlternativo.trim() || current.textoAlternativo;
-    }
-    if (dto.ordenVisualizacion !== undefined) {
-      current.ordenVisualizacion = dto.ordenVisualizacion;
-    }
-    if (dto.activa !== undefined) {
-      current.activa = dto.activa;
-    }
-    current.url = file
-      ? savePublicImage('galeria', file)
-      : dto.url?.trim() || current.url;
+      if (dto.titulo !== undefined) {
+        current.titulo = emptyToNull(dto.titulo) ?? null;
+      }
+      if (dto.descripcion !== undefined) {
+        current.descripcion = emptyToNull(dto.descripcion) ?? null;
+      }
+      if (dto.textoAlternativo !== undefined) {
+        current.textoAlternativo =
+          dto.textoAlternativo.trim() || current.textoAlternativo;
+      }
+      if (dto.ordenVisualizacion !== undefined) {
+        current.ordenVisualizacion = dto.ordenVisualizacion;
+      }
+      if (dto.activa !== undefined) {
+        current.activa = dto.activa;
+      }
+      current.url = file
+        ? savePublicImage('galeria', file)
+        : dto.url?.trim() || current.url;
 
-    return toGaleriaRecord(await this.galeriaRepo.save(current));
+      return toGaleriaRecord(await this.galeriaRepo.save(current));
     });
   }
 
   async removeGaleria(id: number) {
     return withDbRetry(async () => {
-    const current = await this.galeriaRepo.findOne({ where: { id } });
-    if (!current) {
-      throw new NotFoundException(`Fotografía con ID ${id} no encontrada`);
-    }
+      const current = await this.galeriaRepo.findOne({ where: { id } });
+      if (!current) {
+        throw new NotFoundException(`Fotografía con ID ${id} no encontrada`);
+      }
 
-    await this.galeriaRepo.remove(current);
-    return { deleted: true };
+      await this.galeriaRepo.remove(current);
+      return { deleted: true };
     });
   }
 

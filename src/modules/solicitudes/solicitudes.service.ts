@@ -75,12 +75,13 @@ export class SolicitudesService implements OnModuleInit {
       order: { idSolicitud: 'ASC' },
     });
 
-    const items = solicitudes.map((solicitud) => this.toPendienteDto(solicitud));
+    const items = solicitudes.map((solicitud) =>
+      this.toPendienteDto(solicitud),
+    );
 
     return {
       solicitudes: items,
-      mensaje:
-        items.length === 0 ? SIN_SOLICITUDES_MENSAJE : null,
+      mensaje: items.length === 0 ? SIN_SOLICITUDES_MENSAJE : null,
     };
   }
 

@@ -48,7 +48,12 @@ describe('Catálogo de tipos de actividad del fontanero', () => {
           type: 'sqljs',
           autoSave: false,
           dropSchema: true,
-          entities: [ActividadFontanero, TipoActividadFontanero, DocumentoActividadFontanero, Usuario],
+          entities: [
+            ActividadFontanero,
+            TipoActividadFontanero,
+            DocumentoActividadFontanero,
+            Usuario,
+          ],
           synchronize: true,
         }),
         AuthModule,

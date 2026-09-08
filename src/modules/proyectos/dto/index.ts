@@ -5,5 +5,3 @@ export * from './update-proyecto-estado.dto';
 export * from './update-proyecto-visibilidad.dto';
 export * from './create-proyecto-imagen.dto';
 export * from './reordenar-imagenes.dto';
-
-

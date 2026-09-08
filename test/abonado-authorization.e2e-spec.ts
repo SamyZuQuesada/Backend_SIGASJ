@@ -20,7 +20,6 @@ const ADMIN_ENDPOINTS = [
   '/api/v1/admin/transparencia',
 ] as const;
 
-
 describe('autorización Abonado (e2e)', () => {
   let app: INestApplication;
   let abonadoToken: string;

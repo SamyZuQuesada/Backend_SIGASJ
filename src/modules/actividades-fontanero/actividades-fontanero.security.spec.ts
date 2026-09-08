@@ -96,7 +96,12 @@ describe('Seguridad Backend — módulo actividades Fontanero', () => {
           type: 'sqljs',
           autoSave: false,
           dropSchema: true,
-          entities: [ActividadFontanero, TipoActividadFontanero, DocumentoActividadFontanero, Usuario],
+          entities: [
+            ActividadFontanero,
+            TipoActividadFontanero,
+            DocumentoActividadFontanero,
+            Usuario,
+          ],
           synchronize: true,
         }),
         AuthModule,
@@ -124,7 +129,9 @@ describe('Seguridad Backend — módulo actividades Fontanero', () => {
 
     jwtService = moduleFixture.get(JwtService);
     actividades = moduleFixture.get(getRepositoryToken(ActividadFontanero));
-    tiposActividad = moduleFixture.get(getRepositoryToken(TipoActividadFontanero));
+    tiposActividad = moduleFixture.get(
+      getRepositoryToken(TipoActividadFontanero),
+    );
   });
 
   afterAll(async () => {

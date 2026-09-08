@@ -55,12 +55,16 @@ export class CorregirActividadDto {
   @MaxLength(200)
   ubicacion?: string;
 
-  @ApiPropertyOptional({ description: 'Objeto de datos específicos del tipo de actividad' })
+  @ApiPropertyOptional({
+    description: 'Objeto de datos específicos del tipo de actividad',
+  })
   @IsOptional()
   @IsObject({ message: 'Los datos específicos deben ser un objeto' })
   datos?: Record<string, unknown>;
 
-  @ApiPropertyOptional({ description: 'Presión medida en PSI/bar para toma de presión' })
+  @ApiPropertyOptional({
+    description: 'Presión medida en PSI/bar para toma de presión',
+  })
   @IsOptional()
   @IsNumber({}, { message: 'La presión medida debe ser un número' })
   presionMedida?: number;
@@ -70,12 +74,16 @@ export class CorregirActividadDto {
   @IsNumber({}, { message: 'El caudal debe ser un número' })
   caudal?: number;
 
-  @ApiPropertyOptional({ description: 'Cantidad de cloro medida para control de cloros' })
+  @ApiPropertyOptional({
+    description: 'Cantidad de cloro medida para control de cloros',
+  })
   @IsOptional()
   @IsNumber({}, { message: 'La cantidad de cloro debe ser un número' })
   cantidadCloro?: number;
 
-  @ApiPropertyOptional({ description: 'Ubicación detallada de la fuga para control de fugas' })
+  @ApiPropertyOptional({
+    description: 'Ubicación detallada de la fuga para control de fugas',
+  })
   @Transform(trimOptionalString)
   @IsOptional()
   @IsString({ message: 'La ubicación de la fuga debe ser texto' })
@@ -87,7 +95,10 @@ export class CorregirActividadDto {
   @IsString({ message: 'El resultado de la visita debe ser texto' })
   resultadoVisita?: string;
 
-  @ApiPropertyOptional({ description: 'Documentos adjuntos para incapacidades o vacaciones', type: [String] })
+  @ApiPropertyOptional({
+    description: 'Documentos adjuntos para incapacidades o vacaciones',
+    type: [String],
+  })
   @IsOptional()
   @IsArray({ message: 'Los documentos deben ser una lista' })
   documentos?: string[];

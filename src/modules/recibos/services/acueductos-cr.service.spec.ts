@@ -35,7 +35,9 @@ describe('AcueductosCrService', () => {
   });
 
   it('debe lanzar ServiceUnavailableException cuando la petición HTTP falla', async () => {
-    jest.spyOn(global, 'fetch').mockRejectedValueOnce(new Error('Network error'));
+    jest
+      .spyOn(global, 'fetch')
+      .mockRejectedValueOnce(new Error('Network error'));
 
     await expect(service.consultarReciboRaw(130)).rejects.toThrow(
       ServiceUnavailableException,

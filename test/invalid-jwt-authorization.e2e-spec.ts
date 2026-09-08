@@ -17,10 +17,7 @@ const ADMIN_ENDPOINTS = [
   '/api/v1/admin/informacion',
 ] as const;
 
-const ABONADOS_ENDPOINTS = [
-  '/api/v1/abonados',
-  '/api/v1/abonados/me',
-] as const;
+const ABONADOS_ENDPOINTS = ['/api/v1/abonados', '/api/v1/abonados/me'] as const;
 
 const looksLikePrivatePayload = (body: unknown) => {
   const serialized = JSON.stringify(body ?? '');
@@ -31,7 +28,10 @@ const looksLikePrivatePayload = (body: unknown) => {
   );
 };
 
-const assertRejectedUnauthorized = (response: { status: number; body: unknown }) => {
+const assertRejectedUnauthorized = (response: {
+  status: number;
+  body: unknown;
+}) => {
   expect(response.status).toBe(401);
   expect(response.status).not.toBe(200);
   expect(looksLikePrivatePayload(response.body)).toBe(false);
@@ -75,7 +75,9 @@ describe('autorización con JWT inválido (e2e)', () => {
   });
 
   const requestWithBearer = (path: string, token: string) =>
-    request(app.getHttpServer()).get(path).set('Authorization', `Bearer ${token}`);
+    request(app.getHttpServer())
+      .get(path)
+      .set('Authorization', `Bearer ${token}`);
 
   const validShapeInvalidSignature = () => {
     const signed = jwtService.sign({
@@ -86,7 +88,9 @@ describe('autorización con JWT inválido (e2e)', () => {
     });
     const parts = signed.split('.');
     const last = parts[2] ?? 'sig';
-    const flipped = last.endsWith('a') ? `${last.slice(0, -1)}b` : `${last.slice(0, -1)}a`;
+    const flipped = last.endsWith('a')
+      ? `${last.slice(0, -1)}b`
+      : `${last.slice(0, -1)}a`;
     return `${parts[0]}.${parts[1]}.${flipped}`;
   };
 

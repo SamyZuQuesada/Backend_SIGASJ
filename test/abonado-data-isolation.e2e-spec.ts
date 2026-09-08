@@ -60,7 +60,10 @@ const assertNoForeignAbonadoPayload = (
   expect(serialized).not.toContain('Listado base de usuarios');
 };
 
-const assertNotOwnDataSuccess = (response: { status: number; body: unknown }) => {
+const assertNotOwnDataSuccess = (response: {
+  status: number;
+  body: unknown;
+}) => {
   expect(response.status).not.toBe(200);
   expect(response.status).not.toBe(201);
 };
@@ -114,7 +117,9 @@ describe('aislamiento de datos — rol Abonado (e2e)', () => {
   });
 
   const getAs = (path: string, token: string) =>
-    request(app.getHttpServer()).get(path).set('Authorization', `Bearer ${token}`);
+    request(app.getHttpServer())
+      .get(path)
+      .set('Authorization', `Bearer ${token}`);
 
   it('la identidad JWT del Abonado es sub → request.user.userId; no hay idAbonado ni @CurrentUser en controladores', async () => {
     const jwtService = app.get(JwtService);

@@ -14,10 +14,15 @@ export class RecibosService {
    * Consulta pública de recibo de agua para un abonado mediante su número de paja.
    * Sin registrar PII (números de paja, nombres ni montos) en los logs técnicos.
    */
-  async consultarRecibo(numeroPaja: number): Promise<ReciboConsultaResponseDto> {
-    this.logger.log('Procesando solicitud de consulta pública de recibo de agua');
+  async consultarRecibo(
+    numeroPaja: number,
+  ): Promise<ReciboConsultaResponseDto> {
+    this.logger.log(
+      'Procesando solicitud de consulta pública de recibo de agua',
+    );
 
-    const rawResponse = await this.acueductosCrService.consultarReciboRaw(numeroPaja);
+    const rawResponse =
+      await this.acueductosCrService.consultarReciboRaw(numeroPaja);
     const result = this.parser.parseResponse(rawResponse, numeroPaja);
 
     this.logger.log('Consulta pública de recibo completada exitosamente');

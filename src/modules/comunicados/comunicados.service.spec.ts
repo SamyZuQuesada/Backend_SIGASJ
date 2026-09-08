@@ -131,7 +131,8 @@ describe('ComunicadosService', () => {
     expect(created.esPublico).toBe(true);
     expect(
       (await service.findPublicos()).some(
-        (item) => item.id === created.id && item.titulo === 'Aviso solo con título',
+        (item) =>
+          item.id === created.id && item.titulo === 'Aviso solo con título',
       ),
     ).toBe(true);
   });
