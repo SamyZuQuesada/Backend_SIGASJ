@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, Repository, SelectQueryBuilder } from 'typeorm';
 import { EstadoActividadFontanero } from '../../common/enums/estado-actividad-fontanero.enum';
 import { TipoActividadFontaneroCodigo } from '../../common/enums/tipo-actividad-fontanero-codigo.enum';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
@@ -17,6 +17,7 @@ import {
 } from '../../common/media/public-media';
 import { CorregirActividadDto } from './dto/corregir-actividad.dto';
 import { CreateActividadDto } from './dto/create-actividad.dto';
+import { QueryReporteActividadesDto } from './dto/query-reporte-actividades.dto';
 import { RevisarActividadDto } from './dto/revisar-actividad.dto';
 import { SolicitarCorreccionDto } from './dto/solicitar-correccion.dto';
 import { validarDatosEspecificosActividad } from './validators/datos-especificos-actividad.validator';
@@ -56,9 +57,34 @@ export type ListadoActividadesAdminResponse = {
   total: number;
 };
 
+export type ReporteActividadPorTipo = {
+  tipoActividadId: number | null;
+  tipoActividadNombre: string;
+  cantidad: number;
+};
+
+export type ReporteActividadPorFontanero = {
+  fontaneroId: string;
+  cantidad: number;
+};
+
+/** Detalle controlado del reporte (sin entidad TypeORM completa). */
+export type ReporteActividadDetalle = {
+  id: number;
+  fechaActividad: string | null;
+  estado: EstadoActividadFontanero;
+  tipoActividadId: number | null;
+  tipoActividadNombre: string;
+  fontaneroId: string;
+};
+
 export type ReporteActividadesResponse = {
+  /** Total filtrado (alias administrativo de totalActividades). */
   total: number;
   porEstado: Record<EstadoActividadFontanero, number>;
+  porTipo: ReporteActividadPorTipo[];
+  porFontanero: ReporteActividadPorFontanero[];
+  actividades: ReporteActividadDetalle[];
 };
 
 export type TipoActividadFontaneroResponse = {
@@ -392,8 +418,53 @@ export class ActividadesFontaneroService {
     };
   }
 
-  async reportesAdmin(): Promise<ReporteActividadesResponse> {
-    const actividades = await this.actividadRepository.find();
+  async reportesAdmin(
+    filters: QueryReporteActividadesDto = {},
+  ): Promise<ReporteActividadesResponse> {
+    this.assertRangoFechasReporte(filters);
+
+    const [total, porEstadoRows, porTipoRows, porFontaneroRows, actividadRows] =
+      await Promise.all([
+        this.createReportBaseQb(filters).getCount(),
+        this.createReportBaseQb(filters)
+          .select('actividad.estado', 'estado')
+          .addSelect('COUNT(*)', 'cantidad')
+          .groupBy('actividad.estado')
+          .getRawMany<{ estado: EstadoActividadFontanero; cantidad: string }>(),
+        this.createReportBaseQb(filters)
+          .select('tipo.id', 'tipoActividadId')
+          .addSelect('tipo.nombre', 'tipoActividadNombre')
+          .addSelect('COUNT(*)', 'cantidad')
+          .groupBy('tipo.id')
+          .addGroupBy('tipo.nombre')
+          .orderBy('cantidad', 'DESC')
+          .addOrderBy('tipo.nombre', 'ASC')
+          .getRawMany<{
+            tipoActividadId: number | string | null;
+            tipoActividadNombre: string | null;
+            cantidad: string;
+          }>(),
+        this.createReportBaseQb(filters)
+          .select('actividad.fontaneroId', 'fontaneroId')
+          .addSelect('COUNT(*)', 'cantidad')
+          .groupBy('actividad.fontaneroId')
+          .orderBy('cantidad', 'DESC')
+          .addOrderBy('actividad.fontaneroId', 'ASC')
+          .getRawMany<{ fontaneroId: string; cantidad: string }>(),
+        this.createReportBaseQb(filters)
+          .select([
+            'actividad.id',
+            'actividad.fechaActividad',
+            'actividad.estado',
+            'actividad.fontaneroId',
+            'tipo.id',
+            'tipo.nombre',
+          ])
+          .orderBy('actividad.fechaActividad', 'DESC')
+          .addOrderBy('actividad.id', 'DESC')
+          .getMany(),
+      ]);
+
     const porEstado = Object.values(EstadoActividadFontanero).reduce(
       (acc, estado) => {
         acc[estado] = 0;
@@ -402,14 +473,85 @@ export class ActividadesFontaneroService {
       {} as Record<EstadoActividadFontanero, number>,
     );
 
-    for (const actividad of actividades) {
-      porEstado[actividad.estado] += 1;
+    for (const row of porEstadoRows) {
+      if (row.estado in porEstado) {
+        porEstado[row.estado] = Number(row.cantidad);
+      }
     }
 
     return {
-      total: actividades.length,
+      total,
       porEstado,
+      porTipo: porTipoRows.map((row) => ({
+        tipoActividadId:
+          row.tipoActividadId === null || row.tipoActividadId === undefined
+            ? null
+            : Number(row.tipoActividadId),
+        tipoActividadNombre: row.tipoActividadNombre ?? '',
+        cantidad: Number(row.cantidad),
+      })),
+      porFontanero: porFontaneroRows.map((row) => ({
+        fontaneroId: row.fontaneroId,
+        cantidad: Number(row.cantidad),
+      })),
+      actividades: actividadRows.map((actividad) => ({
+        id: actividad.id,
+        fechaActividad: actividad.fechaActividad,
+        estado: actividad.estado,
+        tipoActividadId: actividad.tipoActividad?.id ?? null,
+        tipoActividadNombre: actividad.tipoActividad?.nombre ?? '',
+        fontaneroId: actividad.fontaneroId,
+      })),
     };
+  }
+
+  /**
+   * `fechaActividad` es columna `date` (YYYY-MM-DD): comparación inclusiva directa.
+   */
+  private applyReportFilters(
+    qb: SelectQueryBuilder<ActividadFontanero>,
+    filters: QueryReporteActividadesDto,
+  ): void {
+    if (filters.fechaInicio) {
+      qb.andWhere('actividad.fechaActividad >= :fechaInicio', {
+        fechaInicio: filters.fechaInicio,
+      });
+    }
+    if (filters.fechaFin) {
+      qb.andWhere('actividad.fechaActividad <= :fechaFin', {
+        fechaFin: filters.fechaFin,
+      });
+    }
+    if (filters.fontaneroId) {
+      qb.andWhere('actividad.fontaneroId = :fontaneroId', {
+        fontaneroId: filters.fontaneroId,
+      });
+    }
+    if (filters.tipoActividadId !== undefined) {
+      qb.andWhere('tipo.id = :tipoActividadId', {
+        tipoActividadId: filters.tipoActividadId,
+      });
+    }
+  }
+
+  private createReportBaseQb(
+    filters: QueryReporteActividadesDto,
+  ): SelectQueryBuilder<ActividadFontanero> {
+    const qb = this.actividadRepository
+      .createQueryBuilder('actividad')
+      .leftJoin('actividad.tipoActividad', 'tipo');
+    this.applyReportFilters(qb, filters);
+    return qb;
+  }
+
+  private assertRangoFechasReporte(filters: QueryReporteActividadesDto): void {
+    if (filters.fechaInicio && filters.fechaFin) {
+      if (filters.fechaInicio > filters.fechaFin) {
+        throw new BadRequestException(
+          'fechaInicio no puede ser posterior a fechaFin',
+        );
+      }
+    }
   }
 
   async detalleAdmin(id: number): Promise<ActividadFontaneroAdminResponse> {
