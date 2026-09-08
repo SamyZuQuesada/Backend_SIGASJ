@@ -8,6 +8,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UploadedFile,
   UploadedFiles,
   UseGuards,
@@ -18,6 +19,7 @@ import {
   ApiBearerAuth,
   ApiConsumes,
   ApiOperation,
+  ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -29,6 +31,7 @@ import type { AuthenticatedUser } from '../../common/interfaces/authenticated-us
 import { ActividadesFontaneroService } from './actividades-fontanero.service';
 import { CorregirActividadDto } from './dto/corregir-actividad.dto';
 import { CreateActividadDto } from './dto/create-actividad.dto';
+import { QueryReporteActividadesDto } from './dto/query-reporte-actividades.dto';
 import { RevisarActividadDto } from './dto/revisar-actividad.dto';
 import { SolicitarCorreccionDto } from './dto/solicitar-correccion.dto';
 import {
@@ -186,9 +189,16 @@ export class ActividadesFontaneroController {
   @Roles(Role.ADMINISTRADORA)
   @ApiOperation({
     summary: 'Consultar reportes agregados de actividades (Administradora)',
+    description:
+      'Reporte de solo lectura con total, agregados por estado/tipo/fontanero y detalle. ' +
+      'Filtros opcionales combinables con AND. Sin resultados → 200 con colecciones vacías.',
   })
-  reportesAdmin() {
-    return this.actividadesFontaneroService.reportesAdmin();
+  @ApiQuery({ name: 'fechaInicio', required: false, example: '2026-09-01' })
+  @ApiQuery({ name: 'fechaFin', required: false, example: '2026-09-30' })
+  @ApiQuery({ name: 'fontaneroId', required: false, example: 'fontanero-1' })
+  @ApiQuery({ name: 'tipoActividadId', required: false, example: 1 })
+  reportesAdmin(@Query() query: QueryReporteActividadesDto) {
+    return this.actividadesFontaneroService.reportesAdmin(query);
   }
 
   @Get('admin/actividades/:id')
