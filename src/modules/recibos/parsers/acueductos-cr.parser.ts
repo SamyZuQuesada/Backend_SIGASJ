@@ -1,17 +1,28 @@
 import { NotFoundException, ServiceUnavailableException } from '@nestjs/common';
-import { ReciboConsultaResponseDto, ReciboItemDto } from '../dto/recibo-consulta-response.dto';
+import {
+  ReciboConsultaResponseDto,
+  ReciboItemDto,
+} from '../dto/recibo-consulta-response.dto';
 
 export class AcueductosCrParser {
   /**
    * Procesa la respuesta HTML o Delta de ASP.NET Web Forms y la convierte a DTO.
    */
-  public parseResponse(htmlOrDelta: string, numeroPaja: number): ReciboConsultaResponseDto {
+  public parseResponse(
+    htmlOrDelta: string,
+    numeroPaja: number,
+  ): ReciboConsultaResponseDto {
     if (!htmlOrDelta || typeof htmlOrDelta !== 'string') {
-      throw new ServiceUnavailableException('Respuesta vacía o inválida del servicio externo AcueductosCR');
+      throw new ServiceUnavailableException(
+        'Respuesta vacía o inválida del servicio externo AcueductosCR',
+      );
     }
 
     // Detectar redirección a Error.aspx o mensaje de error general
-    if (htmlOrDelta.includes('pageRedirect||%2fError.aspx') || htmlOrDelta.includes('MainContent_lblErrorMessage')) {
+    if (
+      htmlOrDelta.includes('pageRedirect||%2fError.aspx') ||
+      htmlOrDelta.includes('MainContent_lblErrorMessage')
+    ) {
       throw new ServiceUnavailableException(
         'El servidor de AcueductosCR reportó un error al procesar la solicitud',
       );
@@ -19,8 +30,9 @@ export class AcueductosCrParser {
 
     // Extraer mensaje principal de MainContent_lblMensaje
     const mensajeMatch =
-      htmlOrDelta.match(/id="MainContent_lblMensaje"[^>]*>([\s\S]*?)<\/span>/i) ||
-      htmlOrDelta.match(/MainContent_lblMensaje\|([^\|]*)/i);
+      htmlOrDelta.match(
+        /id="MainContent_lblMensaje"[^>]*>([\s\S]*?)<\/span>/i,
+      ) || htmlOrDelta.match(/MainContent_lblMensaje\|([^\|]*)/i);
 
     const rawMensaje = mensajeMatch ? this.cleanHtmlText(mensajeMatch[1]) : '';
 
@@ -52,12 +64,17 @@ export class AcueductosCrParser {
     }
 
     // Caso 3: Recibos pendientes en tabla MainContent_grvRecibos
-    const gridMatch = htmlOrDelta.match(/id="MainContent_grvRecibos"[\s\S]*?<\/table>/i);
+    const gridMatch = htmlOrDelta.match(
+      /id="MainContent_grvRecibos"[\s\S]*?<\/table>/i,
+    );
     const clienteMatch =
-      htmlOrDelta.match(/id="MainContent_lblCliente"[^>]*>([\s\S]*?)<\/span>/i) ||
-      htmlOrDelta.match(/MainContent_lblCliente\|([^\|]*)/i);
+      htmlOrDelta.match(
+        /id="MainContent_lblCliente"[^>]*>([\s\S]*?)<\/span>/i,
+      ) || htmlOrDelta.match(/MainContent_lblCliente\|([^\|]*)/i);
 
-    const abonadoCliente = clienteMatch ? this.cleanHtmlText(clienteMatch[1]) : 'ABONADO';
+    const abonadoCliente = clienteMatch
+      ? this.cleanHtmlText(clienteMatch[1])
+      : 'ABONADO';
 
     if (gridMatch) {
       const recibos = this.parseGridRecibos(gridMatch[0]);
@@ -68,7 +85,10 @@ export class AcueductosCrParser {
           numeroPaja,
           abonado: abonadoCliente,
           tieneRecibosPendientes: recibos.length > 0,
-          mensaje: recibos.length > 0 ? 'Recibos pendientes encontrados' : 'No posee recibos pendientes',
+          mensaje:
+            recibos.length > 0
+              ? 'Recibos pendientes encontrados'
+              : 'No posee recibos pendientes',
           recibos,
         },
       };
@@ -76,7 +96,8 @@ export class AcueductosCrParser {
 
     // Si hay un mensaje pero no encaja en las anteriores
     if (rawMensaje) {
-      const abonadoFallback = this.extractAbonadoNombre(rawMensaje) || abonadoCliente;
+      const abonadoFallback =
+        this.extractAbonadoNombre(rawMensaje) || abonadoCliente;
       return {
         success: true,
         data: {
@@ -122,14 +143,14 @@ export class AcueductosCrParser {
 
       // Extraer encabezados th si existen
       const headerRow = rowMatches[0][1];
-      const headers = [...headerRow.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/gi)].map((m) =>
-        this.cleanHtmlText(m[1]).toLowerCase(),
-      );
+      const headers = [
+        ...headerRow.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/gi),
+      ].map((m) => this.cleanHtmlText(m[1]).toLowerCase());
 
       for (let i = 1; i < rowMatches.length; i++) {
-        const cells = [...rowMatches[i][1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map((m) =>
-          this.cleanHtmlText(m[1]),
-        );
+        const cells = [
+          ...rowMatches[i][1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi),
+        ].map((m) => this.cleanHtmlText(m[1]));
 
         if (cells.length === 0) continue;
 
@@ -142,11 +163,18 @@ export class AcueductosCrParser {
             item.fechaEmision = val;
           } else if (headerName.includes('vencimiento')) {
             item.fechaVencimiento = val;
-          } else if (headerName.includes('total') || headerName.includes('monto') || headerName.includes('pagar')) {
+          } else if (
+            headerName.includes('total') ||
+            headerName.includes('monto') ||
+            headerName.includes('pagar')
+          ) {
             const sanitizedVal = val.replace(/,/g, '').replace(/[^0-9.]/g, '');
             const parsedMonto = parseFloat(sanitizedVal);
             item.total = isNaN(parsedMonto) ? undefined : parsedMonto;
-          } else if (headerName.includes('periodo') || headerName.includes('mes')) {
+          } else if (
+            headerName.includes('periodo') ||
+            headerName.includes('mes')
+          ) {
             item.periodo = val;
           } else {
             // Preservar cualquier columna adicional sin fallar ni romper el tipo

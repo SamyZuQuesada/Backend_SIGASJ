@@ -7,9 +7,12 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { EstadoActividadFontanero } from '../../common/enums/estado-actividad-fontanero.enum';
+import { TipoActividadFontaneroCodigo } from '../../common/enums/tipo-actividad-fontanero-codigo.enum';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import {
+  deleteActividadDocument,
   saveActividadDocument,
+  validateActividadDocument,
   type ActividadDocumentFile,
 } from '../../common/media/public-media';
 import { CorregirActividadDto } from './dto/corregir-actividad.dto';
@@ -35,6 +38,7 @@ export type ActividadFontaneroResponse = {
   observacionCorreccion: string | null;
   createdAt: Date;
   updatedAt: Date;
+  documentos?: DocumentoActividadResponse[];
 };
 
 export type ActividadFontaneroAdminResponse = ActividadFontaneroResponse & {
@@ -71,6 +75,7 @@ export type ListadoTiposActividadResponse = {
 
 export type DocumentoActividadResponse = {
   id: number;
+  actividadId: number;
   nombreOriginal: string;
   tipoArchivo: string;
   rutaReferenciaArchivo: string;
@@ -109,11 +114,20 @@ export class ActividadesFontaneroService {
   async registrar(
     dto: CreateActividadDto,
     user: AuthenticatedUser,
+    files: ActividadDocumentFile[] = [],
   ): Promise<ActividadFontaneroResponse> {
     const tipoActividad = await this.requireTipoActividadActivo(
       dto.tipoActividadId,
     );
     const datosEspecificos = this.extractDatosEspecificos(dto);
+    if (files.length > 0) {
+      datosEspecificos.documentos = files.map((file) => file.originalname);
+    } else if (
+      tipoActividad.codigo ===
+      TipoActividadFontaneroCodigo.INCAPACIDAD_VACACIONES
+    ) {
+      delete datosEspecificos.documentos;
+    }
     const erroresEspecificos = validarDatosEspecificosActividad({
       codigo: tipoActividad.codigo,
       datos: datosEspecificos,
@@ -121,6 +135,7 @@ export class ActividadesFontaneroService {
     if (erroresEspecificos.length > 0) {
       throw new BadRequestException(erroresEspecificos);
     }
+    for (const file of files) validateActividadDocument(file);
     const idUsuario = this.parseOptionalUsuarioId(user.userId);
 
     const actividad = this.actividadRepository.create({
@@ -139,8 +154,68 @@ export class ActividadesFontaneroService {
       revisadoPorId: null,
     });
 
-    const saved = await this.actividadRepository.save(actividad);
-    return this.toFontaneroResponse(saved, tipoActividad);
+    const writtenDocuments: Array<{
+      actividadId: number;
+      rutaReferenciaArchivo: string;
+    }> = [];
+
+    try {
+      return await this.actividadRepository.manager.transaction(
+        async (manager) => {
+          const saved = await manager.save(ActividadFontanero, actividad);
+          const savedDocuments: DocumentoActividadResponse[] = [];
+
+          for (const file of files) {
+            const { rutaReferenciaArchivo } = saveActividadDocument(
+              saved.id,
+              file,
+            );
+            writtenDocuments.push({
+              actividadId: saved.id,
+              rutaReferenciaArchivo,
+            });
+
+            const document = manager.create(DocumentoActividadFontanero, {
+              nombreOriginal: file.originalname,
+              tipoArchivo: file.mimetype,
+              rutaReferenciaArchivo,
+              tamanio: file.size,
+              actividad: saved,
+            });
+            const savedDocument = await manager.save(
+              DocumentoActividadFontanero,
+              document,
+            );
+            savedDocuments.push({
+              id: savedDocument.id,
+              actividadId: saved.id,
+              nombreOriginal: savedDocument.nombreOriginal,
+              tipoArchivo: savedDocument.tipoArchivo,
+              rutaReferenciaArchivo: savedDocument.rutaReferenciaArchivo,
+              tamanio: savedDocument.tamanio,
+              fechaCarga: savedDocument.fechaCarga,
+            });
+          }
+
+          return {
+            ...this.toFontaneroResponse(saved, tipoActividad),
+            documentos: savedDocuments,
+          };
+        },
+      );
+    } catch (error) {
+      for (const document of writtenDocuments) {
+        try {
+          deleteActividadDocument(
+            document.actividadId,
+            document.rutaReferenciaArchivo,
+          );
+        } catch {
+          // Se conserva el error original y se intenta limpiar cada archivo.
+        }
+      }
+      throw error;
+    }
   }
 
   async listarPropias(
@@ -208,10 +283,14 @@ export class ActividadesFontaneroService {
 
   async adjuntarDocumento(
     actividadId: number,
-    file: ActividadDocumentFile,
+    file: ActividadDocumentFile | undefined,
     user: AuthenticatedUser,
   ): Promise<DocumentoActividadResponse> {
-    const actividad = await this.requireOwnedActividad(actividadId, user.userId);
+    const actividad = await this.requireOwnedActividad(
+      actividadId,
+      user.userId,
+    );
+    validateActividadDocument(file);
 
     const { rutaReferenciaArchivo } = saveActividadDocument(actividadId, file);
 
@@ -223,10 +302,21 @@ export class ActividadesFontaneroService {
       actividad,
     });
 
-    const saved = await this.documentoRepository.save(documento);
+    let saved: DocumentoActividadFontanero;
+    try {
+      saved = await this.documentoRepository.save(documento);
+    } catch (error) {
+      try {
+        deleteActividadDocument(actividadId, rutaReferenciaArchivo);
+      } catch {
+        // Se conserva el error original de persistencia.
+      }
+      throw error;
+    }
 
     return {
       id: saved.id,
+      actividadId,
       nombreOriginal: saved.nombreOriginal,
       tipoArchivo: saved.tipoArchivo,
       rutaReferenciaArchivo: saved.rutaReferenciaArchivo,
@@ -404,11 +494,15 @@ export class ActividadesFontaneroService {
     dto: CreateActividadDto | CorregirActividadDto,
   ): Record<string, unknown> {
     const datos: Record<string, unknown> = { ...(dto.datos ?? {}) };
-    if (dto.presionMedida !== undefined) datos.presionMedida = dto.presionMedida;
+    if (dto.presionMedida !== undefined)
+      datos.presionMedida = dto.presionMedida;
     if (dto.caudal !== undefined) datos.caudal = dto.caudal;
-    if (dto.cantidadCloro !== undefined) datos.cantidadCloro = dto.cantidadCloro;
-    if (dto.ubicacionFuga !== undefined) datos.ubicacionFuga = dto.ubicacionFuga;
-    if (dto.resultadoVisita !== undefined) datos.resultadoVisita = dto.resultadoVisita;
+    if (dto.cantidadCloro !== undefined)
+      datos.cantidadCloro = dto.cantidadCloro;
+    if (dto.ubicacionFuga !== undefined)
+      datos.ubicacionFuga = dto.ubicacionFuga;
+    if (dto.resultadoVisita !== undefined)
+      datos.resultadoVisita = dto.resultadoVisita;
     if (dto.documentos !== undefined) datos.documentos = dto.documentos;
     return datos;
   }

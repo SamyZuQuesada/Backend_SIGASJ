@@ -5,9 +5,7 @@ import {
   TableForeignKey,
 } from 'typeorm';
 
-export class CreateProyectosAndImagenProyectoTables1724684000000
-  implements MigrationInterface
-{
+export class CreateProyectosAndImagenProyectoTables1724684000000 implements MigrationInterface {
   name = 'CreateProyectosAndImagenProyectoTables1724684000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -138,8 +136,9 @@ export class CreateProyectosAndImagenProyectoTables1724684000000
         columnNames: ['proyectoId'],
         referencedTableName: 'Proyecto',
         referencedColumnNames: ['id'],
-        onDelete: 'CASCADE',
-        onUpdate: 'CASCADE',
+        // SQL Server rechaza cascadas cuando detecta rutas múltiples en un esquema existente.
+        onDelete: 'NO ACTION',
+        onUpdate: 'NO ACTION',
       }),
     );
   }

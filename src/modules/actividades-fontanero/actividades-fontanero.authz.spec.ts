@@ -121,7 +121,12 @@ describe('Actividades Fontanero — autenticación y autorización', () => {
           type: 'sqljs',
           autoSave: false,
           dropSchema: true,
-          entities: [ActividadFontanero, TipoActividadFontanero, DocumentoActividadFontanero, Usuario],
+          entities: [
+            ActividadFontanero,
+            TipoActividadFontanero,
+            DocumentoActividadFontanero,
+            Usuario,
+          ],
           synchronize: true,
         }),
         AuthModule,
@@ -151,7 +156,9 @@ describe('Actividades Fontanero — autenticación y autorización', () => {
 
     jwtService = moduleFixture.get(JwtService);
     actividades = moduleFixture.get(getRepositoryToken(ActividadFontanero));
-    tiposActividad = moduleFixture.get(getRepositoryToken(TipoActividadFontanero));
+    tiposActividad = moduleFixture.get(
+      getRepositoryToken(TipoActividadFontanero),
+    );
   });
 
   afterAll(async () => {
@@ -314,7 +321,10 @@ describe('Actividades Fontanero — autenticación y autorización', () => {
     });
 
     it('rechaza un tipo de actividad inactivo', async () => {
-      await tiposActividad.update({ id: validTipoActividadId }, { activo: false });
+      await tiposActividad.update(
+        { id: validTipoActividadId },
+        { activo: false },
+      );
 
       const response = await authPost(
         '/fontanero/actividades',
@@ -353,7 +363,9 @@ describe('Actividades Fontanero — autenticación y autorización', () => {
 
       const body = response.body as ListadoTiposActividadResponse;
       expect(body.total).toBe(TIPOS_ACTIVIDAD_FONTANERO_INICIALES.length);
-      expect(body.data).toHaveLength(TIPOS_ACTIVIDAD_FONTANERO_INICIALES.length);
+      expect(body.data).toHaveLength(
+        TIPOS_ACTIVIDAD_FONTANERO_INICIALES.length,
+      );
       expect(body.data[0]).toMatchObject({
         codigo: 'CONTROL_FUGAS',
         nombre: 'Control de Fugas',
@@ -375,9 +387,9 @@ describe('Actividades Fontanero — autenticación y autorización', () => {
     });
 
     it('sin token responde 401', async () => {
-      const response = await authGet(
-        '/fontanero/actividades/tipos',
-      ).expect(401);
+      const response = await authGet('/fontanero/actividades/tipos').expect(
+        401,
+      );
       expect(response.body).toMatchObject({
         statusCode: 401,
         message: 'No autenticado',

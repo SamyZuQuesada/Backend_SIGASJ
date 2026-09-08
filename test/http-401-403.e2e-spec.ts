@@ -18,7 +18,9 @@ const assertNoSensitiveLeak = (body: unknown) => {
   const serialized = JSON.stringify(body ?? '');
   expect(serialized).not.toMatch(/at\s+\w+\s+\(/);
   expect(serialized).not.toContain('\\n    at ');
-  expect(serialized).not.toMatch(/\bSELECT\b|\bINSERT\b|\bUPDATE\b|\bDELETE\b/i);
+  expect(serialized).not.toMatch(
+    /\bSELECT\b|\bINSERT\b|\bUPDATE\b|\bDELETE\b/i,
+  );
   expect(serialized).not.toContain('JWT_SECRET');
   expect(serialized).not.toContain('super_secret_jwt');
   expect(serialized).not.toContain('password');
@@ -87,7 +89,9 @@ describe('revisión HTTP 401 vs 403 (e2e)', () => {
   });
 
   it('401 — sin token en endpoint privado', async () => {
-    const response = await request(app.getHttpServer()).get(PRIVATE_ADMIN_ENDPOINT);
+    const response = await request(app.getHttpServer()).get(
+      PRIVATE_ADMIN_ENDPOINT,
+    );
 
     expect(response.status).toBe(401);
     expect(response.status).not.toBe(403);

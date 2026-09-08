@@ -29,7 +29,7 @@ const looksLikePrivatePayload = (body: unknown) => {
     serialized.includes('accessToken') ||
     serialized.includes('demo-user-id')
   );
-}
+};
 
 describe('autorización sin token (e2e)', () => {
   let app: INestApplication;
@@ -117,8 +117,12 @@ describe('autorización sin token (e2e)', () => {
     await request(app.getHttpServer())
       .get('/api/v1/public/comunicados')
       .expect(200);
-    await request(app.getHttpServer()).get('/api/v1/public/galeria').expect(200);
-    await request(app.getHttpServer()).get('/api/v1/public/contacto').expect(200);
+    await request(app.getHttpServer())
+      .get('/api/v1/public/galeria')
+      .expect(200);
+    await request(app.getHttpServer())
+      .get('/api/v1/public/contacto')
+      .expect(200);
     await request(app.getHttpServer())
       .get('/api/v1/public/transparencia')
       .expect(200);

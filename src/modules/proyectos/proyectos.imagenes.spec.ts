@@ -323,24 +323,22 @@ describe('Proyectos - Gestión de Imágenes (Unit Tests)', () => {
       expect(detalle.imagenes).toEqual([]);
     });
 
-
     it('lanza 404 si el proyecto no existe al agregar una fotografía', async () => {
       proyectoRepo.findOne.mockResolvedValue(null);
       const file = mockFile('foto.png', 'image/png', 200);
 
-      await expect(
-        service.addImagenGaleria(999, {}, file),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.addImagenGaleria(999, {}, file)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('lanza 400 si no se proporciona archivo de imagen al agregar a la galería', async () => {
       proyectoRepo.findOne.mockResolvedValue({ id: 10 });
 
-      await expect(
-        service.addImagenGaleria(10, {}, undefined),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.addImagenGaleria(10, {}, undefined)).rejects.toThrow(
+        BadRequestException,
+      );
     });
-
 
     it('elimina una fotografía de la galería y su archivo físico', async () => {
       const photoFile = mockFile('gal.jpg', 'image/jpeg', 200);
@@ -409,7 +407,6 @@ describe('Proyectos - Gestión de Imágenes (Unit Tests)', () => {
       expect(res.imagenPrincipal).toBe(coverUrl);
       deletePhysicalMediaFile(photoUrl);
     });
-
 
     it('reordena las imágenes de la galería', async () => {
       proyectoRepo.findOne.mockResolvedValue({ id: 10 });
@@ -524,10 +521,12 @@ describe('Proyectos - Gestión de Imágenes (Unit Tests)', () => {
         addOrderBy: jest.fn().mockReturnThis(),
         skip: jest.fn().mockReturnThis(),
         take: jest.fn().mockReturnThis(),
-        getManyAndCount: jest.fn().mockResolvedValue([
-          [{ id: 10, nombre: 'Proyecto Público Activo', activo: true }],
-          1,
-        ]),
+        getManyAndCount: jest
+          .fn()
+          .mockResolvedValue([
+            [{ id: 10, nombre: 'Proyecto Público Activo', activo: true }],
+            1,
+          ]),
       };
       proyectoRepo.createQueryBuilder.mockReturnValue(qbMock);
 
@@ -596,7 +595,3 @@ describe('Proyectos - Gestión de Imágenes (Unit Tests)', () => {
     });
   });
 });
-
-
-
-

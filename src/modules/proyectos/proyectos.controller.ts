@@ -37,8 +37,6 @@ import { UpdateProyectoEstadoDto } from './dto/update-proyecto-estado.dto';
 import { UpdateProyectoVisibilidadDto } from './dto/update-proyecto-visibilidad.dto';
 import { ProyectosService } from './proyectos.service';
 
-
-
 @ApiTags('Proyectos')
 @Controller()
 export class ProyectosController {
@@ -86,7 +84,8 @@ export class ProyectosController {
   @Roles(Role.ADMINISTRADORA)
   @UseInterceptors(FileInterceptor('imagenPrincipal'))
   @ApiOperation({
-    summary: 'Registrar un proyecto con imagen principal opcional (Administradora)',
+    summary:
+      'Registrar un proyecto con imagen principal opcional (Administradora)',
   })
   create(
     @Body() dto: CreateProyectoDto,
@@ -104,7 +103,8 @@ export class ProyectosController {
   @Roles(Role.ADMINISTRADORA)
   @UseInterceptors(FileInterceptor('imagenPrincipal'))
   @ApiOperation({
-    summary: 'Actualizar proyecto / reemplazar o quitar imagen principal (Administradora)',
+    summary:
+      'Actualizar proyecto / reemplazar o quitar imagen principal (Administradora)',
   })
   updateAdmin(
     @Param('id', ParseIntPipe) id: number,
@@ -121,7 +121,8 @@ export class ProyectosController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMINISTRADORA)
   @ApiOperation({
-    summary: 'Actualizar el estado del ciclo de ejecución de un proyecto (Administradora)',
+    summary:
+      'Actualizar el estado del ciclo de ejecución de un proyecto (Administradora)',
   })
   updateEstado(
     @Param('id', ParseIntPipe) id: number,
@@ -137,7 +138,8 @@ export class ProyectosController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMINISTRADORA)
   @ApiOperation({
-    summary: 'Actualizar la visibilidad pública (activo/inactivo) de un proyecto (Administradora)',
+    summary:
+      'Actualizar la visibilidad pública (activo/inactivo) de un proyecto (Administradora)',
   })
   updateVisibilidad(
     @Param('id', ParseIntPipe) id: number,
@@ -147,8 +149,6 @@ export class ProyectosController {
     return this.proyectosService.updateVisibilidad(id, dto, user);
   }
 
-
-
   @Post('admin/proyectos/:id/imagen-principal')
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
@@ -157,7 +157,8 @@ export class ProyectosController {
   @Roles(Role.ADMINISTRADORA)
   @UseInterceptors(FileInterceptor('imagenPrincipal'))
   @ApiOperation({
-    summary: 'Asignar o reemplazar la imagen principal de un proyecto (Administradora)',
+    summary:
+      'Asignar o reemplazar la imagen principal de un proyecto (Administradora)',
   })
   updateImagenPrincipal(
     @Param('id', ParseIntPipe) id: number,
@@ -186,7 +187,8 @@ export class ProyectosController {
   @Roles(Role.ADMINISTRADORA)
   @UseInterceptors(FileInterceptor('imagen'))
   @ApiOperation({
-    summary: 'Agregar una fotografía a la galería del proyecto (Administradora)',
+    summary:
+      'Agregar una fotografía a la galería del proyecto (Administradora)',
   })
   addImagenGaleria(
     @Param('id', ParseIntPipe) id: number,
@@ -202,7 +204,8 @@ export class ProyectosController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMINISTRADORA)
   @ApiOperation({
-    summary: 'Eliminar una fotografía de la galería del proyecto (Administradora)',
+    summary:
+      'Eliminar una fotografía de la galería del proyecto (Administradora)',
   })
   removeImagenGaleria(
     @Param('id', ParseIntPipe) id: number,
@@ -217,7 +220,8 @@ export class ProyectosController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMINISTRADORA)
   @ApiOperation({
-    summary: 'Reordenar las fotografías de la galería del proyecto (Administradora)',
+    summary:
+      'Reordenar las fotografías de la galería del proyecto (Administradora)',
   })
   reordenarImagenesGaleria(
     @Param('id', ParseIntPipe) id: number,
@@ -226,4 +230,3 @@ export class ProyectosController {
     return this.proyectosService.reordenarImagenesGaleria(id, dto);
   }
 }
-

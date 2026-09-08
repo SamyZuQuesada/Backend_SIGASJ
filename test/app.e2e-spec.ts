@@ -17,15 +17,12 @@ describe('AppController (e2e)', () => {
   });
 
   it('GET / devuelve el estado de SIGASJ', () => {
-    return request(app.getHttpServer())
-      .get('/')
-      .expect(200)
-      .expect({
-        name: 'SIGASJ API',
-        status: 'ok',
-        message: 'Sistema de Gestión de la ASADA San Juan',
-        version: '1.0.0',
-      });
+    return request(app.getHttpServer()).get('/').expect(200).expect({
+      name: 'SIGASJ API',
+      status: 'ok',
+      message: 'Sistema de Gestión de la ASADA San Juan',
+      version: '1.0.0',
+    });
   });
 
   it('GET /health es un alias del estado', () => {

@@ -75,7 +75,6 @@ const createMemoryRepo = () => {
 };
 
 const mockImagenRepo = {
-
   create: jest.fn((data) => ({ id: 1, ...data })),
   save: jest.fn((data) => Promise.resolve({ id: 1, ...data })),
   findOne: jest.fn(),
@@ -107,7 +106,6 @@ describe('ProyectosService', () => {
 
     service = module.get(ProyectosService);
   });
-
 
   it('persiste un proyecto válido con visibilidad inicial inactiva', async () => {
     const dto: CreateProyectoDto = {

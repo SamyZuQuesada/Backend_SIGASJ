@@ -57,7 +57,9 @@ describe('JWT tras cierre de sesión en cliente (e2e, sin invalidación server-s
   });
 
   it('no existe endpoint de logout que invalide el JWT', async () => {
-    const response = await request(app.getHttpServer()).post('/api/v1/auth/logout');
+    const response = await request(app.getHttpServer()).post(
+      '/api/v1/auth/logout',
+    );
 
     expect(response.status).toBe(404);
   });

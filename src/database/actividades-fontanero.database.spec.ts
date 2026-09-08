@@ -52,9 +52,7 @@ class ActividadesFontaneroMemoryDatabase {
     return id;
   }
 
-  saveActividad(
-    datos: Omit<ActividadRow, 'id'>,
-  ): ActividadRow {
+  saveActividad(datos: Omit<ActividadRow, 'id'>): ActividadRow {
     if (
       datos.idTipoActividad !== null &&
       !this.tipos.has(datos.idTipoActividad)
@@ -92,7 +90,9 @@ describe('Migración e integridad: Actividades Fontanero (#387)', () => {
   describe('Definición de migración SQL Server', () => {
     it('expone la migración para crear tablas y relaciones', () => {
       const migration = new CreateActividadesFontaneroTables1724684200000();
-      expect(migration.name).toBe('CreateActividadesFontaneroTables1724684200000');
+      expect(migration.name).toBe(
+        'CreateActividadesFontaneroTables1724684200000',
+      );
       expect(typeof migration.up).toBe('function');
       expect(typeof migration.down).toBe('function');
     });

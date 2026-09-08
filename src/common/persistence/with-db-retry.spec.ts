@@ -4,10 +4,14 @@ describe('withDbRetry', () => {
   it('reconoce cortes transitorios de SQL Server', () => {
     expect(
       isTransientDbError(
-        new Error('QueryFailedError: ConnectionError: Connection lost - read ECONNRESET'),
+        new Error(
+          'QueryFailedError: ConnectionError: Connection lost - read ECONNRESET',
+        ),
       ),
     ).toBe(true);
-    expect(isTransientDbError(new Error('Fotografía no encontrada'))).toBe(false);
+    expect(isTransientDbError(new Error('Fotografía no encontrada'))).toBe(
+      false,
+    );
   });
 
   it('reintenta y resuelve cuando la segunda llamada funciona', async () => {

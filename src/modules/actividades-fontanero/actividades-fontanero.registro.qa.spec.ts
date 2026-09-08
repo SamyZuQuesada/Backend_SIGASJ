@@ -59,7 +59,12 @@ describe('QA #933 — registro y validación de actividades Fontanero', () => {
           type: 'sqljs',
           autoSave: false,
           dropSchema: true,
-          entities: [ActividadFontanero, TipoActividadFontanero, DocumentoActividadFontanero, Usuario],
+          entities: [
+            ActividadFontanero,
+            TipoActividadFontanero,
+            DocumentoActividadFontanero,
+            Usuario,
+          ],
           synchronize: true,
         }),
         AuthModule,
@@ -82,7 +87,9 @@ describe('QA #933 — registro y validación de actividades Fontanero', () => {
 
     jwtService = moduleFixture.get(JwtService);
     actividades = moduleFixture.get(getRepositoryToken(ActividadFontanero));
-    tiposActividad = moduleFixture.get(getRepositoryToken(TipoActividadFontanero));
+    tiposActividad = moduleFixture.get(
+      getRepositoryToken(TipoActividadFontanero),
+    );
   });
 
   afterAll(async () => {
@@ -137,10 +144,13 @@ describe('QA #933 — registro y validación de actividades Fontanero', () => {
     await postActividad(buildValidCreateActividadPayload(9999)).expect(404);
     expect(await actividades.count()).toBe(0);
 
-    await tiposActividad.update({ id: validTipoActividadId }, { activo: false });
-    await postActividad(buildValidCreateActividadPayload(validTipoActividadId)).expect(
-      400,
+    await tiposActividad.update(
+      { id: validTipoActividadId },
+      { activo: false },
     );
+    await postActividad(
+      buildValidCreateActividadPayload(validTipoActividadId),
+    ).expect(400);
     expect(await actividades.count()).toBe(0);
 
     await tiposActividad.update({ id: validTipoActividadId }, { activo: true });

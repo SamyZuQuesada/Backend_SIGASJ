@@ -30,7 +30,7 @@ export class DocumentoActividadFontanero {
   fechaCarga: Date;
 
   @ManyToOne(() => ActividadFontanero, (actividad) => actividad.documentos, {
-    onDelete: 'CASCADE',
+    onDelete: 'NO ACTION',
   })
   @JoinColumn({ name: 'idActividad' })
   actividad: ActividadFontanero;

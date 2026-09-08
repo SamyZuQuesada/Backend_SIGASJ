@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class EnsureTipoActividadFontaneroActivo1724684400000
-  implements MigrationInterface
-{
+export class EnsureTipoActividadFontaneroActivo1724684400000 implements MigrationInterface {
   name = 'EnsureTipoActividadFontaneroActivo1724684400000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

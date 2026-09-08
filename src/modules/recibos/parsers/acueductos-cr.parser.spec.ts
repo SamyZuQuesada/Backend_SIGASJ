@@ -30,7 +30,9 @@ describe('AcueductosCrParser', () => {
       <span id="MainContent_lblMensaje">La cuenta consultada no existe, por favor verificar si ingreso la cuenta la correcta.</span>
     `;
 
-    expect(() => parser.parseResponse(mockHtml, 99999)).toThrow(NotFoundException);
+    expect(() => parser.parseResponse(mockHtml, 99999)).toThrow(
+      NotFoundException,
+    );
   });
 
   it('debe parsear correctamente una tabla con recibos pendientes (MainContent_grvRecibos)', () => {
@@ -65,10 +67,14 @@ describe('AcueductosCrParser', () => {
   it('debe lanzar ServiceUnavailableException ante respuestas de error de Web Forms', () => {
     const mockHtml = `pageRedirect||%2fError.aspx|`;
 
-    expect(() => parser.parseResponse(mockHtml, 130)).toThrow(ServiceUnavailableException);
+    expect(() => parser.parseResponse(mockHtml, 130)).toThrow(
+      ServiceUnavailableException,
+    );
   });
 
   it('debe lanzar ServiceUnavailableException ante respuestas vacías', () => {
-    expect(() => parser.parseResponse('', 130)).toThrow(ServiceUnavailableException);
+    expect(() => parser.parseResponse('', 130)).toThrow(
+      ServiceUnavailableException,
+    );
   });
 });

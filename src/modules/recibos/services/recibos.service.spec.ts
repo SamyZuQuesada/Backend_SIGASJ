@@ -42,6 +42,8 @@ describe('RecibosService', () => {
     expect(result.data?.numeroPaja).toBe(130);
     expect(result.data?.abonado).toBe('MARCO ANTONIO CABALCETA JIMENEZ');
     expect(result.data?.tieneRecibosPendientes).toBe(false);
-    expect(mockAcueductosCrService.consultarReciboRaw).toHaveBeenCalledWith(130);
+    expect(mockAcueductosCrService.consultarReciboRaw).toHaveBeenCalledWith(
+      130,
+    );
   });
 });

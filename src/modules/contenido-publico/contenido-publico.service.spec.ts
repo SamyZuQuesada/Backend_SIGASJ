@@ -44,7 +44,9 @@ const createGaleriaRepo = () => {
     findOne: jest.fn(async ({ where: { id } }: { where: { id: number } }) =>
       items.find((item) => item.id === id),
     ),
-    create: jest.fn((data: Partial<GaleriaFoto>) => ({ ...data }) as GaleriaFoto),
+    create: jest.fn(
+      (data: Partial<GaleriaFoto>) => ({ ...data }) as GaleriaFoto,
+    ),
     save: jest.fn(async (entity: GaleriaFoto | GaleriaFoto[]) => {
       const list = Array.isArray(entity) ? entity : [entity];
       for (const row of list) {
@@ -167,14 +169,14 @@ describe('ContenidoPublicoService', () => {
       url: '/api/v1/public/media/galeria/demo.jpg',
     });
 
-    expect((await service.getGaleria()).some((item) => item.id === created.id)).toBe(
-      true,
-    );
+    expect(
+      (await service.getGaleria()).some((item) => item.id === created.id),
+    ).toBe(true);
 
     await service.setGaleriaActiva(created.id, false);
-    expect((await service.getGaleria()).some((item) => item.id === created.id)).toBe(
-      false,
-    );
+    expect(
+      (await service.getGaleria()).some((item) => item.id === created.id),
+    ).toBe(false);
     expect(
       (await service.getGaleriaAdmin()).some(
         (item) => item.id === created.id && !item.activa,
@@ -182,9 +184,9 @@ describe('ContenidoPublicoService', () => {
     ).toBe(true);
 
     await service.setGaleriaActiva(created.id, true);
-    expect((await service.getGaleria()).some((item) => item.id === created.id)).toBe(
-      true,
-    );
+    expect(
+      (await service.getGaleria()).some((item) => item.id === created.id),
+    ).toBe(true);
 
     await service.removeGaleria(created.id);
     expect(

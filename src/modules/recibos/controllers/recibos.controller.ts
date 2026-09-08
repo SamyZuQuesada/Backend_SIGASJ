@@ -13,7 +13,8 @@ export class RecibosController {
   @Get(':numeroPaja')
   @UseGuards(RecibosRateLimiterGuard)
   @ApiOperation({
-    summary: 'Consultar estado del recibo de agua de forma pública (Landing Page)',
+    summary:
+      'Consultar estado del recibo de agua de forma pública (Landing Page)',
     description:
       'Permite a cualquier visitante ingresar su número de paja y obtener la información de su recibo consumida en tiempo real desde AcueductosCR sin necesidad de autenticación.',
   })
@@ -37,11 +38,13 @@ export class RecibosController {
   })
   @ApiResponse({
     status: 429,
-    description: 'Demasiadas solicitudes desde esta dirección IP (Rate Limiting)',
+    description:
+      'Demasiadas solicitudes desde esta dirección IP (Rate Limiting)',
   })
   @ApiResponse({
     status: 503,
-    description: 'El servicio externo de AcueductosCR no está disponible temporalmente',
+    description:
+      'El servicio externo de AcueductosCR no está disponible temporalmente',
   })
   async consultarRecibo(
     @Param() params: ConsultarReciboDto,

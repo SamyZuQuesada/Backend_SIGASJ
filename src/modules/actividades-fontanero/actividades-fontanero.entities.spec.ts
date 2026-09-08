@@ -11,7 +11,12 @@ describe('Entidades Actividades Fontanero (#386)', () => {
   beforeAll(async () => {
     dataSource = new DataSource({
       type: 'sqljs',
-      entities: [ActividadFontanero, TipoActividadFontanero, DocumentoActividadFontanero, Usuario],
+      entities: [
+        ActividadFontanero,
+        TipoActividadFontanero,
+        DocumentoActividadFontanero,
+        Usuario,
+      ],
       synchronize: true,
     });
     await dataSource.initialize();

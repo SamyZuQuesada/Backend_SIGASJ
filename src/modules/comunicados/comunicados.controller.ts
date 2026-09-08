@@ -11,7 +11,12 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiConsumes,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ComunicadosService } from './comunicados.service';
 import { CreateComunicadoDto } from './dto/create-comunicado.dto';
 import { UpdateComunicadoEstadoDto } from './dto/update-comunicado-estado.dto';
@@ -80,10 +85,7 @@ export class ComunicadosController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
   @ApiOperation({ summary: 'Activar o desactivar un comunicado (Admin)' })
-  setEstado(
-    @Param('id') id: string,
-    @Body() dto: UpdateComunicadoEstadoDto,
-  ) {
+  setEstado(@Param('id') id: string, @Body() dto: UpdateComunicadoEstadoDto) {
     return this.comunicadosService.setEstado(id, dto.estado);
   }
 

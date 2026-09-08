@@ -112,119 +112,121 @@ export class ComunicadosService implements OnModuleInit {
 
   async findPublicos() {
     return withDbRetry(async () => {
-    const now = Date.now();
-    const items = await this.comunicados.find();
+      const now = Date.now();
+      const items = await this.comunicados.find();
 
-    return items
-      .filter((comunicado) => {
-        if (
-          String(comunicado.estado ?? '').trim() !== 'Activo' ||
-          !isPublicFlag(comunicado.esPublico)
-        ) {
-          return false;
-        }
-
-        const expiresAt = toIso(comunicado.fechaExpiracion);
-        if (expiresAt) {
-          const parsed = Date.parse(expiresAt);
-          if (!Number.isNaN(parsed) && parsed < now) {
+      return items
+        .filter((comunicado) => {
+          if (
+            String(comunicado.estado ?? '').trim() !== 'Activo' ||
+            !isPublicFlag(comunicado.esPublico)
+          ) {
             return false;
           }
-        }
 
-        return true;
-      })
-      .map(toRecord)
-      .sort((left, right) => {
-        const rightTime = Date.parse(right.fechaPublicacion) || 0;
-        const leftTime = Date.parse(left.fechaPublicacion) || 0;
-        return rightTime - leftTime;
-      });
+          const expiresAt = toIso(comunicado.fechaExpiracion);
+          if (expiresAt) {
+            const parsed = Date.parse(expiresAt);
+            if (!Number.isNaN(parsed) && parsed < now) {
+              return false;
+            }
+          }
+
+          return true;
+        })
+        .map(toRecord)
+        .sort((left, right) => {
+          const rightTime = Date.parse(right.fechaPublicacion) || 0;
+          const leftTime = Date.parse(left.fechaPublicacion) || 0;
+          return rightTime - leftTime;
+        });
     });
   }
 
   async findAllAdmin() {
     return withDbRetry(async () => {
-    const items = await this.comunicados.find({
-      order: { fechaPublicacion: 'DESC' },
-    });
-    return items.map(toRecord);
+      const items = await this.comunicados.find({
+        order: { fechaPublicacion: 'DESC' },
+      });
+      return items.map(toRecord);
     });
   }
 
   async findOne(id: string) {
     return withDbRetry(async () => {
-    const comunicado = await this.comunicados.findOne({ where: { id } });
-    if (!comunicado) {
-      throw new NotFoundException(`Comunicado con ID ${id} no encontrado`);
-    }
-    return toRecord(comunicado);
+      const comunicado = await this.comunicados.findOne({ where: { id } });
+      if (!comunicado) {
+        throw new NotFoundException(`Comunicado con ID ${id} no encontrado`);
+      }
+      return toRecord(comunicado);
     });
   }
 
   async create(dto: CreateComunicadoDto, file?: UploadedImageFile) {
     return withDbRetry(async () => {
-    const imagenUrl = file
-      ? savePublicImage('comunicados', file)
-      : (emptyToNull(dto.imagenUrl) ?? null);
+      const imagenUrl = file
+        ? savePublicImage('comunicados', file)
+        : (emptyToNull(dto.imagenUrl) ?? null);
 
-    const saved = await this.comunicados.save(
-      this.comunicados.create({
-        id: randomUUID(),
-        titulo: dto.titulo.trim(),
-        descripcion: dto.descripcion?.trim() || '',
-        contenido: emptyToNull(dto.contenido) ?? null,
-        tipo: dto.tipo?.trim() || 'Informativo',
-        prioridad: dto.prioridad || 'Media',
-        estado: dto.estado === 'Inactivo' ? 'Inactivo' : 'Activo',
-        esPublico: isPublicFlag(dto.esPublico),
-        fechaPublicacion: toDate(dto.fechaPublicacion) ?? new Date(),
-        fechaExpiracion: toDate(dto.fechaExpiracion ?? null),
-        imagenUrl,
-      }),
-    );
+      const saved = await this.comunicados.save(
+        this.comunicados.create({
+          id: randomUUID(),
+          titulo: dto.titulo.trim(),
+          descripcion: dto.descripcion?.trim() || '',
+          contenido: emptyToNull(dto.contenido) ?? null,
+          tipo: dto.tipo?.trim() || 'Informativo',
+          prioridad: dto.prioridad || 'Media',
+          estado: dto.estado === 'Inactivo' ? 'Inactivo' : 'Activo',
+          esPublico: isPublicFlag(dto.esPublico),
+          fechaPublicacion: toDate(dto.fechaPublicacion) ?? new Date(),
+          fechaExpiracion: toDate(dto.fechaExpiracion ?? null),
+          imagenUrl,
+        }),
+      );
 
-    return toRecord(saved);
+      return toRecord(saved);
     });
   }
 
   async update(id: string, dto: UpdateComunicadoDto, file?: UploadedImageFile) {
     return withDbRetry(async () => {
-    const current = await this.comunicados.findOne({ where: { id } });
-    if (!current) {
-      throw new NotFoundException(`Comunicado con ID ${id} no encontrado`);
-    }
+      const current = await this.comunicados.findOne({ where: { id } });
+      if (!current) {
+        throw new NotFoundException(`Comunicado con ID ${id} no encontrado`);
+      }
 
-    current.titulo = dto.titulo?.trim() || current.titulo;
-    current.descripcion =
-      dto.descripcion !== undefined ? dto.descripcion.trim() : current.descripcion;
-    current.contenido =
-      dto.contenido !== undefined
-        ? (emptyToNull(dto.contenido) ?? null)
-        : current.contenido;
-    current.tipo = dto.tipo?.trim() || current.tipo;
-    current.prioridad = dto.prioridad || current.prioridad;
-    current.estado =
-      dto.estado === 'Inactivo' || dto.estado === 'Activo'
-        ? dto.estado
-        : current.estado;
-    current.esPublico =
-      dto.esPublico !== undefined
-        ? isPublicFlag(dto.esPublico)
-        : current.esPublico;
-    current.fechaPublicacion =
-      toDate(dto.fechaPublicacion) ?? current.fechaPublicacion;
-    current.fechaExpiracion =
-      dto.fechaExpiracion !== undefined
-        ? toDate(dto.fechaExpiracion)
-        : current.fechaExpiracion;
-    current.imagenUrl = file
-      ? savePublicImage('comunicados', file)
-      : dto.imagenUrl !== undefined
-        ? (emptyToNull(dto.imagenUrl) ?? null)
-        : current.imagenUrl;
+      current.titulo = dto.titulo?.trim() || current.titulo;
+      current.descripcion =
+        dto.descripcion !== undefined
+          ? dto.descripcion.trim()
+          : current.descripcion;
+      current.contenido =
+        dto.contenido !== undefined
+          ? (emptyToNull(dto.contenido) ?? null)
+          : current.contenido;
+      current.tipo = dto.tipo?.trim() || current.tipo;
+      current.prioridad = dto.prioridad || current.prioridad;
+      current.estado =
+        dto.estado === 'Inactivo' || dto.estado === 'Activo'
+          ? dto.estado
+          : current.estado;
+      current.esPublico =
+        dto.esPublico !== undefined
+          ? isPublicFlag(dto.esPublico)
+          : current.esPublico;
+      current.fechaPublicacion =
+        toDate(dto.fechaPublicacion) ?? current.fechaPublicacion;
+      current.fechaExpiracion =
+        dto.fechaExpiracion !== undefined
+          ? toDate(dto.fechaExpiracion)
+          : current.fechaExpiracion;
+      current.imagenUrl = file
+        ? savePublicImage('comunicados', file)
+        : dto.imagenUrl !== undefined
+          ? (emptyToNull(dto.imagenUrl) ?? null)
+          : current.imagenUrl;
 
-    return toRecord(await this.comunicados.save(current));
+      return toRecord(await this.comunicados.save(current));
     });
   }
 
