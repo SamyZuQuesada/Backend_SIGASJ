@@ -218,6 +218,11 @@ export class CreateActividadesFontaneroTables1724684200000 implements MigrationI
             isNullable: true,
           },
           {
+            name: 'fechaRevision',
+            type: dateTimeType,
+            isNullable: true,
+          },
+          {
             name: 'createdAt',
             type: dateTimeType,
             default: defaultDate,

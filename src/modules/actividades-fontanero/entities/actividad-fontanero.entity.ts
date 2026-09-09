@@ -71,6 +71,9 @@ export class ActividadFontanero {
   @Column({ type: 'varchar', length: 100, nullable: true })
   revisadoPorId: string | null;
 
+  @Column({ type: 'datetime', nullable: true })
+  fechaRevision: Date | null;
+
   @Column({ type: 'simple-json', nullable: true })
   datosEspecificos: Record<string, unknown> | null;
 

@@ -24,6 +24,19 @@ import {
   seedTiposActividadFontanero,
 } from './testing/actividades-fontanero.test-helpers';
 
+type PaginatedResponse = {
+  data: Array<{
+    id: number;
+    titulo: string;
+    estado: EstadoActividadFontanero;
+    observacionCorreccion?: string | null;
+  }>;
+  total: number;
+};
+
+const asPaginated = (body: unknown): PaginatedResponse =>
+  body as PaginatedResponse;
+
 /**
  * QA #937 — validación, solicitud de corrección y reenvío end-to-end.
  */
@@ -148,8 +161,9 @@ describe('QA #937 — validación y corrección de actividades Fontanero', () =>
       fontaneroToken,
     ).expect(200);
 
-    expect(listado.body).toMatchObject({ total: 1 });
-    expect(listado.body.data[0]).toMatchObject({
+    const listadoBody = asPaginated(listado.body);
+    expect(listadoBody).toMatchObject({ total: 1 });
+    expect(listadoBody.data[0]).toMatchObject({
       id: actividadId,
       estado: EstadoActividadFontanero.REQUIERE_CORRECCION,
       observacionCorreccion: 'Verifique la presión registrada',
@@ -182,7 +196,7 @@ describe('QA #937 — validación y corrección de actividades Fontanero', () =>
       '/fontanero/actividades/correcciones',
       fontaneroToken,
     ).expect(200);
-    expect(sinPendientes.body.total).toBe(0);
+    expect(asPaginated(sinPendientes.body).total).toBe(0);
   });
 
   it('corregir con datos inválidos responde 400 y mantiene REQUIERE_CORRECCION', async () => {
@@ -282,15 +296,17 @@ describe('QA #937 — validación y corrección de actividades Fontanero', () =>
       fontanero1,
     ).expect(200);
 
-    expect(listado1.body.total).toBe(1);
-    expect(listado1.body.data[0].titulo).toBe('Actividad fontanero 1');
+    const body1 = asPaginated(listado1.body);
+    expect(body1.total).toBe(1);
+    expect(body1.data[0].titulo).toBe('Actividad fontanero 1');
 
     const listado2 = await authGet(
       '/fontanero/actividades/correcciones',
       fontanero2,
     ).expect(200);
 
-    expect(listado2.body.total).toBe(1);
-    expect(listado2.body.data[0].titulo).toBe('Actividad fontanero 2');
+    const body2 = asPaginated(listado2.body);
+    expect(body2.total).toBe(1);
+    expect(body2.data[0].titulo).toBe('Actividad fontanero 2');
   });
 });

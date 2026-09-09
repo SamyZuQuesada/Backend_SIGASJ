@@ -17,6 +17,8 @@ type ActividadRow = {
   observaciones: string | null;
   titulo: string;
   estado: EstadoActividadFontanero;
+  fechaRevision?: Date | null;
+  revisadoPorId?: string | null;
 };
 
 class ActividadesFontaneroMemoryDatabase {
@@ -159,6 +161,35 @@ describe('Migración e integridad: Actividades Fontanero (#387)', () => {
           estado: EstadoActividadFontanero.REPORTADA,
         }),
       ).toThrow('FK Constraint Error: usuario inexistente');
+    });
+
+    it('permite registrar revisión administrativa manteniendo intactos los datos técnicos', () => {
+      const idUsuario = db.createUsuario();
+      const actividad = db.saveActividad({
+        fontaneroId: 'fontanero-qa',
+        idUsuario,
+        idTipoActividad: 1,
+        fechaActividad: '2026-08-23',
+        observaciones: 'Observaciones iniciales intactas',
+        titulo: 'Control de Fugas Barrio San Juan',
+        estado: EstadoActividadFontanero.REPORTADA,
+      });
+
+      const fechaRevision = new Date();
+      actividad.estado = EstadoActividadFontanero.REVISADA;
+      actividad.fechaRevision = fechaRevision;
+      actividad.revisadoPorId = 'admin-qa-1';
+
+      const guardada = db.getActividad(actividad.id);
+      expect(guardada).toBeDefined();
+      expect(guardada!.estado).toBe(EstadoActividadFontanero.REVISADA);
+      expect(guardada!.fechaRevision).toBe(fechaRevision);
+      expect(guardada!.revisadoPorId).toBe('admin-qa-1');
+      expect(guardada!.titulo).toBe('Control de Fugas Barrio San Juan');
+      expect(guardada!.observaciones).toBe('Observaciones iniciales intactas');
+      expect(guardada!.fechaActividad).toBe('2026-08-23');
+      expect(guardada!.fontaneroId).toBe('fontanero-qa');
+      expect(guardada!.idTipoActividad).toBe(1);
     });
   });
 });

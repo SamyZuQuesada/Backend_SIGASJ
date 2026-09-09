@@ -5,6 +5,7 @@ export enum EstadoActividadFontanero {
   CORREGIDA = 'CORREGIDA',
   APROBADA = 'APROBADA',
   RECHAZADA = 'RECHAZADA',
+  REVISADA = 'REVISADA',
 }
 
 /** Estados consultables en el historial operativo del Fontanero. */

@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import type { EntityManager, Repository } from 'typeorm';
+import { Role } from '../../common/enums/role.enum';
 import { TipoActividadFontaneroCodigo } from '../../common/enums/tipo-actividad-fontanero-codigo.enum';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import {
@@ -16,7 +17,7 @@ import type { TipoActividadFontanero } from './entities/tipo-actividad-fontanero
 const user: AuthenticatedUser = {
   userId: 'fontanero-1',
   email: 'fontanero@asada.test',
-  role: 'FONTANERO',
+  role: Role.FONTANERO,
   name: 'Fontanero',
 };
 
@@ -171,7 +172,7 @@ describe('ActividadesFontaneroService - documentos', () => {
     });
     deleteActividadDocument(
       actividad.id,
-      responseDocument.rutaReferenciaArchivo,
+      responseDocument!.rutaReferenciaArchivo,
     );
   });
 });

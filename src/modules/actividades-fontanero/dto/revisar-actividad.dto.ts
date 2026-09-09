@@ -23,6 +23,7 @@ const trimOptionalString = (params: TransformFnParams): unknown => {
 };
 
 const ESTADOS_REVISION = [
+  EstadoActividadFontanero.REVISADA,
   EstadoActividadFontanero.EN_REVISION,
   EstadoActividadFontanero.APROBADA,
   EstadoActividadFontanero.RECHAZADA,
@@ -31,12 +32,14 @@ const ESTADOS_REVISION = [
 export class RevisarActividadDto {
   @ApiPropertyOptional({
     enum: ESTADOS_REVISION,
-    example: EstadoActividadFontanero.EN_REVISION,
+    example: EstadoActividadFontanero.REVISADA,
+    description: 'Estado tras la revisión (por defecto: REVISADA)',
   })
+  @IsOptional()
   @IsEnum(ESTADOS_REVISION, {
     message: 'El estado de revisión no es válido',
   })
-  estado: (typeof ESTADOS_REVISION)[number];
+  estado?: (typeof ESTADOS_REVISION)[number];
 
   @ApiPropertyOptional()
   @Transform(trimOptionalString)
