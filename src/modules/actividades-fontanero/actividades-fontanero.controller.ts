@@ -31,6 +31,7 @@ import type { AuthenticatedUser } from '../../common/interfaces/authenticated-us
 import { ActividadesFontaneroService } from './actividades-fontanero.service';
 import { CorregirActividadDto } from './dto/corregir-actividad.dto';
 import { CreateActividadDto } from './dto/create-actividad.dto';
+import { QueryHistorialActividadesDto } from './dto/query-historial-actividades.dto';
 import { QueryReporteActividadesDto } from './dto/query-reporte-actividades.dto';
 import { RevisarActividadDto } from './dto/revisar-actividad.dto';
 import { SolicitarCorreccionDto } from './dto/solicitar-correccion.dto';
@@ -89,9 +90,19 @@ export class ActividadesFontaneroController {
   @Roles(Role.FONTANERO)
   @ApiOperation({
     summary: 'Consultar historial propio (Fontanero)',
+    description:
+      'Actividades APROBADA, RECHAZADA o CORREGIDA del fontanero autenticado. ' +
+      'Filtro de periodo inclusivo sobre fechaActividad. Paginación en servidor.',
   })
-  historialPropio(@CurrentUser() user: AuthenticatedUser) {
-    return this.actividadesFontaneroService.historialPropio(user);
+  @ApiQuery({ name: 'fechaInicio', required: false, example: '2026-09-01' })
+  @ApiQuery({ name: 'fechaFin', required: false, example: '2026-09-30' })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, example: 10 })
+  historialPropio(
+    @Query() query: QueryHistorialActividadesDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.actividadesFontaneroService.historialPropio(user, query);
   }
 
   @Get('fontanero/actividades/correcciones')
