@@ -5,3 +5,4 @@ export { SolicitarCorreccionDto } from './solicitar-correccion.dto';
 export { QueryHistorialActividadesDto } from './query-historial-actividades.dto';
 export { QueryReporteActividadesDto } from './query-reporte-actividades.dto';
 export { QueryListadoActividadesAdminDto } from './query-listado-actividades-admin.dto';
+export { ACTIVIDADES_MSG } from '../actividades-fontanero.messages';

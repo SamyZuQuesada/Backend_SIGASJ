@@ -26,6 +26,7 @@ import { QueryListadoActividadesAdminDto } from './dto/query-listado-actividades
 import { QueryReporteActividadesDto } from './dto/query-reporte-actividades.dto';
 import { RevisarActividadDto } from './dto/revisar-actividad.dto';
 import { SolicitarCorreccionDto } from './dto/solicitar-correccion.dto';
+import { ACTIVIDADES_MSG } from './actividades-fontanero.messages';
 import { validarDatosEspecificosActividad } from './validators/datos-especificos-actividad.validator';
 import { ActividadFontanero } from './entities/actividad-fontanero.entity';
 import { DocumentoActividadFontanero } from './entities/documento-actividad-fontanero.entity';
@@ -400,7 +401,7 @@ export class ActividadesFontaneroService {
     const actividad = await this.requireOwnedActividad(id, user.userId);
 
     if (actividad.estado !== EstadoActividadFontanero.REQUIERE_CORRECCION) {
-      throw new ForbiddenException('Acceso denegado');
+      throw new ForbiddenException(ACTIVIDADES_MSG.forbidden);
     }
 
     const datosEspecificos = this.extractDatosEspecificos(dto);
@@ -666,9 +667,7 @@ export class ActividadesFontaneroService {
   private assertRangoFechasInclusive(filters: FiltroFechaActividad): void {
     if (filters.fechaInicio && filters.fechaFin) {
       if (filters.fechaInicio > filters.fechaFin) {
-        throw new BadRequestException(
-          'fechaInicio no puede ser posterior a fechaFin',
-        );
+        throw new BadRequestException(ACTIVIDADES_MSG.rangoFechasInvalido);
       }
     }
   }
@@ -688,7 +687,7 @@ export class ActividadesFontaneroService {
         },
       });
       if (!actividad) {
-        throw new NotFoundException('Actividad no encontrada');
+        throw new NotFoundException(ACTIVIDADES_MSG.actividadNotFound);
       }
       return this.toAdminResponse(actividad);
     });
@@ -708,15 +707,15 @@ export class ActividadesFontaneroService {
         },
       });
       if (!actividad) {
-        throw new NotFoundException('Actividad no encontrada');
+        throw new NotFoundException(ACTIVIDADES_MSG.actividadNotFound);
       }
 
       if (user.role === Role.FONTANERO) {
         if (actividad.fontaneroId !== user.userId) {
-          throw new ForbiddenException('Acceso denegado');
+          throw new ForbiddenException(ACTIVIDADES_MSG.forbidden);
         }
       } else if (user.role !== Role.ADMINISTRADORA) {
-        throw new ForbiddenException('Acceso denegado');
+        throw new ForbiddenException(ACTIVIDADES_MSG.forbidden);
       }
 
       return this.toAdminResponse(actividad);
@@ -732,7 +731,7 @@ export class ActividadesFontaneroService {
       const actividad = await this.requireActividad(id);
 
       if (actividad.estado === EstadoActividadFontanero.REVISADA) {
-        throw new BadRequestException('La actividad ya fue revisada');
+        throw new BadRequestException(ACTIVIDADES_MSG.yaRevisada);
       }
 
       actividad.estado = dto.estado ?? EstadoActividadFontanero.REVISADA;
@@ -769,10 +768,10 @@ export class ActividadesFontaneroService {
     return withDbRetry(async () => {
       const tipo = await this.tipoActividadRepository.findOneBy({ id });
       if (!tipo) {
-        throw new NotFoundException('Tipo de actividad no encontrado');
+        throw new NotFoundException(ACTIVIDADES_MSG.tipoNotFound);
       }
       if (!tipo.activo) {
-        throw new BadRequestException('El tipo de actividad no está activo');
+        throw new BadRequestException(ACTIVIDADES_MSG.tipoInactivo);
       }
       return tipo;
     });
@@ -793,7 +792,7 @@ export class ActividadesFontaneroService {
         relations: { tipoActividad: true },
       });
       if (!actividad) {
-        throw new NotFoundException('Actividad no encontrada');
+        throw new NotFoundException(ACTIVIDADES_MSG.actividadNotFound);
       }
       return actividad;
     });
@@ -805,7 +804,7 @@ export class ActividadesFontaneroService {
   ): Promise<ActividadFontanero> {
     const actividad = await this.requireActividad(id);
     if (actividad.fontaneroId !== fontaneroId) {
-      throw new ForbiddenException('Acceso denegado');
+      throw new ForbiddenException(ACTIVIDADES_MSG.forbidden);
     }
     return actividad;
   }

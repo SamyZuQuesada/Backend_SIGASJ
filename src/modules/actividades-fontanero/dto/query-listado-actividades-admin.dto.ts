@@ -18,7 +18,7 @@ export class QueryListadoActividadesAdminDto {
     example: 'fontanero-123',
   })
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'fontaneroId debe ser texto' })
   fontaneroId?: string;
 
   @ApiPropertyOptional({
@@ -27,7 +27,8 @@ export class QueryListadoActividadesAdminDto {
   })
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
+  @IsInt({ message: 'tipoActividadId debe ser un número entero' })
+  @Min(1, { message: 'tipoActividadId debe ser mayor o igual a 1' })
   tipoActividadId?: number;
 
   @ApiPropertyOptional({
@@ -36,7 +37,7 @@ export class QueryListadoActividadesAdminDto {
     example: '2026-08-01',
   })
   @IsOptional()
-  @IsDateString()
+  @IsDateString({}, { message: 'fechaInicio debe tener formato YYYY-MM-DD' })
   fechaInicio?: string;
 
   @ApiPropertyOptional({
@@ -45,7 +46,7 @@ export class QueryListadoActividadesAdminDto {
     example: '2026-08-31',
   })
   @IsOptional()
-  @IsDateString()
+  @IsDateString({}, { message: 'fechaFin debe tener formato YYYY-MM-DD' })
   fechaFin?: string;
 
   @ApiPropertyOptional({
@@ -54,7 +55,9 @@ export class QueryListadoActividadesAdminDto {
     example: EstadoActividadFontanero.REPORTADA,
   })
   @IsOptional()
-  @IsEnum(EstadoActividadFontanero)
+  @IsEnum(EstadoActividadFontanero, {
+    message: 'El estado de la actividad no es válido',
+  })
   estado?: EstadoActividadFontanero;
 
   @ApiPropertyOptional({
@@ -65,8 +68,8 @@ export class QueryListadoActividadesAdminDto {
   })
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
-  @Min(1)
+  @IsInt({ message: 'page debe ser un número entero' })
+  @Min(1, { message: 'page debe ser mayor o igual a 1' })
   page?: number = 1;
 
   @ApiPropertyOptional({
@@ -78,8 +81,8 @@ export class QueryListadoActividadesAdminDto {
   })
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(100)
+  @IsInt({ message: 'limit debe ser un número entero' })
+  @Min(1, { message: 'limit debe ser mayor o igual a 1' })
+  @Max(100, { message: 'limit no puede ser mayor a 100' })
   limit?: number = 10;
 }

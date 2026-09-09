@@ -19,8 +19,10 @@ export class SolicitarCorreccionDto {
     example: 'Indique el material utilizado y adjunte evidencia fotográfica.',
   })
   @Transform(trimString)
-  @IsString()
+  @IsString({ message: 'La observación de corrección debe ser texto' })
   @IsNotEmpty({ message: 'La observación de corrección es obligatoria' })
-  @MaxLength(2000)
+  @MaxLength(2000, {
+    message: 'La observación de corrección no puede superar 2000 caracteres',
+  })
   observacion: string;
 }

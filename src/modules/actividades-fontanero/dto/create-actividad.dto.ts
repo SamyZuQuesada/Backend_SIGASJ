@@ -79,7 +79,7 @@ export class CreateActividadDto {
   @ApiPropertyOptional({ maxLength: 5000 })
   @Transform(trimOptionalString)
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'La descripción debe ser texto' })
   @MaxLength(5000, {
     message: 'La descripción no puede superar 5000 caracteres',
   })
@@ -88,14 +88,14 @@ export class CreateActividadDto {
   @ApiPropertyOptional({ maxLength: 200 })
   @Transform(trimOptionalString)
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'La ubicación debe ser texto' })
   @MaxLength(200, { message: 'La ubicación no puede superar 200 caracteres' })
   ubicacion?: string;
 
   @ApiPropertyOptional({ maxLength: 5000 })
   @Transform(trimOptionalString)
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'Las observaciones deben ser texto' })
   @MaxLength(5000, {
     message: 'Las observaciones no pueden superar 5000 caracteres',
   })

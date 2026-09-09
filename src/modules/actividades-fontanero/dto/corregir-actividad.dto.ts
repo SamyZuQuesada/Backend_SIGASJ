@@ -37,22 +37,25 @@ const trimOptionalString = (params: TransformFnParams): unknown => {
 export class CorregirActividadDto {
   @ApiProperty({ example: 'Reparación de tubería (corregida)', maxLength: 200 })
   @Transform(trimString)
-  @IsString()
+  @IsString({ message: 'El título debe ser texto' })
   @IsNotEmpty({ message: 'El título de la actividad es obligatorio' })
-  @MaxLength(200)
+  @MaxLength(200, { message: 'El título no puede superar 200 caracteres' })
   titulo: string;
 
   @ApiPropertyOptional()
   @Transform(trimOptionalString)
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'La descripción debe ser texto' })
+  @MaxLength(5000, {
+    message: 'La descripción no puede superar 5000 caracteres',
+  })
   descripcion?: string;
 
   @ApiPropertyOptional({ maxLength: 200 })
   @Transform(trimOptionalString)
   @IsOptional()
-  @IsString()
-  @MaxLength(200)
+  @IsString({ message: 'La ubicación debe ser texto' })
+  @MaxLength(200, { message: 'La ubicación no puede superar 200 caracteres' })
   ubicacion?: string;
 
   @ApiPropertyOptional({
