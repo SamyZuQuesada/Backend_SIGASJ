@@ -165,7 +165,9 @@ describe('Seguridad Backend — módulo actividades Fontanero', () => {
         const response = await get(path, token).expect(200);
         expect(response.body).toHaveProperty('data');
         expect(response.body).toHaveProperty('total');
-        expect(response.body.statusCode).toBeUndefined();
+        expect(
+          (response.body as Record<string, unknown>).statusCode,
+        ).toBeUndefined();
       }
 
       const detail = await get(
@@ -315,7 +317,7 @@ describe('Seguridad Backend — módulo actividades Fontanero', () => {
         signAs('ABONADO', 'abonado-99'),
       ).expect(403);
 
-      expect(response.body.statusCode).toBe(403);
+      expect((response.body as { statusCode: number }).statusCode).toBe(403);
       expect(await actividades.count()).toBe(0);
     });
 

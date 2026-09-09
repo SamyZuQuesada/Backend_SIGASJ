@@ -32,6 +32,7 @@ import { ActividadesFontaneroService } from './actividades-fontanero.service';
 import { CorregirActividadDto } from './dto/corregir-actividad.dto';
 import { CreateActividadDto } from './dto/create-actividad.dto';
 import { QueryHistorialActividadesDto } from './dto/query-historial-actividades.dto';
+import { QueryListadoActividadesAdminDto } from './dto/query-listado-actividades-admin.dto';
 import { QueryReporteActividadesDto } from './dto/query-reporte-actividades.dto';
 import { RevisarActividadDto } from './dto/revisar-actividad.dto';
 import { SolicitarCorreccionDto } from './dto/solicitar-correccion.dto';
@@ -180,9 +181,22 @@ export class ActividadesFontaneroController {
   @Roles(Role.ADMINISTRADORA)
   @ApiOperation({
     summary: 'Listar actividades reportadas (Administradora)',
+    description:
+      'Endpoint para consultar y filtrar las actividades reportadas por los fontaneros con soporte para paginación.',
   })
-  listarAdmin() {
-    return this.actividadesFontaneroService.listarAdmin();
+  @ApiQuery({ name: 'fontaneroId', required: false, example: 'fontanero-123' })
+  @ApiQuery({ name: 'tipoActividadId', required: false, example: 1 })
+  @ApiQuery({ name: 'fechaInicio', required: false, example: '2026-08-01' })
+  @ApiQuery({ name: 'fechaFin', required: false, example: '2026-08-31' })
+  @ApiQuery({
+    name: 'estado',
+    required: false,
+    description: 'Estado de la actividad',
+  })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, example: 10 })
+  listarAdmin(@Query() query: QueryListadoActividadesAdminDto) {
+    return this.actividadesFontaneroService.listarAdmin(query);
   }
 
   @Get('admin/actividades/historial')
@@ -212,25 +226,36 @@ export class ActividadesFontaneroController {
     return this.actividadesFontaneroService.reportesAdmin(query);
   }
 
-  @Get('admin/actividades/:id')
+  @Get(['admin/actividades/:id', 'admin/actividades-fontanero/:id'])
   @HttpCode(HttpStatus.OK)
   @Roles(Role.ADMINISTRADORA)
   @ApiOperation({
     summary: 'Consultar detalle de una actividad (Administradora)',
+    description:
+      'Obtiene toda la información de una actividad reportada por un Fontanero, ' +
+      'incluyendo fontanero responsable, tipo de actividad, fecha, estado de revisión, ' +
+      'datos específicos, observaciones y documentos adjuntos.',
   })
   detalleAdmin(@Param('id', ParseIntPipe) id: number) {
     return this.actividadesFontaneroService.detalleAdmin(id);
   }
 
-  @Patch('admin/actividades/:id/revisar')
+  @Patch([
+    'admin/actividades/:id/revisar',
+    'admin/actividades-fontanero/:id/revisar',
+  ])
   @HttpCode(HttpStatus.OK)
   @Roles(Role.ADMINISTRADORA)
   @ApiOperation({
     summary: 'Revisar una actividad reportada (Administradora)',
+    description:
+      'Registra que la actividad fue consultada y revisada administrativamente por la Administradora. ' +
+      'Guarda la fecha/hora de revisión y el usuario revisor, estableciendo el estado en REVISADA. ' +
+      'No modifica los datos técnicos registrados originalmente por el fontanero ni implica aprobación o rechazo.',
   })
   revisar(
     @Param('id', ParseIntPipe) id: number,
-    @Body() dto: RevisarActividadDto,
+    @Body() dto: RevisarActividadDto = new RevisarActividadDto(),
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.actividadesFontaneroService.revisar(id, dto, user);
@@ -248,5 +273,24 @@ export class ActividadesFontaneroController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.actividadesFontaneroService.solicitarCorreccion(id, dto, user);
+  }
+
+  // ── Consulta de Detalle Completo (Fontanero y Administradora) ───────────
+
+  @Get(['actividades-fontanero/:id', 'actividades/:id'])
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.FONTANERO, Role.ADMINISTRADORA)
+  @ApiOperation({
+    summary:
+      'Consultar detalle completo de una actividad (Fontanero y Administradora)',
+    description:
+      'Obtiene toda la información asociada a una actividad registrada a partir de su ID. ' +
+      'El Fontanero solo puede consultar actividades propias. La Administradora puede consultar cualquier actividad.',
+  })
+  consultarDetalle(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.actividadesFontaneroService.consultarDetalle(id, user);
   }
 }

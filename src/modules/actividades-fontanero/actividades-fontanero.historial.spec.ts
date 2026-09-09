@@ -7,7 +7,10 @@ import { getRepositoryToken, TypeOrmModule } from '@nestjs/typeorm';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { Repository } from 'typeorm';
-import { EstadoActividadFontanero, ESTADOS_HISTORIAL_FONTANERO } from '../../common/enums/estado-actividad-fontanero.enum';
+import {
+  EstadoActividadFontanero,
+  ESTADOS_HISTORIAL_FONTANERO,
+} from '../../common/enums/estado-actividad-fontanero.enum';
 import { Role } from '../../common/enums/role.enum';
 import { HttpExceptionFilter } from '../../common/filters/http-exception.filter';
 import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';

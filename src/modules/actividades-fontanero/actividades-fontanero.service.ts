@@ -5,11 +5,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository, SelectQueryBuilder } from 'typeorm';
+import { Repository, SelectQueryBuilder } from 'typeorm';
 import {
   ESTADOS_HISTORIAL_FONTANERO,
   EstadoActividadFontanero,
 } from '../../common/enums/estado-actividad-fontanero.enum';
+import { Role } from '../../common/enums/role.enum';
 import { TipoActividadFontaneroCodigo } from '../../common/enums/tipo-actividad-fontanero-codigo.enum';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import {
@@ -21,6 +22,7 @@ import {
 import { CorregirActividadDto } from './dto/corregir-actividad.dto';
 import { CreateActividadDto } from './dto/create-actividad.dto';
 import { QueryHistorialActividadesDto } from './dto/query-historial-actividades.dto';
+import { QueryListadoActividadesAdminDto } from './dto/query-listado-actividades-admin.dto';
 import { QueryReporteActividadesDto } from './dto/query-reporte-actividades.dto';
 import { RevisarActividadDto } from './dto/revisar-actividad.dto';
 import { SolicitarCorreccionDto } from './dto/solicitar-correccion.dto';
@@ -28,27 +30,35 @@ import { validarDatosEspecificosActividad } from './validators/datos-especificos
 import { ActividadFontanero } from './entities/actividad-fontanero.entity';
 import { DocumentoActividadFontanero } from './entities/documento-actividad-fontanero.entity';
 import { TipoActividadFontanero } from './entities/tipo-actividad-fontanero.entity';
+import { withDbRetry } from '../../common/persistence/with-db-retry';
 
 export type ActividadFontaneroResponse = {
   id: number;
   tipoActividadId: number;
   tipoActividadNombre: string;
+  tipoActividadCodigo?: string;
   fechaActividad: string;
+  fechaRegistro?: Date;
   titulo: string;
   descripcion: string | null;
   ubicacion: string | null;
   observaciones: string | null;
   datosEspecificos?: Record<string, unknown> | null;
   estado: EstadoActividadFontanero;
+  estadoRevision?: string;
   observacionCorreccion: string | null;
   createdAt: Date;
   updatedAt: Date;
+  fechaRevision?: Date | null;
   documentos?: DocumentoActividadResponse[];
 };
 
 export type ActividadFontaneroAdminResponse = ActividadFontaneroResponse & {
   fontaneroId: string;
+  fontaneroNombre?: string | null;
   revisadoPorId: string | null;
+  fechaRevision: Date | null;
+  estadoRevision: string;
 };
 
 export type ListadoActividadesResponse = {
@@ -58,7 +68,11 @@ export type ListadoActividadesResponse = {
 
 export type ListadoActividadesAdminResponse = {
   data: ActividadFontaneroAdminResponse[];
+  actividades?: ActividadFontaneroAdminResponse[];
   total: number;
+  page?: number;
+  limit?: number;
+  totalPages?: number;
 };
 
 export type ReporteActividadPorTipo = {
@@ -279,15 +293,24 @@ export class ActividadesFontaneroService {
     this.assertRangoFechasInclusive(query);
 
     const page = query.page ?? HISTORIAL_PAGE_DEFAULT;
-    const limit = Math.min(query.limit ?? HISTORIAL_LIMIT_DEFAULT, HISTORIAL_LIMIT_MAX);
+    const limit = Math.min(
+      query.limit ?? HISTORIAL_LIMIT_DEFAULT,
+      HISTORIAL_LIMIT_MAX,
+    );
 
     const qb = this.createHistorialPropioQb(user.userId, query);
-    qb.orderBy('actividad.updatedAt', 'DESC').addOrderBy('actividad.id', 'DESC');
+    qb.orderBy('actividad.updatedAt', 'DESC').addOrderBy(
+      'actividad.id',
+      'DESC',
+    );
 
     const total = await qb.getCount();
     // Clamp: evita data=[] con total>0 cuando page supera la última página válida.
     const totalPages = Math.max(1, Math.ceil(total / limit));
-    const safePage = Math.min(Math.max(page, HISTORIAL_PAGE_DEFAULT), totalPages);
+    const safePage = Math.min(
+      Math.max(page, HISTORIAL_PAGE_DEFAULT),
+      totalPages,
+    );
 
     const data = await qb
       .skip((safePage - 1) * limit)
@@ -321,9 +344,8 @@ export class ActividadesFontaneroService {
   async detallePropio(
     id: number,
     user: AuthenticatedUser,
-  ): Promise<ActividadFontaneroResponse> {
-    const actividad = await this.requireOwnedActividad(id, user.userId);
-    return this.toFontaneroResponse(actividad);
+  ): Promise<ActividadFontaneroAdminResponse> {
+    return this.consultarDetalle(id, user);
   }
 
   async adjuntarDocumento(
@@ -405,36 +427,87 @@ export class ActividadesFontaneroService {
     return this.toFontaneroResponse(saved);
   }
 
-  async listarAdmin(): Promise<ListadoActividadesAdminResponse> {
-    const data = await this.actividadRepository.find({
-      where: {
-        estado: In([
-          EstadoActividadFontanero.REPORTADA,
-          EstadoActividadFontanero.EN_REVISION,
-          EstadoActividadFontanero.CORREGIDA,
-          EstadoActividadFontanero.REQUIERE_CORRECCION,
-        ]),
-      },
-      relations: { tipoActividad: true },
-      order: { createdAt: 'DESC' },
-    });
+  async listarAdmin(
+    query: QueryListadoActividadesAdminDto = {},
+  ): Promise<ListadoActividadesAdminResponse> {
+    return withDbRetry(async () => {
+      const rawPage = Number(query.page);
+      const rawLimit = Number(query.limit);
+      const page =
+        !isNaN(rawPage) && rawPage > 0 ? rawPage : HISTORIAL_PAGE_DEFAULT;
+      const limit = Math.min(
+        !isNaN(rawLimit) && rawLimit > 0 ? rawLimit : HISTORIAL_LIMIT_DEFAULT,
+        HISTORIAL_LIMIT_MAX,
+      );
 
-    return {
-      data: data.map((item) => this.toAdminResponse(item)),
-      total: data.length,
-    };
+      const qb = this.actividadRepository
+        .createQueryBuilder('actividad')
+        .leftJoinAndSelect('actividad.tipoActividad', 'tipo');
+
+      if (query.estado) {
+        qb.andWhere('actividad.estado = :estado', { estado: query.estado });
+      }
+
+      if (query.fontaneroId) {
+        qb.andWhere('actividad.fontaneroId = :fontaneroId', {
+          fontaneroId: query.fontaneroId,
+        });
+      }
+
+      if (
+        query.tipoActividadId !== undefined &&
+        query.tipoActividadId !== null &&
+        !isNaN(Number(query.tipoActividadId))
+      ) {
+        qb.andWhere('tipo.id = :tipoActividadId', {
+          tipoActividadId: Number(query.tipoActividadId),
+        });
+      }
+
+      this.applyFechaActividadFilters(qb, query);
+
+      qb.orderBy('actividad.createdAt', 'DESC').addOrderBy(
+        'actividad.id',
+        'DESC',
+      );
+
+      const total = await qb.getCount();
+      const totalPages = Math.max(1, Math.ceil(total / limit));
+      const safePage = Math.max(1, page);
+      const skip = (safePage - 1) * limit;
+
+      const data = await qb
+        .skip(skip)
+        .take(limit)
+        .getMany();
+
+      const mapped = data.map((item) => this.toAdminResponse(item));
+
+      return {
+        data: mapped,
+        actividades: mapped,
+        total,
+        page: safePage,
+        limit,
+        totalPages,
+      };
+    });
   }
 
   async historialAdmin(): Promise<ListadoActividadesAdminResponse> {
-    const data = await this.actividadRepository.find({
-      relations: { tipoActividad: true },
-      order: { updatedAt: 'DESC' },
-    });
+    return withDbRetry(async () => {
+      const data = await this.actividadRepository.find({
+        relations: { tipoActividad: true },
+        order: { updatedAt: 'DESC' },
+      });
 
-    return {
-      data: data.map((item) => this.toAdminResponse(item)),
-      total: data.length,
-    };
+      const mapped = data.map((item) => this.toAdminResponse(item));
+      return {
+        data: mapped,
+        actividades: mapped,
+        total: data.length,
+      };
+    });
   }
 
   async reportesAdmin(
@@ -442,86 +515,89 @@ export class ActividadesFontaneroService {
   ): Promise<ReporteActividadesResponse> {
     this.assertRangoFechasReporte(filters);
 
-    const [total, porEstadoRows, porTipoRows, porFontaneroRows, actividadRows] =
-      await Promise.all([
-        this.createReportBaseQb(filters).getCount(),
-        this.createReportBaseQb(filters)
-          .select('actividad.estado', 'estado')
-          .addSelect('COUNT(*)', 'cantidad')
-          .groupBy('actividad.estado')
-          .getRawMany<{ estado: EstadoActividadFontanero; cantidad: string }>(),
-        this.createReportBaseQb(filters)
-          .select('tipo.id', 'tipoActividadId')
-          .addSelect('tipo.nombre', 'tipoActividadNombre')
-          .addSelect('COUNT(*)', 'cantidad')
-          .groupBy('tipo.id')
-          .addGroupBy('tipo.nombre')
-          .orderBy('cantidad', 'DESC')
-          .addOrderBy('tipo.nombre', 'ASC')
-          .getRawMany<{
-            tipoActividadId: number | string | null;
-            tipoActividadNombre: string | null;
-            cantidad: string;
-          }>(),
-        this.createReportBaseQb(filters)
-          .select('actividad.fontaneroId', 'fontaneroId')
-          .addSelect('COUNT(*)', 'cantidad')
-          .groupBy('actividad.fontaneroId')
-          .orderBy('cantidad', 'DESC')
-          .addOrderBy('actividad.fontaneroId', 'ASC')
-          .getRawMany<{ fontaneroId: string; cantidad: string }>(),
-        this.createReportBaseQb(filters)
-          .select([
-            'actividad.id',
-            'actividad.fechaActividad',
-            'actividad.estado',
-            'actividad.fontaneroId',
-            'tipo.id',
-            'tipo.nombre',
-          ])
-          .orderBy('actividad.fechaActividad', 'DESC')
-          .addOrderBy('actividad.id', 'DESC')
-          .getMany(),
-      ]);
+    return withDbRetry(async () => {
+      const total = await this.createReportBaseQb(filters).getCount();
 
-    const porEstado = Object.values(EstadoActividadFontanero).reduce(
-      (acc, estado) => {
-        acc[estado] = 0;
-        return acc;
-      },
-      {} as Record<EstadoActividadFontanero, number>,
-    );
+      const porEstadoRows = await this.createReportBaseQb(filters)
+        .select('actividad.estado', 'estado')
+        .addSelect('COUNT(*)', 'cantidad')
+        .groupBy('actividad.estado')
+        .getRawMany<{ estado: EstadoActividadFontanero; cantidad: string }>();
 
-    for (const row of porEstadoRows) {
-      if (row.estado in porEstado) {
-        porEstado[row.estado] = Number(row.cantidad);
+      const porTipoRows = await this.createReportBaseQb(filters)
+        .select('tipo.id', 'tipoActividadId')
+        .addSelect('tipo.nombre', 'tipoActividadNombre')
+        .addSelect('COUNT(*)', 'cantidad')
+        .groupBy('tipo.id')
+        .addGroupBy('tipo.nombre')
+        .orderBy('cantidad', 'DESC')
+        .addOrderBy('tipo.nombre', 'ASC')
+        .getRawMany<{
+          tipoActividadId: number | string | null;
+          tipoActividadNombre: string | null;
+          cantidad: string;
+        }>();
+
+      const porFontaneroRows = await this.createReportBaseQb(filters)
+        .select('actividad.fontaneroId', 'fontaneroId')
+        .addSelect('COUNT(*)', 'cantidad')
+        .groupBy('actividad.fontaneroId')
+        .orderBy('cantidad', 'DESC')
+        .addOrderBy('actividad.fontaneroId', 'ASC')
+        .getRawMany<{ fontaneroId: string; cantidad: string }>();
+
+      const actividadRows = await this.createReportBaseQb(filters)
+        .select([
+          'actividad.id',
+          'actividad.fechaActividad',
+          'actividad.estado',
+          'actividad.fontaneroId',
+          'tipo.id',
+          'tipo.nombre',
+        ])
+        .orderBy('actividad.fechaActividad', 'DESC')
+        .addOrderBy('actividad.id', 'DESC')
+        .getMany();
+
+      const porEstado = Object.values(EstadoActividadFontanero).reduce(
+        (acc, estado) => {
+          acc[estado] = 0;
+          return acc;
+        },
+        {} as Record<EstadoActividadFontanero, number>,
+      );
+
+      for (const row of porEstadoRows) {
+        if (row.estado in porEstado) {
+          porEstado[row.estado] = Number(row.cantidad);
+        }
       }
-    }
 
-    return {
-      total,
-      porEstado,
-      porTipo: porTipoRows.map((row) => ({
-        tipoActividadId:
-          row.tipoActividadId === null || row.tipoActividadId === undefined
-            ? null
-            : Number(row.tipoActividadId),
-        tipoActividadNombre: row.tipoActividadNombre ?? '',
-        cantidad: Number(row.cantidad),
-      })),
-      porFontanero: porFontaneroRows.map((row) => ({
-        fontaneroId: row.fontaneroId,
-        cantidad: Number(row.cantidad),
-      })),
-      actividades: actividadRows.map((actividad) => ({
-        id: actividad.id,
-        fechaActividad: actividad.fechaActividad,
-        estado: actividad.estado,
-        tipoActividadId: actividad.tipoActividad?.id ?? null,
-        tipoActividadNombre: actividad.tipoActividad?.nombre ?? '',
-        fontaneroId: actividad.fontaneroId,
-      })),
-    };
+      return {
+        total,
+        porEstado,
+        porTipo: porTipoRows.map((row) => ({
+          tipoActividadId:
+            row.tipoActividadId === null || row.tipoActividadId === undefined
+              ? null
+              : Number(row.tipoActividadId),
+          tipoActividadNombre: row.tipoActividadNombre ?? '',
+          cantidad: Number(row.cantidad),
+        })),
+        porFontanero: porFontaneroRows.map((row) => ({
+          fontaneroId: row.fontaneroId,
+          cantidad: Number(row.cantidad),
+        })),
+        actividades: actividadRows.map((actividad) => ({
+          id: actividad.id,
+          fechaActividad: actividad.fechaActividad,
+          estado: actividad.estado,
+          tipoActividadId: actividad.tipoActividad?.id ?? null,
+          tipoActividadNombre: actividad.tipoActividad?.nombre ?? '',
+          fontaneroId: actividad.fontaneroId,
+        })),
+      };
+    });
   }
 
   private createHistorialPropioQb(
@@ -602,24 +678,73 @@ export class ActividadesFontaneroService {
   }
 
   async detalleAdmin(id: number): Promise<ActividadFontaneroAdminResponse> {
-    const actividad = await this.requireActividad(id);
-    return this.toAdminResponse(actividad);
+    return withDbRetry(async () => {
+      const actividad = await this.actividadRepository.findOne({
+        where: { id },
+        relations: {
+          tipoActividad: true,
+          documentos: true,
+          fontanero: true,
+        },
+      });
+      if (!actividad) {
+        throw new NotFoundException('Actividad no encontrada');
+      }
+      return this.toAdminResponse(actividad);
+    });
+  }
+
+  async consultarDetalle(
+    id: number,
+    user: AuthenticatedUser,
+  ): Promise<ActividadFontaneroAdminResponse> {
+    return withDbRetry(async () => {
+      const actividad = await this.actividadRepository.findOne({
+        where: { id },
+        relations: {
+          tipoActividad: true,
+          documentos: true,
+          fontanero: true,
+        },
+      });
+      if (!actividad) {
+        throw new NotFoundException('Actividad no encontrada');
+      }
+
+      if (user.role === Role.FONTANERO) {
+        if (actividad.fontaneroId !== user.userId) {
+          throw new ForbiddenException('Acceso denegado');
+        }
+      } else if (user.role !== Role.ADMINISTRADORA) {
+        throw new ForbiddenException('Acceso denegado');
+      }
+
+      return this.toAdminResponse(actividad);
+    });
   }
 
   async revisar(
     id: number,
-    dto: RevisarActividadDto,
+    dto: RevisarActividadDto = {},
     user: AuthenticatedUser,
   ): Promise<ActividadFontaneroAdminResponse> {
-    const actividad = await this.requireActividad(id);
-    actividad.estado = dto.estado;
-    actividad.revisadoPorId = user.userId;
-    if (dto.observacion !== undefined) {
-      actividad.observacionCorreccion = dto.observacion;
-    }
+    return withDbRetry(async () => {
+      const actividad = await this.requireActividad(id);
 
-    const saved = await this.actividadRepository.save(actividad);
-    return this.toAdminResponse(saved);
+      if (actividad.estado === EstadoActividadFontanero.REVISADA) {
+        throw new BadRequestException('La actividad ya fue revisada');
+      }
+
+      actividad.estado = dto.estado ?? EstadoActividadFontanero.REVISADA;
+      actividad.revisadoPorId = user.userId;
+      actividad.fechaRevision = new Date();
+      if (dto.observacion !== undefined) {
+        actividad.observacionCorreccion = dto.observacion;
+      }
+
+      const saved = await this.actividadRepository.save(actividad);
+      return this.toAdminResponse(saved);
+    });
   }
 
   async solicitarCorreccion(
@@ -627,26 +752,30 @@ export class ActividadesFontaneroService {
     dto: SolicitarCorreccionDto,
     user: AuthenticatedUser,
   ): Promise<ActividadFontaneroAdminResponse> {
-    const actividad = await this.requireActividad(id);
-    actividad.estado = EstadoActividadFontanero.REQUIERE_CORRECCION;
-    actividad.observacionCorreccion = dto.observacion;
-    actividad.revisadoPorId = user.userId;
+    return withDbRetry(async () => {
+      const actividad = await this.requireActividad(id);
+      actividad.estado = EstadoActividadFontanero.REQUIERE_CORRECCION;
+      actividad.observacionCorreccion = dto.observacion;
+      actividad.revisadoPorId = user.userId;
 
-    const saved = await this.actividadRepository.save(actividad);
-    return this.toAdminResponse(saved);
+      const saved = await this.actividadRepository.save(actividad);
+      return this.toAdminResponse(saved);
+    });
   }
 
   private async requireTipoActividadActivo(
     id: number,
   ): Promise<TipoActividadFontanero> {
-    const tipo = await this.tipoActividadRepository.findOneBy({ id });
-    if (!tipo) {
-      throw new NotFoundException('Tipo de actividad no encontrado');
-    }
-    if (!tipo.activo) {
-      throw new BadRequestException('El tipo de actividad no está activo');
-    }
-    return tipo;
+    return withDbRetry(async () => {
+      const tipo = await this.tipoActividadRepository.findOneBy({ id });
+      if (!tipo) {
+        throw new NotFoundException('Tipo de actividad no encontrado');
+      }
+      if (!tipo.activo) {
+        throw new BadRequestException('El tipo de actividad no está activo');
+      }
+      return tipo;
+    });
   }
 
   private parseOptionalUsuarioId(userId: string): number | null {
@@ -658,14 +787,16 @@ export class ActividadesFontaneroService {
   }
 
   private async requireActividad(id: number): Promise<ActividadFontanero> {
-    const actividad = await this.actividadRepository.findOne({
-      where: { id },
-      relations: { tipoActividad: true },
+    return withDbRetry(async () => {
+      const actividad = await this.actividadRepository.findOne({
+        where: { id },
+        relations: { tipoActividad: true },
+      });
+      if (!actividad) {
+        throw new NotFoundException('Actividad no encontrada');
+      }
+      return actividad;
     });
-    if (!actividad) {
-      throw new NotFoundException('Actividad no encontrada');
-    }
-    return actividad;
   }
 
   private async requireOwnedActividad(
@@ -701,31 +832,67 @@ export class ActividadesFontaneroService {
     tipoActividad?: TipoActividadFontanero | null,
   ): ActividadFontaneroResponse {
     const tipo = tipoActividad ?? actividad.tipoActividad;
+    const estadoRevision =
+      actividad.fechaRevision !== null ||
+      actividad.estado === EstadoActividadFontanero.REVISADA
+        ? 'REVISADA'
+        : 'PENDIENTE';
 
     return {
       id: actividad.id,
       tipoActividadId: tipo?.id ?? 0,
-      tipoActividadNombre: tipo?.nombre ?? '',
+      tipoActividadNombre: tipo?.nombre ?? actividad.titulo ?? 'Sin tipo',
+      tipoActividadCodigo: tipo?.codigo,
       fechaActividad: actividad.fechaActividad ?? '',
+      fechaRegistro: actividad.createdAt,
       titulo: actividad.titulo,
-      descripcion: actividad.descripcion,
-      ubicacion: actividad.ubicacion,
-      observaciones: actividad.observaciones,
+      descripcion: actividad.descripcion ?? null,
+      ubicacion: actividad.ubicacion ?? null,
+      observaciones: actividad.observaciones ?? null,
       datosEspecificos: actividad.datosEspecificos ?? null,
       estado: actividad.estado,
-      observacionCorreccion: actividad.observacionCorreccion,
+      estadoRevision,
+      observacionCorreccion: actividad.observacionCorreccion ?? null,
       createdAt: actividad.createdAt,
       updatedAt: actividad.updatedAt,
+      fechaRevision: actividad.fechaRevision ?? null,
+      documentos: (actividad.documentos ?? []).map((doc) => ({
+        id: doc.id,
+        actividadId: actividad.id,
+        nombreOriginal: doc.nombreOriginal,
+        tipoArchivo: doc.tipoArchivo,
+        rutaReferenciaArchivo: doc.rutaReferenciaArchivo,
+        tamanio: doc.tamanio,
+        fechaCarga: doc.fechaCarga,
+      })),
     };
   }
 
   private toAdminResponse(
     actividad: ActividadFontanero,
   ): ActividadFontaneroAdminResponse {
+    const estadoRevision =
+      actividad.fechaRevision !== null ||
+      actividad.estado === EstadoActividadFontanero.REVISADA
+        ? 'REVISADA'
+        : 'PENDIENTE';
+
+    const fontanero = actividad.fontanero as
+      | Record<string, unknown>
+      | null
+      | undefined;
+    const fontaneroNombre =
+      fontanero && (fontanero.nombre || fontanero.apellidos)
+        ? `${fontanero.nombre ?? ''} ${fontanero.apellidos ?? ''}`.trim()
+        : null;
+
     return {
       ...this.toFontaneroResponse(actividad),
       fontaneroId: actividad.fontaneroId,
-      revisadoPorId: actividad.revisadoPorId,
+      fontaneroNombre,
+      revisadoPorId: actividad.revisadoPorId ?? null,
+      fechaRevision: actividad.fechaRevision ?? null,
+      estadoRevision,
     };
   }
 }

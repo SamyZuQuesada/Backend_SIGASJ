@@ -70,7 +70,7 @@ class ProyectosMemoryDatabase {
       url: datos.url || '',
       descripcion: datos.descripcion ?? null,
       orden: datos.orden ?? 0,
-      proyecto: datos.proyecto as Proyecto,
+      proyecto: datos.proyecto,
       createdAt: datos.createdAt || now,
     };
 

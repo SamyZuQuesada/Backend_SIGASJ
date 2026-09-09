@@ -411,7 +411,7 @@ describe('ProyectosService', () => {
     ];
     const stored = repo.items.find((item) => item.id === saved.id);
     if (stored) {
-      stored.imagenes = imagenes as Proyecto['imagenes'];
+      stored.imagenes = imagenes;
     }
 
     const found = await service.findOneAdmin(saved.id);

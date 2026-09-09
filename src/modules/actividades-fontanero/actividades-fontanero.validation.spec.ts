@@ -8,6 +8,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { Repository } from 'typeorm';
 import { Role } from '../../common/enums/role.enum';
+import { TipoActividadFontaneroCodigo } from '../../common/enums/tipo-actividad-fontanero-codigo.enum';
 import { HttpExceptionFilter } from '../../common/filters/http-exception.filter';
 import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
 import jwtConfig from '../../config/jwt.config';
@@ -139,7 +140,8 @@ describe('POST /api/v1/fontanero/actividades — validación (#931)', () => {
   });
 
   it('rechaza payload sin título', async () => {
-    const { titulo: _titulo, ...payload } = validPayload();
+    const payload = validPayload();
+    delete (payload as Record<string, unknown>).titulo;
     const response = await postActividad(payload).expect(400);
 
     assertReadableValidationError(response.body);
@@ -167,7 +169,8 @@ describe('POST /api/v1/fontanero/actividades — validación (#931)', () => {
   });
 
   it('rechaza payload sin fecha de actividad', async () => {
-    const { fechaActividad: _fecha, ...payload } = validPayload();
+    const payload = validPayload();
+    delete (payload as Record<string, unknown>).fechaActividad;
     const response = await postActividad(payload).expect(400);
 
     assertReadableValidationError(response.body);
@@ -266,7 +269,9 @@ describe('POST /api/v1/fontanero/actividades — validación (#931)', () => {
 
   it('valida datos específicos obligatorios según el tipo de actividad', async () => {
     const tipos = await tiposActividad.find({ order: { id: 'ASC' } });
-    const tipoTomaPresion = tipos.find((t) => t.codigo === 'TOMA_PRESION');
+    const tipoTomaPresion = tipos.find(
+      (t) => t.codigo === TipoActividadFontaneroCodigo.TOMA_PRESION,
+    );
     expect(tipoTomaPresion).toBeDefined();
 
     const invalido = await postActividad({

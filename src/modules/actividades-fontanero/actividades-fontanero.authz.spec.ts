@@ -25,6 +25,13 @@ import {
 } from './testing/actividades-fontanero.test-helpers';
 import { TIPOS_ACTIVIDAD_FONTANERO_INICIALES } from './tipo-actividad-fontanero.catalogo';
 
+type GenericPaginated = { total: number; data: Array<Record<string, unknown>> };
+type ReporteBody = { total: number; porEstado: Record<string, number> };
+
+const asPaginated = (body: unknown): GenericPaginated =>
+  body as GenericPaginated;
+const asReporte = (body: unknown): ReporteBody => body as ReporteBody;
+
 const assertSafeClientBody = (body: unknown) => {
   const serialized = JSON.stringify(body ?? '');
   expect(serialized).not.toMatch(/at\s+\w+\s+\(/);
@@ -341,7 +348,8 @@ describe('Actividades Fontanero — autenticación y autorización', () => {
     });
 
     it('rechaza payload incompleto sin fecha de actividad', async () => {
-      const { fechaActividad: _fecha, ...incomplete } = validPayload();
+      const incomplete = validPayload();
+      delete (incomplete as Record<string, unknown>).fechaActividad;
       const response = await authPost(
         '/fontanero/actividades',
         incomplete,
@@ -474,9 +482,10 @@ describe('Actividades Fontanero — autenticación y autorización', () => {
         signAs(Role.FONTANERO, 'fontanero-1'),
       ).expect(200);
 
-      expect(response.body).toMatchObject({ total: 1 });
-      expect(response.body.data).toHaveLength(1);
-      expect(response.body.data[0].titulo).toBe('Mía');
+      const body = asPaginated(response.body);
+      expect(body).toMatchObject({ total: 1 });
+      expect(body.data).toHaveLength(1);
+      expect(body.data[0].titulo).toBe('Mía');
       expect(JSON.stringify(response.body)).not.toContain('Ajena');
       expect(JSON.stringify(response.body)).not.toContain('fontanero-2');
       assertSafeClientBody(response.body);
@@ -686,8 +695,9 @@ describe('Actividades Fontanero — autenticación y autorización', () => {
         signAs(Role.ADMINISTRADORA, 'admin-1'),
       ).expect(200);
 
-      expect(response.body.total).toBe(1);
-      expect(response.body.data[0]).toMatchObject({
+      const body = asPaginated(response.body);
+      expect(body.total).toBe(1);
+      expect(body.data[0]).toMatchObject({
         titulo: 'Reportada',
         fontaneroId: 'fontanero-1',
       });
@@ -712,14 +722,15 @@ describe('Actividades Fontanero — autenticación y autorización', () => {
         '/admin/actividades/historial',
         token,
       ).expect(200);
-      expect(historial.body.total).toBe(1);
+      expect(asPaginated(historial.body).total).toBe(1);
 
       const reportes = await authGet(
         '/admin/actividades/reportes',
         token,
       ).expect(200);
-      expect(reportes.body.total).toBe(1);
-      expect(reportes.body.porEstado.REPORTADA).toBe(1);
+      const repBody = asReporte(reportes.body);
+      expect(repBody.total).toBe(1);
+      expect(repBody.porEstado.REPORTADA).toBe(1);
 
       const detalle = await authGet(
         `/admin/actividades/${saved.id}`,

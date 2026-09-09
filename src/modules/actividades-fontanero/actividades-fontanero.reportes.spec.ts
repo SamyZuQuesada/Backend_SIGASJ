@@ -360,7 +360,7 @@ describe('GET /api/v1/admin/actividades/reportes', () => {
     expect(body.total).toBe(7);
     expect(body.porTipo).toEqual(
       expect.arrayContaining(
-        tipos.slice(0, 6).map((tipo, index) =>
+        tipos.slice(0, 6).map((tipo, index): unknown =>
           expect.objectContaining({
             tipoActividadId: tipo.id,
             tipoActividadNombre: tipo.nombre,
