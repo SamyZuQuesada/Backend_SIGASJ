@@ -34,6 +34,7 @@ import { CreateActividadDto } from './dto/create-actividad.dto';
 import { QueryHistorialActividadesDto } from './dto/query-historial-actividades.dto';
 import { QueryListadoActividadesAdminDto } from './dto/query-listado-actividades-admin.dto';
 import { QueryReporteActividadesDto } from './dto/query-reporte-actividades.dto';
+import { QueryResumenActividadesDto } from './dto/query-resumen-actividades.dto';
 import { RevisarActividadDto } from './dto/revisar-actividad.dto';
 import { SolicitarCorreccionDto } from './dto/solicitar-correccion.dto';
 import {
@@ -114,6 +115,24 @@ export class ActividadesFontaneroController {
   })
   correccionesPendientes(@CurrentUser() user: AuthenticatedUser) {
     return this.actividadesFontaneroService.correccionesPendientes(user);
+  }
+
+  @Get('fontanero/actividades/resumen')
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.FONTANERO)
+  @ApiOperation({
+    summary: 'Consultar resumen de actividades propias (Fontanero)',
+    description:
+      'Totales y agregados por estado del fontanero autenticado. ' +
+      'Filtro de periodo inclusivo sobre fechaActividad.',
+  })
+  @ApiQuery({ name: 'fechaInicio', required: false, example: '2026-09-01' })
+  @ApiQuery({ name: 'fechaFin', required: false, example: '2026-09-30' })
+  resumenPropio(
+    @Query() query: QueryResumenActividadesDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.actividadesFontaneroService.resumenPropio(user, query);
   }
 
   @Get('fontanero/actividades/tipos')
@@ -207,6 +226,21 @@ export class ActividadesFontaneroController {
   })
   historialAdmin() {
     return this.actividadesFontaneroService.historialAdmin();
+  }
+
+  @Get('admin/actividades/resumen')
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.ADMINISTRADORA)
+  @ApiOperation({
+    summary: 'Consultar resumen de actividades (Administradora)',
+    description:
+      'Totales y agregados por estado de todas las actividades reportadas. ' +
+      'Filtro de periodo inclusivo sobre fechaActividad.',
+  })
+  @ApiQuery({ name: 'fechaInicio', required: false, example: '2026-09-01' })
+  @ApiQuery({ name: 'fechaFin', required: false, example: '2026-09-30' })
+  resumenAdmin(@Query() query: QueryResumenActividadesDto) {
+    return this.actividadesFontaneroService.resumenAdmin(query);
   }
 
   @Get('admin/actividades/reportes')

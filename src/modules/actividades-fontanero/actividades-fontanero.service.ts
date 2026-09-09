@@ -24,6 +24,7 @@ import { CreateActividadDto } from './dto/create-actividad.dto';
 import { QueryHistorialActividadesDto } from './dto/query-historial-actividades.dto';
 import { QueryListadoActividadesAdminDto } from './dto/query-listado-actividades-admin.dto';
 import { QueryReporteActividadesDto } from './dto/query-reporte-actividades.dto';
+import { QueryResumenActividadesDto } from './dto/query-resumen-actividades.dto';
 import { RevisarActividadDto } from './dto/revisar-actividad.dto';
 import { SolicitarCorreccionDto } from './dto/solicitar-correccion.dto';
 import { ACTIVIDADES_MSG } from './actividades-fontanero.messages';
@@ -104,6 +105,11 @@ export type ReporteActividadesResponse = {
   porTipo: ReporteActividadPorTipo[];
   porFontanero: ReporteActividadPorFontanero[];
   actividades: ReporteActividadDetalle[];
+};
+
+export type ResumenActividadesResponse = {
+  total: number;
+  porEstado: Record<EstadoActividadFontanero, number>;
 };
 
 export type TipoActividadFontaneroResponse = {
@@ -511,6 +517,35 @@ export class ActividadesFontaneroService {
     });
   }
 
+  async resumenPropio(
+    user: AuthenticatedUser,
+    query: QueryResumenActividadesDto = {},
+  ): Promise<ResumenActividadesResponse> {
+    this.assertRangoFechasInclusive(query);
+
+    return withDbRetry(async () => {
+      const qb = this.actividadRepository
+        .createQueryBuilder('actividad')
+        .where('actividad.fontaneroId = :fontaneroId', {
+          fontaneroId: user.userId,
+        });
+      this.applyFechaActividadFilters(qb, query);
+      return this.buildResumenActividades(qb);
+    });
+  }
+
+  async resumenAdmin(
+    query: QueryResumenActividadesDto = {},
+  ): Promise<ResumenActividadesResponse> {
+    this.assertRangoFechasInclusive(query);
+
+    return withDbRetry(async () => {
+      const qb = this.actividadRepository.createQueryBuilder('actividad');
+      this.applyFechaActividadFilters(qb, query);
+      return this.buildResumenActividades(qb);
+    });
+  }
+
   async reportesAdmin(
     filters: QueryReporteActividadesDto = {},
   ): Promise<ReporteActividadesResponse> {
@@ -652,6 +687,35 @@ export class ActividadesFontaneroService {
         tipoActividadId: filters.tipoActividadId,
       });
     }
+  }
+
+  private async buildResumenActividades(
+    qb: SelectQueryBuilder<ActividadFontanero>,
+  ): Promise<ResumenActividadesResponse> {
+    const total = await qb.getCount();
+
+    const porEstadoRows = await qb
+      .clone()
+      .select('actividad.estado', 'estado')
+      .addSelect('COUNT(*)', 'cantidad')
+      .groupBy('actividad.estado')
+      .getRawMany<{ estado: EstadoActividadFontanero; cantidad: string }>();
+
+    const porEstado = Object.values(EstadoActividadFontanero).reduce(
+      (acc, estado) => {
+        acc[estado] = 0;
+        return acc;
+      },
+      {} as Record<EstadoActividadFontanero, number>,
+    );
+
+    for (const row of porEstadoRows) {
+      if (row.estado in porEstado) {
+        porEstado[row.estado] = Number(row.cantidad);
+      }
+    }
+
+    return { total, porEstado };
   }
 
   private createReportBaseQb(
