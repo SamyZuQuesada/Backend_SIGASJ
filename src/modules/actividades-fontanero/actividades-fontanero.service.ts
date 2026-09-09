@@ -6,7 +6,10 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository, SelectQueryBuilder } from 'typeorm';
-import { EstadoActividadFontanero } from '../../common/enums/estado-actividad-fontanero.enum';
+import {
+  ESTADOS_HISTORIAL_FONTANERO,
+  EstadoActividadFontanero,
+} from '../../common/enums/estado-actividad-fontanero.enum';
 import { TipoActividadFontaneroCodigo } from '../../common/enums/tipo-actividad-fontanero-codigo.enum';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import {
@@ -17,6 +20,7 @@ import {
 } from '../../common/media/public-media';
 import { CorregirActividadDto } from './dto/corregir-actividad.dto';
 import { CreateActividadDto } from './dto/create-actividad.dto';
+import { QueryHistorialActividadesDto } from './dto/query-historial-actividades.dto';
 import { QueryReporteActividadesDto } from './dto/query-reporte-actividades.dto';
 import { RevisarActividadDto } from './dto/revisar-actividad.dto';
 import { SolicitarCorreccionDto } from './dto/solicitar-correccion.dto';
@@ -107,6 +111,15 @@ export type DocumentoActividadResponse = {
   rutaReferenciaArchivo: string;
   tamanio: number;
   fechaCarga: Date;
+};
+
+const HISTORIAL_PAGE_DEFAULT = 1;
+const HISTORIAL_LIMIT_DEFAULT = 10;
+const HISTORIAL_LIMIT_MAX = 50;
+
+type FiltroFechaActividad = {
+  fechaInicio?: string;
+  fechaFin?: string;
 };
 
 @Injectable()
@@ -261,23 +274,29 @@ export class ActividadesFontaneroService {
 
   async historialPropio(
     user: AuthenticatedUser,
+    query: QueryHistorialActividadesDto = {},
   ): Promise<ListadoActividadesResponse> {
-    const data = await this.actividadRepository.find({
-      where: {
-        fontaneroId: user.userId,
-        estado: In([
-          EstadoActividadFontanero.APROBADA,
-          EstadoActividadFontanero.RECHAZADA,
-          EstadoActividadFontanero.CORREGIDA,
-        ]),
-      },
-      relations: { tipoActividad: true },
-      order: { updatedAt: 'DESC' },
-    });
+    this.assertRangoFechasInclusive(query);
+
+    const page = query.page ?? HISTORIAL_PAGE_DEFAULT;
+    const limit = Math.min(query.limit ?? HISTORIAL_LIMIT_DEFAULT, HISTORIAL_LIMIT_MAX);
+
+    const qb = this.createHistorialPropioQb(user.userId, query);
+    qb.orderBy('actividad.updatedAt', 'DESC').addOrderBy('actividad.id', 'DESC');
+
+    const total = await qb.getCount();
+    // Clamp: evita data=[] con total>0 cuando page supera la última página válida.
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const safePage = Math.min(Math.max(page, HISTORIAL_PAGE_DEFAULT), totalPages);
+
+    const data = await qb
+      .skip((safePage - 1) * limit)
+      .take(limit)
+      .getMany();
 
     return {
       data: data.map((item) => this.toFontaneroResponse(item)),
-      total: data.length,
+      total,
     };
   }
 
@@ -505,12 +524,29 @@ export class ActividadesFontaneroService {
     };
   }
 
+  private createHistorialPropioQb(
+    fontaneroId: string,
+    query: QueryHistorialActividadesDto,
+  ): SelectQueryBuilder<ActividadFontanero> {
+    const qb = this.actividadRepository
+      .createQueryBuilder('actividad')
+      .leftJoinAndSelect('actividad.tipoActividad', 'tipo')
+      .where('actividad.fontaneroId = :fontaneroId', { fontaneroId })
+      .andWhere('actividad.estado IN (:...estadosHistorial)', {
+        estadosHistorial: [...ESTADOS_HISTORIAL_FONTANERO],
+      });
+
+    this.applyFechaActividadFilters(qb, query);
+    return qb;
+  }
+
   /**
    * `fechaActividad` es columna `date` (YYYY-MM-DD): comparación inclusiva directa.
+   * Registros con fechaActividad NULL quedan excluidos cuando hay filtro de fechas.
    */
-  private applyReportFilters(
+  private applyFechaActividadFilters(
     qb: SelectQueryBuilder<ActividadFontanero>,
-    filters: QueryReporteActividadesDto,
+    filters: FiltroFechaActividad,
   ): void {
     if (filters.fechaInicio) {
       qb.andWhere('actividad.fechaActividad >= :fechaInicio', {
@@ -522,6 +558,13 @@ export class ActividadesFontaneroService {
         fechaFin: filters.fechaFin,
       });
     }
+  }
+
+  private applyReportFilters(
+    qb: SelectQueryBuilder<ActividadFontanero>,
+    filters: QueryReporteActividadesDto,
+  ): void {
+    this.applyFechaActividadFilters(qb, filters);
     if (filters.fontaneroId) {
       qb.andWhere('actividad.fontaneroId = :fontaneroId', {
         fontaneroId: filters.fontaneroId,
@@ -544,7 +587,7 @@ export class ActividadesFontaneroService {
     return qb;
   }
 
-  private assertRangoFechasReporte(filters: QueryReporteActividadesDto): void {
+  private assertRangoFechasInclusive(filters: FiltroFechaActividad): void {
     if (filters.fechaInicio && filters.fechaFin) {
       if (filters.fechaInicio > filters.fechaFin) {
         throw new BadRequestException(
@@ -552,6 +595,10 @@ export class ActividadesFontaneroService {
         );
       }
     }
+  }
+
+  private assertRangoFechasReporte(filters: QueryReporteActividadesDto): void {
+    this.assertRangoFechasInclusive(filters);
   }
 
   async detalleAdmin(id: number): Promise<ActividadFontaneroAdminResponse> {
