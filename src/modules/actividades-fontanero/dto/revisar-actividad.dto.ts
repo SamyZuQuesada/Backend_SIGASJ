@@ -44,7 +44,9 @@ export class RevisarActividadDto {
   @ApiPropertyOptional()
   @Transform(trimOptionalString)
   @IsOptional()
-  @IsString()
-  @MaxLength(2000)
+  @IsString({ message: 'La observación debe ser texto' })
+  @MaxLength(2000, {
+    message: 'La observación no puede superar 2000 caracteres',
+  })
   observacion?: string;
 }

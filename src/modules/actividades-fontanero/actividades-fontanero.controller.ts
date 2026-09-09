@@ -5,7 +5,6 @@ import {
   HttpCode,
   HttpStatus,
   Param,
-  ParseIntPipe,
   Patch,
   Post,
   Query,
@@ -28,6 +27,7 @@ import { Role } from '../../common/enums/role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
+import { ActividadIdPipe } from './actividad-id.pipe';
 import { ActividadesFontaneroService } from './actividades-fontanero.service';
 import { CorregirActividadDto } from './dto/corregir-actividad.dto';
 import { CreateActividadDto } from './dto/create-actividad.dto';
@@ -134,7 +134,7 @@ export class ActividadesFontaneroController {
     summary: 'Consultar detalle de una actividad propia (Fontanero)',
   })
   detallePropio(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ActividadIdPipe) id: number,
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.actividadesFontaneroService.detallePropio(id, user);
@@ -153,7 +153,7 @@ export class ActividadesFontaneroController {
     summary: 'Adjuntar documento a una actividad propia (Fontanero)',
   })
   adjuntarDocumento(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ActividadIdPipe) id: number,
     @UploadedFile() file: UploadedImageFile | undefined,
     @CurrentUser() user: AuthenticatedUser,
   ) {
@@ -167,7 +167,7 @@ export class ActividadesFontaneroController {
     summary: 'Corregir y reenviar una actividad propia (Fontanero)',
   })
   corregirPropia(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ActividadIdPipe) id: number,
     @Body() dto: CorregirActividadDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
@@ -236,7 +236,7 @@ export class ActividadesFontaneroController {
       'incluyendo fontanero responsable, tipo de actividad, fecha, estado de revisión, ' +
       'datos específicos, observaciones y documentos adjuntos.',
   })
-  detalleAdmin(@Param('id', ParseIntPipe) id: number) {
+  detalleAdmin(@Param('id', ActividadIdPipe) id: number) {
     return this.actividadesFontaneroService.detalleAdmin(id);
   }
 
@@ -254,7 +254,7 @@ export class ActividadesFontaneroController {
       'No modifica los datos técnicos registrados originalmente por el fontanero ni implica aprobación o rechazo.',
   })
   revisar(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ActividadIdPipe) id: number,
     @Body() dto: RevisarActividadDto = new RevisarActividadDto(),
     @CurrentUser() user: AuthenticatedUser,
   ) {
@@ -268,7 +268,7 @@ export class ActividadesFontaneroController {
     summary: 'Solicitar corrección de una actividad (Administradora)',
   })
   solicitarCorreccion(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ActividadIdPipe) id: number,
     @Body() dto: SolicitarCorreccionDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
@@ -288,7 +288,7 @@ export class ActividadesFontaneroController {
       'El Fontanero solo puede consultar actividades propias. La Administradora puede consultar cualquier actividad.',
   })
   consultarDetalle(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ActividadIdPipe) id: number,
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.actividadesFontaneroService.consultarDetalle(id, user);
