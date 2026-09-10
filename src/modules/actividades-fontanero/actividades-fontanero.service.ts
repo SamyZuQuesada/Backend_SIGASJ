@@ -483,10 +483,7 @@ export class ActividadesFontaneroService {
       const safePage = Math.max(1, page);
       const skip = (safePage - 1) * limit;
 
-      const data = await qb
-        .skip(skip)
-        .take(limit)
-        .getMany();
+      const data = await qb.skip(skip).take(limit).getMany();
 
       const mapped = data.map((item) => this.toAdminResponse(item));
 
@@ -941,9 +938,7 @@ export class ActividadesFontaneroService {
         : 'PENDIENTE';
 
     const fontanero = actividad.fontanero as
-      | Record<string, unknown>
-      | null
-      | undefined;
+      Record<string, unknown> | null | undefined;
     const fontaneroNombre =
       fontanero && (fontanero.nombre || fontanero.apellidos)
         ? `${fontanero.nombre ?? ''} ${fontanero.apellidos ?? ''}`.trim()

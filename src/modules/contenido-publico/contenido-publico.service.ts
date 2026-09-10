@@ -7,6 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
+  normalizeMediaUrl,
   savePublicDocument,
   savePublicImage,
   type UploadedImageFile,
@@ -38,6 +39,7 @@ export type GaleriaFotoRecord = {
   titulo: string | null;
   descripcion: string | null;
   url: string;
+  imagenUrl: string;
   textoAlternativo: string;
   ordenVisualizacion: number;
   activa: boolean;
@@ -115,15 +117,20 @@ const emptyToNull = (value?: string | null) => {
   return trimmed.length > 0 ? trimmed : null;
 };
 
-const toGaleriaRecord = (foto: GaleriaFoto): GaleriaFotoRecord => ({
-  id: foto.id,
-  titulo: foto.titulo,
-  descripcion: foto.descripcion,
-  url: foto.url,
-  textoAlternativo: foto.textoAlternativo,
-  ordenVisualizacion: foto.ordenVisualizacion,
-  activa: isActiveFlag(foto.activa),
-});
+const toGaleriaRecord = (foto: GaleriaFoto): GaleriaFotoRecord => {
+  const normalizedUrl =
+    normalizeMediaUrl(foto.url, 'galeria') ?? '/uploads/galeria/tanque.jpg';
+  return {
+    id: foto.id,
+    titulo: foto.titulo,
+    descripcion: foto.descripcion,
+    url: normalizedUrl,
+    imagenUrl: normalizedUrl,
+    textoAlternativo: foto.textoAlternativo,
+    ordenVisualizacion: foto.ordenVisualizacion,
+    activa: isActiveFlag(foto.activa),
+  };
+};
 
 const toTransparenciaRecord = (
   row: TransparenciaDocumento,
@@ -172,13 +179,13 @@ export class ContenidoPublicoService implements OnModuleInit {
         );
       }
 
-      const galleryCount = await this.galeriaRepo.count();
-      if (galleryCount === 0) {
+      const allGallery = await this.galeriaRepo.find();
+      if (allGallery.length === 0) {
         await this.galeriaRepo.save([
           this.galeriaRepo.create({
             titulo: 'Tanque Principal',
             descripcion: 'Infraestructura principal del acueducto comunal.',
-            url: '/images/tanque.jpg',
+            url: '/uploads/galeria/tanque.jpg',
             textoAlternativo: 'Tanque elevado de la ASADA San Juan',
             ordenVisualizacion: 0,
             activa: true,
@@ -186,12 +193,20 @@ export class ContenidoPublicoService implements OnModuleInit {
           this.galeriaRepo.create({
             titulo: 'Oficina Central',
             descripcion: 'Instalaciones de atención al abonado.',
-            url: '/images/oficina.jpg',
+            url: '/uploads/galeria/oficina.jpg',
             textoAlternativo: 'Oficina central de la ASADA San Juan',
             ordenVisualizacion: 1,
             activa: true,
           }),
         ]);
+      } else {
+        for (const item of allGallery) {
+          const normalized = normalizeMediaUrl(item.url, 'galeria');
+          if (normalized && normalized !== item.url) {
+            item.url = normalized;
+            await this.galeriaRepo.save(item);
+          }
+        }
       }
     });
   }
@@ -252,7 +267,8 @@ export class ContenidoPublicoService implements OnModuleInit {
   }
 
   async createGaleria(dto: CreateGaleriaDto, file?: UploadedImageFile) {
-    const url = file ? savePublicImage('galeria', file) : dto.url?.trim();
+    const rawUrl = file ? savePublicImage('galeria', file) : dto.url?.trim();
+    const url = normalizeMediaUrl(rawUrl, 'galeria');
     if (!url) {
       throw new BadRequestException(
         'Debe adjuntar una imagen o indicar su URL.',
@@ -306,9 +322,14 @@ export class ContenidoPublicoService implements OnModuleInit {
       if (dto.activa !== undefined) {
         current.activa = dto.activa;
       }
-      current.url = file
-        ? savePublicImage('galeria', file)
-        : dto.url?.trim() || current.url;
+      if (file) {
+        current.url = savePublicImage('galeria', file);
+      } else if (dto.url !== undefined) {
+        const normalized = normalizeMediaUrl(dto.url, 'galeria');
+        if (normalized) {
+          current.url = normalized;
+        }
+      }
 
       return toGaleriaRecord(await this.galeriaRepo.save(current));
     });

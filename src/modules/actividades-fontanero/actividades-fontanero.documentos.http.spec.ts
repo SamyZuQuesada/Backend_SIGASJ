@@ -10,9 +10,7 @@ import { Repository } from 'typeorm';
 import { Role } from '../../common/enums/role.enum';
 import { HttpExceptionFilter } from '../../common/filters/http-exception.filter';
 import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
-import {
-  MAX_ACTIVIDAD_DOCUMENT_BYTES,
-} from '../../common/media/public-media';
+import { MAX_ACTIVIDAD_DOCUMENT_BYTES } from '../../common/media/public-media';
 import jwtConfig from '../../config/jwt.config';
 import { AuthModule } from '../auth/auth.module';
 import { Usuario } from '../usuarios/entities/usuario.entity';

@@ -8,6 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { Repository } from 'typeorm';
 import {
+  normalizeMediaUrl,
   savePublicImage,
   type UploadedImageFile,
 } from '../../common/media/public-media';
@@ -28,6 +29,7 @@ export type ComunicadoRecord = {
   fechaPublicacion: string;
   fechaExpiracion: string | null;
   imagenUrl: string | null;
+  url: string | null;
 };
 
 const isPublicFlag = (value: unknown): boolean => {
@@ -69,19 +71,24 @@ const toIso = (value: Date | string | null) => {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 };
 
-const toRecord = (entity: Comunicado): ComunicadoRecord => ({
-  id: entity.id,
-  titulo: entity.titulo,
-  descripcion: entity.descripcion,
-  contenido: entity.contenido,
-  tipo: entity.tipo,
-  prioridad: entity.prioridad,
-  estado: entity.estado === 'Inactivo' ? 'Inactivo' : 'Activo',
-  esPublico: isPublicFlag(entity.esPublico),
-  fechaPublicacion: toIso(entity.fechaPublicacion) ?? new Date().toISOString(),
-  fechaExpiracion: toIso(entity.fechaExpiracion),
-  imagenUrl: entity.imagenUrl,
-});
+const toRecord = (entity: Comunicado): ComunicadoRecord => {
+  const normalizedImg = normalizeMediaUrl(entity.imagenUrl, 'comunicados');
+  return {
+    id: entity.id,
+    titulo: entity.titulo,
+    descripcion: entity.descripcion,
+    contenido: entity.contenido,
+    tipo: entity.tipo,
+    prioridad: entity.prioridad,
+    estado: entity.estado === 'Inactivo' ? 'Inactivo' : 'Activo',
+    esPublico: isPublicFlag(entity.esPublico),
+    fechaPublicacion:
+      toIso(entity.fechaPublicacion) ?? new Date().toISOString(),
+    fechaExpiracion: toIso(entity.fechaExpiracion),
+    imagenUrl: normalizedImg,
+    url: normalizedImg,
+  };
+};
 
 @Injectable()
 export class ComunicadosService implements OnModuleInit {
@@ -92,20 +99,39 @@ export class ComunicadosService implements OnModuleInit {
 
   async onModuleInit() {
     await withDbRetry(async () => {
-      const demoTitles = new Set([
-        'Mantenimiento Programado de Red de Agua',
-        'Asamblea General Ordinaria de Abonados',
-      ]);
-
-      const demos = (await this.comunicados.find()).filter((item) =>
-        demoTitles.has(item.titulo),
-      );
-
-      for (const demo of demos) {
-        if (demo.estado !== 'Inactivo') {
-          demo.estado = 'Inactivo';
-          await this.comunicados.save(demo);
+      const all = await this.comunicados.find();
+      for (const item of all) {
+        if (item.imagenUrl) {
+          const normalized = normalizeMediaUrl(item.imagenUrl, 'comunicados');
+          if (normalized && normalized !== item.imagenUrl) {
+            item.imagenUrl = normalized;
+            await this.comunicados.save(item);
+          }
         }
+      }
+
+      const activeCount = all.filter(
+        (c) => c.estado === 'Activo' && isPublicFlag(c.esPublico),
+      ).length;
+
+      if (activeCount === 0) {
+        await this.comunicados.save(
+          this.comunicados.create({
+            id: randomUUID(),
+            titulo: 'Aviso de Mantenimiento Preventivo',
+            descripcion:
+              'Mantenimiento en los sistemas de bombeo y distribución de agua potable.',
+            contenido:
+              'Estimados abonados, se informa que se realizarán trabajos de mantenimiento preventivo para garantizar la continuidad y calidad del servicio.',
+            tipo: 'Informativo',
+            prioridad: 'Media',
+            estado: 'Activo',
+            esPublico: true,
+            fechaPublicacion: new Date(),
+            fechaExpiracion: null,
+            imagenUrl: '/uploads/comunicados/aviso.jpg',
+          }),
+        );
       }
     });
   }
@@ -164,9 +190,10 @@ export class ComunicadosService implements OnModuleInit {
 
   async create(dto: CreateComunicadoDto, file?: UploadedImageFile) {
     return withDbRetry(async () => {
-      const imagenUrl = file
+      const rawImg = file
         ? savePublicImage('comunicados', file)
         : (emptyToNull(dto.imagenUrl) ?? null);
+      const imagenUrl = normalizeMediaUrl(rawImg, 'comunicados');
 
       const saved = await this.comunicados.save(
         this.comunicados.create({
@@ -223,7 +250,7 @@ export class ComunicadosService implements OnModuleInit {
       current.imagenUrl = file
         ? savePublicImage('comunicados', file)
         : dto.imagenUrl !== undefined
-          ? (emptyToNull(dto.imagenUrl) ?? null)
+          ? normalizeMediaUrl(emptyToNull(dto.imagenUrl), 'comunicados')
           : current.imagenUrl;
 
       return toRecord(await this.comunicados.save(current));

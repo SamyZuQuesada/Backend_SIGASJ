@@ -5,7 +5,9 @@ describe('ACTIVIDADES_MSG — contrato de mensajes', () => {
     expect(ACTIVIDADES_MSG.unauthorized).toBe('No autenticado');
     expect(ACTIVIDADES_MSG.forbidden).toBe('Acceso denegado');
     expect(ACTIVIDADES_MSG.actividadNotFound).toBe('Actividad no encontrada');
-    expect(ACTIVIDADES_MSG.tipoNotFound).toBe('Tipo de actividad no encontrado');
+    expect(ACTIVIDADES_MSG.tipoNotFound).toBe(
+      'Tipo de actividad no encontrado',
+    );
     expect(ACTIVIDADES_MSG.rangoFechasInvalido).toContain('fechaInicio');
     expect(ACTIVIDADES_MSG.interno).toBe('Error interno del servidor');
 
@@ -18,6 +20,8 @@ describe('ACTIVIDADES_MSG — contrato de mensajes', () => {
     expect(ACTIVIDADES_MSG.tipoInactivo).toBe(
       'El tipo de actividad no está activo',
     );
-    expect(ACTIVIDADES_MSG.documentoRequerido).toBe('Debe adjuntar un archivo.');
+    expect(ACTIVIDADES_MSG.documentoRequerido).toBe(
+      'Debe adjuntar un archivo.',
+    );
   });
 });
