@@ -233,10 +233,7 @@ describe('Resumen de actividades (dashboard 7.11)', () => {
     });
 
     it('Fontanero no puede consultar resumen administrativo', async () => {
-      await authGet(
-        '/admin/actividades/resumen',
-        fontaneroToken(),
-      ).expect(403);
+      await authGet('/admin/actividades/resumen', fontaneroToken()).expect(403);
     });
   });
 
@@ -298,10 +295,7 @@ describe('Resumen de actividades (dashboard 7.11)', () => {
     });
 
     it('Administradora no puede consultar resumen de fontanero', async () => {
-      await authGet(
-        '/fontanero/actividades/resumen',
-        adminToken(),
-      ).expect(403);
+      await authGet('/fontanero/actividades/resumen', adminToken()).expect(403);
     });
 
     it('sin token responde 401', async () => {

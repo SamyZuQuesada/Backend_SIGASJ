@@ -32,7 +32,7 @@ import type { UploadedImageFile } from '../../common/media/public-media';
 export class ComunicadosController {
   constructor(private readonly comunicadosService: ComunicadosService) {}
 
-  @Get('public/comunicados')
+  @Get(['public/comunicados', 'comunicados'])
   @ApiOperation({
     summary: 'Obtener comunicados públicos y vigentes (Público)',
   })

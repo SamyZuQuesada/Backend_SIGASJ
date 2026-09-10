@@ -45,6 +45,85 @@ const isAllowedFolder = (folder: string): folder is PublicMediaFolder =>
   folder === 'transparencia' ||
   folder === 'proyectos';
 
+export function normalizeMediaUrl(
+  rawUrl: string | null | undefined,
+  defaultFolder: PublicMediaFolder = 'galeria',
+): string | null {
+  if (!rawUrl) return null;
+  let url = rawUrl.trim();
+  if (!url) return null;
+
+  // URLs externas absolutas (http/https) se preservan
+  if (/^https?:\/\//i.test(url)) {
+    return url;
+  }
+
+  // Convertir barras invertidas de Windows a barras estándar
+  url = url.replace(/\\/g, '/');
+
+  // Si contiene una ruta absoluta de Windows/servidor con 'uploads/'
+  const uploadsIdx = url.toLowerCase().indexOf('uploads/');
+  if (uploadsIdx !== -1) {
+    const cleanSub = url
+      .substring(uploadsIdx + 'uploads/'.length)
+      .replace(/^\/+/, '');
+    return `/uploads/${cleanSub}`;
+  }
+
+  // Si empieza con prefijo legado de controlador /api/v1/public/media/
+  const mediaPrefix = '/api/v1/public/media/';
+  if (url.startsWith(mediaPrefix)) {
+    return `/uploads/${url.substring(mediaPrefix.length)}`;
+  }
+  const shortMediaPrefix = '/public/media/';
+  if (url.startsWith(shortMediaPrefix)) {
+    return `/uploads/${url.substring(shortMediaPrefix.length)}`;
+  }
+
+  // Si empieza con /api/v1/uploads/
+  const apiUploadsPrefix = '/api/v1/uploads/';
+  if (url.startsWith(apiUploadsPrefix)) {
+    return `/uploads/${url.substring(apiUploadsPrefix.length)}`;
+  }
+
+  // Si era un seed antiguo tipo /images/tanque.jpg o /images/oficina.jpg
+  if (url.startsWith('/images/')) {
+    const filename = url.substring('/images/'.length);
+    return `/uploads/${defaultFolder}/${filename}`;
+  }
+
+  // Si ya empieza con /uploads/
+  if (url.startsWith('/uploads/')) {
+    return url;
+  }
+
+  // Si empieza con una barra pero sin uploads
+  if (url.startsWith('/')) {
+    const clean = url.replace(/^\/+/, '');
+    if (
+      clean.startsWith('galeria/') ||
+      clean.startsWith('comunicados/') ||
+      clean.startsWith('proyectos/') ||
+      clean.startsWith('transparencia/')
+    ) {
+      return `/uploads/${clean}`;
+    }
+    return `/uploads/${defaultFolder}/${clean}`;
+  }
+
+  // Si es un nombre relativo
+  if (
+    url.startsWith('galeria/') ||
+    url.startsWith('comunicados/') ||
+    url.startsWith('proyectos/') ||
+    url.startsWith('transparencia/')
+  ) {
+    return `/uploads/${url}`;
+  }
+
+  return `/uploads/${defaultFolder}/${url}`;
+}
+
 export function savePublicImage(
   folder: PublicMediaFolder,
   file: UploadedImageFile,
@@ -69,7 +148,7 @@ export function savePublicImage(
   const filename = `${Date.now()}-${randomUUID()}${extension}`;
   writeFileSync(join(directory, filename), file.buffer);
 
-  return `/api/v1/public/media/${folder}/${filename}`;
+  return `/uploads/${folder}/${filename}`;
 }
 
 export function saveProyectoImage(
@@ -105,10 +184,11 @@ export function deletePhysicalMediaFile(
   publicUrl: string | null | undefined,
 ): void {
   if (!publicUrl) return;
-  const prefix = '/api/v1/public/media/';
-  if (!publicUrl.startsWith(prefix)) return;
 
-  const relativePath = publicUrl.substring(prefix.length);
+  const normalized = normalizeMediaUrl(publicUrl);
+  if (!normalized || !normalized.startsWith('/uploads/')) return;
+
+  const relativePath = normalized.substring('/uploads/'.length);
   const parts = relativePath.split('/');
   if (parts.length !== 2) return;
 

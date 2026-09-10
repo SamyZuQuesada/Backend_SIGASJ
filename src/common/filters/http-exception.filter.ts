@@ -106,9 +106,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     }
   }
 
-  private isMulterError(
-    exception: unknown,
-  ): exception is MulterError {
+  private isMulterError(exception: unknown): exception is MulterError {
     return (
       exception instanceof MulterError ||
       (typeof exception === 'object' &&
@@ -132,9 +130,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     return exception.message;
   }
 
-  private sanitizePublicMessage(
-    message: string | string[],
-  ): string | string[] {
+  private sanitizePublicMessage(message: string | string[]): string | string[] {
     if (Array.isArray(message)) {
       return message.map((item) =>
         this.looksTechnical(item)

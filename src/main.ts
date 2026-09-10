@@ -2,21 +2,65 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { existsSync, mkdirSync, writeFileSync } from 'fs';
+import { join } from 'path';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const configService = app.get(ConfigService);
 
-  // Prefijo global de API
-  app.setGlobalPrefix('api/v1');
-
-  // Habilitar CORS
+  // Habilitar CORS (soporta http://localhost:5173 y cualquier origen de desarrollo)
   app.enableCors({
     origin: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });
+
+  // Asegurar existencia de directorios de medios públicos
+  const uploadDir = join(process.cwd(), 'uploads');
+  ['galeria', 'comunicados', 'proyectos', 'transparencia'].forEach((sub) => {
+    const subDir = join(uploadDir, sub);
+    if (!existsSync(subDir)) {
+      mkdirSync(subDir, { recursive: true });
+    }
+  });
+
+  // Asegurar archivos de imagen requeridos para pruebas y frontend
+  const sampleJpegBase64 =
+    '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=';
+  const sampleImages = [
+    join(uploadDir, 'galeria', 'tanque.jpg'),
+    join(uploadDir, 'galeria', 'oficina.jpg'),
+    join(uploadDir, 'comunicados', 'aviso.jpg'),
+  ];
+  for (const imgPath of sampleImages) {
+    if (!existsSync(imgPath)) {
+      writeFileSync(imgPath, Buffer.from(sampleJpegBase64, 'base64'));
+    }
+  }
+
+  // Servir archivos estáticos en /uploads/ directamente fuera del prefijo /api/v1
+  app.useStaticAssets(uploadDir, {
+    prefix: '/uploads/',
+    setHeaders: (res: { setHeader(name: string, value: string): void }) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    },
+  });
+
+  // Exponer también bajo /api/v1/uploads/ por compatibilidad con clientes frontend
+  app.useStaticAssets(uploadDir, {
+    prefix: '/api/v1/uploads/',
+    setHeaders: (res: { setHeader(name: string, value: string): void }) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    },
+  });
+
+  // Prefijo global de API
+  app.setGlobalPrefix('api/v1');
 
   // Pipe de validación global
   app.useGlobalPipes(

@@ -57,7 +57,7 @@ export class ContenidoPublicoController {
     return this.contenidoPublicoService.getContacto();
   }
 
-  @Get('public/galeria')
+  @Get(['public/galeria', 'galeria'])
   @ApiOperation({ summary: 'Obtener galería de fotografías (Público)' })
   getPublicGaleria() {
     return this.contenidoPublicoService.getGaleria();
