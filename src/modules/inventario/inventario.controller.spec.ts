@@ -20,7 +20,11 @@ import { CreateMaterialDto } from './dto/create-material.dto';
 import { QueryMaterialesDto } from './dto/query-materiales.dto';
 import { UpdateMaterialDto } from './dto/update-material.dto';
 import { CategoriaMaterial } from './entities/categoria-material.entity';
+import { DocumentoMovimientoInventario } from './entities/documento-movimiento-inventario.entity';
 import { Material } from './entities/material.entity';
+import { MovimientoInventario } from './entities/movimiento-inventario.entity';
+import { Proveedor } from './entities/proveedor.entity';
+import { RegistrarEntradaDto } from './dto/registrar-entrada.dto';
 import { InventarioController } from './inventario.controller';
 import { InventarioModule } from './inventario.module';
 import { InventarioService, MaterialesPaginados } from './inventario.service';
@@ -62,6 +66,12 @@ describe('InventarioController — Endpoints de Materiales', () => {
   let findOneCategoriaServiceSpy: jest.Mock;
   let updateCategoriaServiceSpy: jest.Mock;
   let cambiarEstadoCategoriaServiceSpy: jest.Mock;
+  let createProveedorServiceSpy: jest.Mock;
+  let findAllProveedoresServiceSpy: jest.Mock;
+  let findOneProveedorServiceSpy: jest.Mock;
+  let updateProveedorServiceSpy: jest.Mock;
+  let cambiarEstadoProveedorServiceSpy: jest.Mock;
+  let registrarEntradaServiceSpy: jest.Mock;
 
   const signAs = (role: Role | string, sub = '1') => {
     const payload: JwtPayload = {
@@ -274,6 +284,127 @@ describe('InventarioController — Endpoints de Materiales', () => {
         } as CategoriaMaterial);
       });
 
+    createProveedorServiceSpy = jest
+      .fn()
+      .mockImplementation((dto: any) => {
+        return Promise.resolve({
+          id: 1,
+          nombre: dto.nombre.trim(),
+          razonSocial: dto.razonSocial ?? null,
+          identificacion: dto.identificacion ?? null,
+          telefono: dto.telefono ?? null,
+          correo: dto.correo ?? null,
+          direccion: dto.direccion ?? null,
+          personaContacto: dto.personaContacto ?? null,
+          activo: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        } as Proveedor);
+      });
+
+    findAllProveedoresServiceSpy = jest
+      .fn()
+      .mockImplementation(() => {
+        return Promise.resolve({
+          data: [
+            {
+              id: 1,
+              nombre: 'Ferretería El Lagar',
+              activo: true,
+            },
+          ],
+          total: 1,
+          page: 1,
+          limit: 20,
+          totalPages: 1,
+        });
+      });
+
+    findOneProveedorServiceSpy = jest
+      .fn()
+      .mockImplementation((id: number) => {
+        if (id === 999) {
+          return Promise.reject(
+            new NotFoundException('Proveedor no encontrado'),
+          );
+        }
+        return Promise.resolve({
+          id,
+          nombre: 'Ferretería El Lagar',
+          activo: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        } as Proveedor);
+      });
+
+    updateProveedorServiceSpy = jest
+      .fn()
+      .mockImplementation((id: number, dto: any) => {
+        if (id === 999) {
+          return Promise.reject(
+            new NotFoundException('Proveedor no encontrado'),
+          );
+        }
+        return Promise.resolve({
+          id,
+          nombre: dto.nombre ? dto.nombre.trim() : 'Ferretería El Lagar',
+          telefono: dto.telefono ?? null,
+          activo: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        } as Proveedor);
+      });
+
+    cambiarEstadoProveedorServiceSpy = jest
+      .fn()
+      .mockImplementation((id: number, activo: boolean) => {
+        if (id === 999) {
+          return Promise.reject(
+            new NotFoundException('Proveedor no encontrado'),
+          );
+        }
+        return Promise.resolve({
+          id,
+          nombre: 'Ferretería El Lagar',
+          activo,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        } as Proveedor);
+      });
+
+    registrarEntradaServiceSpy = jest
+      .fn()
+      .mockImplementation((dto: any, user: any) => {
+        const idMaterial = dto.idMaterial ?? dto.materialId;
+        if (idMaterial === 999) {
+          return Promise.reject(
+            new NotFoundException('Material con ID 999 no encontrado en el inventario'),
+          );
+        }
+        return Promise.resolve({
+          movimiento: {
+            id: 1,
+            tipo: 'ENTRADA',
+            cantidad: dto.cantidad,
+            idMaterial,
+            idUsuario: Number(user?.userId || 1),
+            idProveedor: dto.idProveedor ?? dto.proveedorId ?? null,
+            observacion: dto.observacion ?? null,
+            fechaMovimiento: dto.fechaMovimiento ?? new Date(),
+            createdAt: new Date(),
+          },
+          material: {
+            id: idMaterial,
+            nombre: 'Tubo PVC 1/2 pulgada',
+            stockActual: 35,
+            activo: true,
+          },
+          stockAnterior: 20,
+          stockActual: 35,
+          mensaje: 'Entrada registrada exitosamente.',
+        });
+      });
+
     const mockInventarioService = {
       create: createServiceSpy,
       findAll: findAllServiceSpy,
@@ -285,6 +416,12 @@ describe('InventarioController — Endpoints de Materiales', () => {
       findOneCategoria: findOneCategoriaServiceSpy,
       updateCategoria: updateCategoriaServiceSpy,
       cambiarEstadoCategoria: cambiarEstadoCategoriaServiceSpy,
+      createProveedor: createProveedorServiceSpy,
+      findAllProveedores: findAllProveedoresServiceSpy,
+      findOneProveedor: findOneProveedorServiceSpy,
+      updateProveedor: updateProveedorServiceSpy,
+      cambiarEstadoProveedor: cambiarEstadoProveedorServiceSpy,
+      registrarEntrada: registrarEntradaServiceSpy,
     };
 
     const moduleRef: TestingModule = await Test.createTestingModule({
@@ -300,6 +437,12 @@ describe('InventarioController — Endpoints de Materiales', () => {
       .overrideProvider(getRepositoryToken(Material))
       .useValue(mockRepo)
       .overrideProvider(getRepositoryToken(CategoriaMaterial))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(Proveedor))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(MovimientoInventario))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(DocumentoMovimientoInventario))
       .useValue({})
       .overrideProvider(InventarioService)
       .useValue(mockInventarioService)
@@ -395,6 +538,24 @@ describe('InventarioController — Endpoints de Materiales', () => {
       expect(cambiarEstadoServiceSpy).toHaveBeenCalledWith(3, false);
       expect(result.id).toBe(3);
       expect(result.activo).toBe(false);
+    });
+
+    it('debe delegar el registro de entradas físicas al servicio con el usuario autenticado', async () => {
+      const dto: RegistrarEntradaDto = {
+        idMaterial: 1,
+        cantidad: 15,
+        observacion: 'Ingreso inicial',
+      };
+      const user = {
+        userId: '2',
+        email: 'admin@sigasj.cr',
+        role: Role.ADMINISTRADORA,
+      };
+
+      const result = await controller.registrarEntrada(dto, user);
+
+      expect(registrarEntradaServiceSpy).toHaveBeenCalledWith(dto, user);
+      expect(result.stockActual).toBe(35);
     });
   });
 
@@ -1154,4 +1315,285 @@ describe('InventarioController — Endpoints de Materiales', () => {
       expect(response.status).toBe(HttpStatus.NOT_FOUND);
     });
   });
+
+  describe('Integración HTTP: Endpoints de Proveedores', () => {
+    it('POST /api/v1/inventario/proveedores — permite registro a ADMINISTRADORA (201)', async () => {
+      const token = signAs(Role.ADMINISTRADORA);
+
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/inventario/proveedores')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          nombre: 'Ferretería El Lagar',
+          razonSocial: 'El Lagar S.A.',
+          identificacion: '3-101-123456',
+          telefono: '2680-1122',
+          correo: 'ventas@ellagar.cr',
+        });
+
+      expect(response.status).toBe(HttpStatus.CREATED);
+      expect(response.body.id).toBe(1);
+      expect(response.body.nombre).toBe('Ferretería El Lagar');
+    });
+
+    it('POST /api/v1/inventario/proveedores — rechaza con 403 a FONTANERO y SECRETARIA', async () => {
+      const tokenFontanero = signAs(Role.FONTANERO);
+      const tokenSecretaria = signAs(Role.SECRETARIA);
+
+      const resFontanero = await request(app.getHttpServer())
+        .post('/api/v1/inventario/proveedores')
+        .set('Authorization', `Bearer ${tokenFontanero}`)
+        .send({ nombre: 'Proveedor Intruso' });
+
+      expect(resFontanero.status).toBe(HttpStatus.FORBIDDEN);
+
+      const resSecretaria = await request(app.getHttpServer())
+        .post('/api/v1/inventario/proveedores')
+        .set('Authorization', `Bearer ${tokenSecretaria}`)
+        .send({ nombre: 'Proveedor Intruso' });
+
+      expect(resSecretaria.status).toBe(HttpStatus.FORBIDDEN);
+    });
+
+    it('POST /api/v1/inventario/proveedores — rechaza con 400 si falta el nombre o el correo es inválido', async () => {
+      const token = signAs(Role.ADMINISTRADORA);
+
+      const resFaltaNombre = await request(app.getHttpServer())
+        .post('/api/v1/inventario/proveedores')
+        .set('Authorization', `Bearer ${token}`)
+        .send({});
+
+      expect(resFaltaNombre.status).toBe(HttpStatus.BAD_REQUEST);
+
+      const resCorreoInvalido = await request(app.getHttpServer())
+        .post('/api/v1/inventario/proveedores')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ nombre: 'Valido', correo: 'no_es_un_correo' });
+
+      expect(resCorreoInvalido.status).toBe(HttpStatus.BAD_REQUEST);
+    });
+
+    it('GET /api/v1/inventario/proveedores — permite consulta a ADMINISTRADORA, SECRETARIA y FONTANERO (200 OK)', async () => {
+      const tokenAdmin = signAs(Role.ADMINISTRADORA);
+      const tokenSec = signAs(Role.SECRETARIA);
+      const tokenFont = signAs(Role.FONTANERO);
+
+      const resAdmin = await request(app.getHttpServer())
+        .get('/api/v1/inventario/proveedores')
+        .set('Authorization', `Bearer ${tokenAdmin}`);
+
+      expect(resAdmin.status).toBe(HttpStatus.OK);
+      expect(resAdmin.body.data).toBeDefined();
+
+      const resSec = await request(app.getHttpServer())
+        .get('/api/v1/inventario/proveedores')
+        .set('Authorization', `Bearer ${tokenSec}`);
+
+      expect(resSec.status).toBe(HttpStatus.OK);
+
+      const resFont = await request(app.getHttpServer())
+        .get('/api/v1/inventario/proveedores')
+        .set('Authorization', `Bearer ${tokenFont}`);
+
+      expect(resFont.status).toBe(HttpStatus.OK);
+    });
+
+    it('GET /api/v1/inventario/proveedores — rechaza con 401 sin token y 403 a un rol no autorizado', async () => {
+      const resSinToken = await request(app.getHttpServer()).get(
+        '/api/v1/inventario/proveedores',
+      );
+      expect(resSinToken.status).toBe(HttpStatus.UNAUTHORIZED);
+
+      const tokenNoAutorizado = signAs('ROL_NO_AUTORIZADO');
+      const resNoAutorizado = await request(app.getHttpServer())
+        .get('/api/v1/inventario/proveedores')
+        .set('Authorization', `Bearer ${tokenNoAutorizado}`);
+
+      expect(resNoAutorizado.status).toBe(HttpStatus.FORBIDDEN);
+    });
+
+    it('GET /api/v1/inventario/proveedores/:id — retorna detalle para personal autorizado y 404 si no existe', async () => {
+      const token = signAs(Role.ADMINISTRADORA);
+
+      const resOk = await request(app.getHttpServer())
+        .get('/api/v1/inventario/proveedores/1')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(resOk.status).toBe(HttpStatus.OK);
+      expect(resOk.body.id).toBe(1);
+
+      const resNotFound = await request(app.getHttpServer())
+        .get('/api/v1/inventario/proveedores/999')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(resNotFound.status).toBe(HttpStatus.NOT_FOUND);
+
+      const resBadId = await request(app.getHttpServer())
+        .get('/api/v1/inventario/proveedores/abc')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(resBadId.status).toBe(HttpStatus.BAD_REQUEST);
+    });
+
+    it('PATCH /api/v1/inventario/proveedores/:id — permite actualizar a ADMINISTRADORA y rechaza a otros roles', async () => {
+      const tokenAdmin = signAs(Role.ADMINISTRADORA);
+      const tokenFont = signAs(Role.FONTANERO);
+
+      const resOk = await request(app.getHttpServer())
+        .patch('/api/v1/inventario/proveedores/1')
+        .set('Authorization', `Bearer ${tokenAdmin}`)
+        .send({ telefono: '2680-9999' });
+
+      expect(resOk.status).toBe(HttpStatus.OK);
+
+      const resForb = await request(app.getHttpServer())
+        .patch('/api/v1/inventario/proveedores/1')
+        .set('Authorization', `Bearer ${tokenFont}`)
+        .send({ telefono: '2680-9999' });
+
+      expect(resForb.status).toBe(HttpStatus.FORBIDDEN);
+    });
+
+    it('PATCH /api/v1/inventario/proveedores/:id/estado — permite desactivar y reactivar a ADMINISTRADORA', async () => {
+      const token = signAs(Role.ADMINISTRADORA);
+
+      const resDesactivar = await request(app.getHttpServer())
+        .patch('/api/v1/inventario/proveedores/1/estado')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ activo: false });
+
+      expect(resDesactivar.status).toBe(HttpStatus.OK);
+      expect(resDesactivar.body.activo).toBe(false);
+
+      const resReactivar = await request(app.getHttpServer())
+        .patch('/api/v1/inventario/proveedores/1/estado')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ activo: 'Activo' });
+
+      expect(resReactivar.status).toBe(HttpStatus.OK);
+      expect(resReactivar.body.activo).toBe(true);
+    });
+  });
+
+  describe('Integración HTTP: POST /api/v1/inventario/entradas', () => {
+    const validEntradaPayload = {
+      idMaterial: 1,
+      cantidad: 15,
+      observacion: 'Compra según factura F-4589',
+    };
+
+    it('rechaza con 401 Unauthorized si no se envía token JWT', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/inventario/entradas')
+        .send(validEntradaPayload);
+
+      expect(res.status).toBe(HttpStatus.UNAUTHORIZED);
+    });
+
+    it('rechaza con 403 Forbidden si el rol es FONTANERO', async () => {
+      const token = signAs(Role.FONTANERO);
+
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/inventario/entradas')
+        .set('Authorization', `Bearer ${token}`)
+        .send(validEntradaPayload);
+
+      expect(res.status).toBe(HttpStatus.FORBIDDEN);
+    });
+
+    it('rechaza con 403 Forbidden si el rol es SECRETARIA', async () => {
+      const token = signAs(Role.SECRETARIA);
+
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/inventario/entradas')
+        .set('Authorization', `Bearer ${token}`)
+        .send(validEntradaPayload);
+
+      expect(res.status).toBe(HttpStatus.FORBIDDEN);
+    });
+
+    it('rechaza con 403 Forbidden a un rol sin permisos como ABONADO', async () => {
+      const token = signAs('ABONADO');
+
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/inventario/entradas')
+        .set('Authorization', `Bearer ${token}`)
+        .send(validEntradaPayload);
+
+      expect(res.status).toBe(HttpStatus.FORBIDDEN);
+    });
+
+    it('permite registrar una entrada física con 201 Created al rol ADMINISTRADORA', async () => {
+      const token = signAs(Role.ADMINISTRADORA, '2');
+
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/inventario/entradas')
+        .set('Authorization', `Bearer ${token}`)
+        .send(validEntradaPayload);
+
+      expect(res.status).toBe(HttpStatus.CREATED);
+      expect(res.body).toHaveProperty('movimiento');
+      expect(res.body).toHaveProperty('material');
+      expect(res.body.stockAnterior).toBe(20);
+      expect(res.body.stockActual).toBe(35);
+      expect(res.body.movimiento.tipo).toBe('ENTRADA');
+      expect(res.body.movimiento.cantidad).toBe(15);
+    });
+
+    it('permite registrar una entrada enviando materialId como alias de idMaterial', async () => {
+      const token = signAs(Role.ADMINISTRADORA, '2');
+
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/inventario/entradas')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ materialId: 1, cantidad: 10 });
+
+      expect(res.status).toBe(HttpStatus.CREATED);
+    });
+
+    it('rechaza con 400 Bad Request si la cantidad es menor o igual a 0', async () => {
+      const token = signAs(Role.ADMINISTRADORA);
+
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/inventario/entradas')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ idMaterial: 1, cantidad: 0 });
+
+      expect(res.status).toBe(HttpStatus.BAD_REQUEST);
+    });
+
+    it('rechaza con 400 Bad Request si la cantidad no es un número entero', async () => {
+      const token = signAs(Role.ADMINISTRADORA);
+
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/inventario/entradas')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ idMaterial: 1, cantidad: 5.5 });
+
+      expect(res.status).toBe(HttpStatus.BAD_REQUEST);
+    });
+
+    it('rechaza con 400 Bad Request si faltan campos obligatorios', async () => {
+      const token = signAs(Role.ADMINISTRADORA);
+
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/inventario/entradas')
+        .set('Authorization', `Bearer ${token}`)
+        .send({});
+
+      expect(res.status).toBe(HttpStatus.BAD_REQUEST);
+    });
+
+    it('retorna 404 Not Found si el material especificado no existe', async () => {
+      const token = signAs(Role.ADMINISTRADORA);
+
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/inventario/entradas')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ idMaterial: 999, cantidad: 5 });
+
+      expect(res.status).toBe(HttpStatus.NOT_FOUND);
+    });
+  });
 });
+

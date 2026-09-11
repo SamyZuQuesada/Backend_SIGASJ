@@ -248,92 +248,98 @@ describe('Pruebas de Base de Datos e Integridad: Migración CategoriaMaterial', 
       ]);
     });
 
-    it('debe confirmar la existencia de la restricción de llave foránea FK_Material_CategoriaMaterial en SQL Server', async () => {
+    it('debe confirmar la existencia de la restricción de llave foránea de Material hacia CategoriaMaterial en SQL Server', async () => {
       if (!isConnected || !dataSource) {
         return;
       }
 
-      const fkRows = await dataSource.query<{ CONSTRAINT_NAME: string }[]>(`
-        SELECT CONSTRAINT_NAME
-        FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
-        WHERE TABLE_NAME = 'Material'
-          AND CONSTRAINT_TYPE = 'FOREIGN KEY'
-          AND CONSTRAINT_NAME = 'FK_Material_CategoriaMaterial'
+      const fkRows = await dataSource.query<{ FK_NAME: string }[]>(`
+        SELECT fk.name AS FK_NAME
+        FROM sys.foreign_keys fk
+        INNER JOIN sys.foreign_key_columns fkc ON fkc.constraint_object_id = fk.object_id
+        INNER JOIN sys.tables t1 ON t1.object_id = fk.parent_object_id
+        INNER JOIN sys.columns col1 ON col1.column_id = fkc.parent_column_id AND col1.object_id = fk.parent_object_id
+        INNER JOIN sys.tables t2 ON t2.object_id = fk.referenced_object_id
+        WHERE t1.name = 'Material' AND col1.name = 'idCategoria' AND t2.name = 'CategoriaMaterial'
       `);
 
       expect(fkRows.length).toBe(1);
-      expect(fkRows[0]?.CONSTRAINT_NAME).toBe('FK_Material_CategoriaMaterial');
     });
 
-    it('debe permitir insertar un material vinculado a una categoría, consultar con JOIN y verificar preservación tras desactivación', async () => {
+    it('debe permitir insertar un material vinculado a una categoría, consultar con JOIN y verificar preservación tras desactivación (Rollback Garantizado)', async () => {
       if (!isConnected || !dataSource) {
         return;
       }
 
-      // 1. Insertar Categoría
-      const catInsert = await dataSource.query<InsertIdRow[]>(`
-        INSERT INTO CategoriaMaterial (nombre, descripcion, activo)
-        OUTPUT INSERTED.id
-        VALUES ('Categoria Relacional QA', 'Para pruebas de FK', 1)
-      `);
-      const catId = catInsert[0]?.id;
-      expect(catId).toBeDefined();
+      const queryRunner = dataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
 
-      // 2. Insertar Material vinculado
-      const matInsert = await dataSource.query<InsertIdRow[]>(
-        `
-        INSERT INTO Material (nombre, unidadMedida, stockMinimo, stockActual, activo, idCategoria)
-        OUTPUT INSERTED.id
-        VALUES ('Material Relacional QA', 'Unidad', 5, 0, 1, @0)
-      `,
-        [catId],
-      );
-      const matId = matInsert[0]?.id;
-      expect(matId).toBeDefined();
+      const uniqueSuffix = `${Date.now()}_${Math.floor(Math.random() * 10000)}`;
 
-      // 3. Consultar con JOIN
-      const joinRows = await dataSource.query<
-        {
+      try {
+        // 1. Insertar Categoría
+        const catInsert = (await queryRunner.query(`
+          INSERT INTO CategoriaMaterial (nombre, descripcion, activo)
+          OUTPUT INSERTED.id
+          VALUES ('TEST_TEMP_Cat_${uniqueSuffix}', 'Para pruebas de FK', 1)
+        `)) as InsertIdRow[];
+        const catId = catInsert[0]?.id;
+        expect(catId).toBeDefined();
+
+        // 2. Insertar Material vinculado
+        const matInsert = (await queryRunner.query(
+          `
+          INSERT INTO Material (nombre, unidadMedida, stockMinimo, stockActual, activo, idCategoria)
+          OUTPUT INSERTED.id
+          VALUES ('TEST_TEMP_Mat_${uniqueSuffix}', 'Unidad', 5, 0, 1, @0)
+        `,
+          [catId],
+        )) as InsertIdRow[];
+        const matId = matInsert[0]?.id;
+        expect(matId).toBeDefined();
+
+        // 3. Consultar con JOIN
+        const joinRows = (await queryRunner.query(
+          `
+          SELECT m.nombre AS materialNombre, c.nombre AS categoriaNombre, c.activo AS categoriaActivo
+          FROM Material m
+          INNER JOIN CategoriaMaterial c ON m.idCategoria = c.id
+          WHERE m.id = @0
+        `,
+          [matId],
+        )) as {
           materialNombre: string;
           categoriaNombre: string;
           categoriaActivo: boolean;
-        }[]
-      >(
-        `
-        SELECT m.nombre AS materialNombre, c.nombre AS categoriaNombre, c.activo AS categoriaActivo
-        FROM Material m
-        INNER JOIN CategoriaMaterial c ON m.idCategoria = c.id
-        WHERE m.id = @0
-      `,
-        [matId],
-      );
+        }[];
 
-      expect(joinRows.length).toBe(1);
-      expect(joinRows[0]?.materialNombre).toBe('Material Relacional QA');
-      expect(joinRows[0]?.categoriaNombre).toBe('Categoria Relacional QA');
-      expect(joinRows[0]?.categoriaActivo).toBe(true);
+        expect(joinRows.length).toBe(1);
+        expect(joinRows[0]?.materialNombre).toBe(`TEST_TEMP_Mat_${uniqueSuffix}`);
+        expect(joinRows[0]?.categoriaNombre).toBe(`TEST_TEMP_Cat_${uniqueSuffix}`);
+        expect(joinRows[0]?.categoriaActivo).toBe(true);
 
-      // 4. Desactivar categoría lógicamente
-      await dataSource.query(
-        `UPDATE CategoriaMaterial SET activo = 0 WHERE id = @0`,
-        [catId],
-      );
+        // 4. Desactivar categoría lógicamente
+        await queryRunner.query(
+          `UPDATE CategoriaMaterial SET activo = 0 WHERE id = @0`,
+          [catId],
+        );
 
-      // 5. Verificar que el material sigue existiendo y mantiene su relación histórica intacta
-      const checkMat = await dataSource.query<{ idCategoria: number }[]>(
-        `
-        SELECT idCategoria FROM Material WHERE id = @0
-      `,
-        [matId],
-      );
-      expect(checkMat.length).toBe(1);
-      expect(checkMat[0]?.idCategoria).toBe(catId);
-
-      // 6. Limpieza en orden referencial (Material primero, luego Categoria)
-      await dataSource.query(`DELETE FROM Material WHERE id = @0`, [matId]);
-      await dataSource.query(`DELETE FROM CategoriaMaterial WHERE id = @0`, [
-        catId,
-      ]);
+        // 5. Verificar que el material sigue existiendo y mantiene su relación histórica intacta
+        const checkMat = (await queryRunner.query(
+          `
+          SELECT idCategoria FROM Material WHERE id = @0
+        `,
+          [matId],
+        )) as { idCategoria: number }[];
+        expect(checkMat.length).toBe(1);
+        expect(checkMat[0]?.idCategoria).toBe(catId);
+      } finally {
+        if (queryRunner.isTransactionActive) {
+          await queryRunner.rollbackTransaction();
+        }
+        await queryRunner.release();
+      }
     });
   });
 });

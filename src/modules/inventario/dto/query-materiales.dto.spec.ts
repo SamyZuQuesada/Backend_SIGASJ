@@ -97,4 +97,19 @@ describe('QueryMaterialesDto — validaciones y transformaciones', () => {
     const { errors } = await validateQuery({ idCategoria: 0 });
     expect(errors.some((e) => e.property === 'idCategoria')).toBe(true);
   });
+
+  it('acepta idProveedor numérico y alias proveedorId', async () => {
+    const res1 = await validateQuery({ idProveedor: 4 });
+    expect(res1.errors).toHaveLength(0);
+    expect(res1.dto.idProveedor).toBe(4);
+
+    const res2 = await validateQuery({ proveedorId: '5' });
+    expect(res2.errors).toHaveLength(0);
+    expect(res2.dto.proveedorId ?? res2.dto.idProveedor).toBe(5);
+  });
+
+  it('rechaza idProveedor si es menor a 1', async () => {
+    const { errors } = await validateQuery({ idProveedor: 0 });
+    expect(errors.some((e) => e.property === 'idProveedor')).toBe(true);
+  });
 });

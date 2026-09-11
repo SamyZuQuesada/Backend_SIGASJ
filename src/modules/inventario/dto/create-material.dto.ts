@@ -146,4 +146,52 @@ export class CreateMaterialDto {
     message: 'El identificador de categoría debe ser mayor a cero',
   })
   categoriaId?: number | null;
+
+  @ApiPropertyOptional({
+    example: 1,
+    description:
+      'Identificador del proveedor para asociar al material en bodega (opcional)',
+  })
+  @Transform((params: TransformFnParams) => {
+    const raw = rawValue(params);
+    if (raw === undefined || raw === null || raw === '') return undefined;
+    if (typeof raw === 'number') return raw;
+    if (typeof raw === 'string') {
+      const parsed = Number(raw.trim());
+      return Number.isInteger(parsed) ? parsed : raw;
+    }
+    return raw;
+  })
+  @IsOptional()
+  @IsInt({
+    message: 'El identificador de proveedor debe ser un número entero',
+  })
+  @Min(1, {
+    message: 'El identificador de proveedor debe ser mayor a cero',
+  })
+  idProveedor?: number | null;
+
+  @ApiPropertyOptional({
+    example: 1,
+    description:
+      'Alias de idProveedor para compatibilidad con clientes frontend (opcional)',
+  })
+  @Transform((params: TransformFnParams) => {
+    const raw = rawValue(params);
+    if (raw === undefined || raw === null || raw === '') return undefined;
+    if (typeof raw === 'number') return raw;
+    if (typeof raw === 'string') {
+      const parsed = Number(raw.trim());
+      return Number.isInteger(parsed) ? parsed : raw;
+    }
+    return raw;
+  })
+  @IsOptional()
+  @IsInt({
+    message: 'El identificador de proveedor debe ser un número entero',
+  })
+  @Min(1, {
+    message: 'El identificador de proveedor debe ser mayor a cero',
+  })
+  proveedorId?: number | null;
 }

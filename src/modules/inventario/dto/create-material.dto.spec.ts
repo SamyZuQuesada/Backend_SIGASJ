@@ -165,6 +165,40 @@ describe('CreateMaterialDto — validaciones de entrada', () => {
     expect(res2.errors.some((e) => e.property === 'idCategoria')).toBe(true);
   });
 
+  it('acepta idProveedor numérico válido y alias proveedorId', async () => {
+    const res1 = await validateCreate({
+      nombre: 'Tubo PVC 1/2',
+      unidadMedida: 'Tubo',
+      idProveedor: 4,
+    });
+    expect(res1.errors).toHaveLength(0);
+    expect(res1.dto.idProveedor).toBe(4);
+
+    const res2 = await validateCreate({
+      nombre: 'Tubo PVC 1/2',
+      unidadMedida: 'Tubo',
+      proveedorId: '5',
+    });
+    expect(res2.errors).toHaveLength(0);
+    expect(res2.dto.proveedorId ?? res2.dto.idProveedor).toBe(5);
+  });
+
+  it('rechaza idProveedor si no es entero o es menor a 1', async () => {
+    const res1 = await validateCreate({
+      nombre: 'Tubo PVC 1/2',
+      unidadMedida: 'Tubo',
+      idProveedor: 0,
+    });
+    expect(res1.errors.some((e) => e.property === 'idProveedor')).toBe(true);
+
+    const res2 = await validateCreate({
+      nombre: 'Tubo PVC 1/2',
+      unidadMedida: 'Tubo',
+      idProveedor: -2,
+    });
+    expect(res2.errors.some((e) => e.property === 'idProveedor')).toBe(true);
+  });
+
   it('no declara campos de existencias físicas ni auditoría para el alta', () => {
     const dto = new CreateMaterialDto();
     expect(dto).not.toHaveProperty('stockActual');

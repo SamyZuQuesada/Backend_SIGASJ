@@ -2,11 +2,22 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { CreateCategoriaDto } from './dto/create-categoria.dto';
 import { CreateMaterialDto } from './dto/create-material.dto';
+import { CreateProveedorDto } from './dto/create-proveedor.dto';
+import { QueryCategoriasDto } from './dto/query-categorias.dto';
 import { QueryMaterialesDto } from './dto/query-materiales.dto';
+import { QueryProveedoresDto } from './dto/query-proveedores.dto';
 import { UpdateCategoriaDto } from './dto/update-categoria.dto';
 import { UpdateMaterialDto } from './dto/update-material.dto';
+import { UpdateProveedorDto } from './dto/update-proveedor.dto';
 import { CategoriaMaterial } from './entities/categoria-material.entity';
+import { DocumentoMovimientoInventario } from './entities/documento-movimiento-inventario.entity';
 import { Material } from './entities/material.entity';
+import { MovimientoInventario } from './entities/movimiento-inventario.entity';
+import { Proveedor } from './entities/proveedor.entity';
+import { TipoMovimientoInventario } from '../../common/enums/tipo-movimiento-inventario.enum';
+import { Role } from '../../common/enums/role.enum';
+import { RegistrarEntradaDto } from './dto/registrar-entrada.dto';
+import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { InventarioService } from './inventario.service';
 
 describe('InventarioService — Catálogo de Materiales y Categorías', () => {
@@ -36,6 +47,24 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
   let catRepoSaveSpy: jest.Mock;
   let catRepoFindOneSpy: jest.Mock;
   let catCreateQueryBuilderSpy: jest.Mock;
+
+  let provQbWhereSpy: jest.Mock;
+  let provQbOrWhereSpy: jest.Mock;
+  let provQbAndWhereSpy: jest.Mock;
+  let provQbOrderBySpy: jest.Mock;
+  let provQbSkipSpy: jest.Mock;
+  let provQbTakeSpy: jest.Mock;
+  let provQbGetOneSpy: jest.Mock;
+  let provQbGetManyAndCountSpy: jest.Mock;
+  let provRepoCreateSpy: jest.Mock;
+  let provRepoSaveSpy: jest.Mock;
+  let provRepoFindOneSpy: jest.Mock;
+  let provCreateQueryBuilderSpy: jest.Mock;
+
+  let movRepoCreateSpy: jest.Mock;
+  let movRepoSaveSpy: jest.Mock;
+  let movRepoFindOneSpy: jest.Mock;
+  let mockManager: any;
 
   beforeEach(async () => {
     qbWhereSpy = jest.fn().mockReturnThis();
@@ -71,7 +100,7 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
       );
     repoFindOneSpy = jest.fn().mockResolvedValue(null);
 
-    const mockRepo = {
+    const mockRepo: any = {
       createQueryBuilder: createQueryBuilderSpy,
       create: repoCreateSpy,
       save: repoSaveSpy,
@@ -114,6 +143,82 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
       findOne: catRepoFindOneSpy,
     };
 
+    provQbWhereSpy = jest.fn().mockReturnThis();
+    provQbOrWhereSpy = jest.fn().mockReturnThis();
+    provQbAndWhereSpy = jest.fn().mockReturnThis();
+    provQbOrderBySpy = jest.fn().mockReturnThis();
+    provQbSkipSpy = jest.fn().mockReturnThis();
+    provQbTakeSpy = jest.fn().mockReturnThis();
+    provQbGetOneSpy = jest.fn().mockResolvedValue(null);
+    provQbGetManyAndCountSpy = jest.fn().mockResolvedValue([[], 0]);
+
+    const mockProvQb = {
+      where: provQbWhereSpy,
+      orWhere: provQbOrWhereSpy,
+      andWhere: provQbAndWhereSpy,
+      orderBy: provQbOrderBySpy,
+      skip: provQbSkipSpy,
+      take: provQbTakeSpy,
+      getOne: provQbGetOneSpy,
+      getManyAndCount: provQbGetManyAndCountSpy,
+    };
+
+    provCreateQueryBuilderSpy = jest.fn().mockReturnValue(mockProvQb);
+    provRepoCreateSpy = jest
+      .fn()
+      .mockImplementation((data: Partial<Proveedor>) => data);
+    provRepoSaveSpy = jest
+      .fn()
+      .mockImplementation((data: Partial<Proveedor>) =>
+        Promise.resolve({ id: 1, ...data } as Proveedor),
+      );
+    provRepoFindOneSpy = jest.fn().mockResolvedValue(null);
+
+    const mockProvRepo = {
+      createQueryBuilder: provCreateQueryBuilderSpy,
+      create: provRepoCreateSpy,
+      save: provRepoSaveSpy,
+      findOne: provRepoFindOneSpy,
+    };
+
+    movRepoCreateSpy = jest
+      .fn()
+      .mockImplementation((data: Partial<MovimientoInventario>) => data);
+    movRepoSaveSpy = jest
+      .fn()
+      .mockImplementation((data: Partial<MovimientoInventario>) =>
+        Promise.resolve({ id: 1, ...data } as MovimientoInventario),
+      );
+    movRepoFindOneSpy = jest.fn().mockResolvedValue(null);
+
+    const mockMovRepo = {
+      create: movRepoCreateSpy,
+      save: movRepoSaveSpy,
+      findOne: movRepoFindOneSpy,
+    };
+
+    const mockDocRepo = {
+      create: jest.fn().mockImplementation((data: any) => data),
+      save: jest.fn().mockImplementation((data: any) => Promise.resolve({ id: 1, ...data })),
+      find: jest.fn().mockResolvedValue([]),
+      findOne: jest.fn().mockResolvedValue(null),
+    };
+
+    mockManager = {
+      getRepository: jest.fn().mockImplementation((entity: any) => {
+        if (entity === Material) return mockRepo;
+        if (entity === MovimientoInventario) return mockMovRepo;
+        if (entity === Proveedor) return mockProvRepo;
+        if (entity === DocumentoMovimientoInventario) return mockDocRepo;
+        return mockRepo;
+      }),
+      transaction: jest
+        .fn()
+        .mockImplementation(async (cb: (m: any) => any) => cb(mockManager)),
+    };
+
+    mockRepo.manager = mockManager;
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         InventarioService,
@@ -124,6 +229,18 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
         {
           provide: getRepositoryToken(CategoriaMaterial),
           useValue: mockCatRepo,
+        },
+        {
+          provide: getRepositoryToken(Proveedor),
+          useValue: mockProvRepo,
+        },
+        {
+          provide: getRepositoryToken(MovimientoInventario),
+          useValue: mockMovRepo,
+        },
+        {
+          provide: getRepositoryToken(DocumentoMovimientoInventario),
+          useValue: mockDocRepo,
         },
       ],
     }).compile();
@@ -162,6 +279,8 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
         activo: true,
         idCategoria: null,
         categoria: null,
+        idProveedor: null,
+        proveedor: null,
       });
       expect(result.id).toBe(1);
       expect(result.stockActual).toBe(0);
@@ -281,6 +400,76 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
 
       await expect(service.create(dto)).rejects.toThrow(
         'No se puede asignar una categoría inactiva a un nuevo material',
+      );
+      expect(repoSaveSpy).not.toHaveBeenCalled();
+    });
+
+    it('debe asignar exitosamente un proveedor activo existente al crear', async () => {
+      const proveedorActivo: Proveedor = {
+        id: 7,
+        nombre: 'Ferretería Central',
+        razonSocial: null,
+        identificacion: null,
+        telefono: null,
+        correo: null,
+        direccion: null,
+        personaContacto: null,
+        activo: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        validar: jest.fn(),
+      };
+      provRepoFindOneSpy.mockResolvedValueOnce(proveedorActivo);
+
+      const dto: CreateMaterialDto = {
+        nombre: 'Tubo PVC 1/2 pulgada',
+        unidadMedida: 'Tubo',
+        idProveedor: 7,
+      };
+
+      const result = await service.create(dto);
+
+      expect(provRepoFindOneSpy).toHaveBeenCalledWith({ where: { id: 7 } });
+      expect(repoCreateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          nombre: 'Tubo PVC 1/2 pulgada',
+          idProveedor: 7,
+          proveedor: proveedorActivo,
+        }),
+      );
+      expect(result.idProveedor).toBe(7);
+    });
+
+    it('debe lanzar NotFoundException si el proveedor asignado al crear no existe', async () => {
+      provRepoFindOneSpy.mockResolvedValueOnce(null);
+
+      const dto: CreateMaterialDto = {
+        nombre: 'Tubo PVC 1/2 pulgada',
+        unidadMedida: 'Tubo',
+        idProveedor: 999,
+      };
+
+      await expect(service.create(dto)).rejects.toThrow(
+        'El proveedor con ID 999 no existe',
+      );
+      expect(repoSaveSpy).not.toHaveBeenCalled();
+    });
+
+    it('debe lanzar BadRequestException si el proveedor asignado al crear se encuentra inactivo', async () => {
+      provRepoFindOneSpy.mockResolvedValueOnce({
+        id: 8,
+        nombre: 'Proveedor Antiguo',
+        activo: false,
+      });
+
+      const dto: CreateMaterialDto = {
+        nombre: 'Tubo PVC 1/2 pulgada',
+        unidadMedida: 'Tubo',
+        idProveedor: 8,
+      };
+
+      await expect(service.create(dto)).rejects.toThrow(
+        'No se puede asignar un proveedor inactivo a un nuevo material',
       );
       expect(repoSaveSpy).not.toHaveBeenCalled();
     });
@@ -404,7 +593,19 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
       );
     });
 
-    it('debe incluir la relación leftJoinAndSelect con categoria', async () => {
+    it('debe aplicar filtro por idProveedor cuando se proporcione', async () => {
+      qbGetManyAndCountSpy.mockResolvedValueOnce([[], 0]);
+
+      const query: QueryMaterialesDto = { idProveedor: 7 };
+      await service.findAll(query);
+
+      expect(qbAndWhereSpy).toHaveBeenCalledWith(
+        'material.idProveedor = :idProveedor',
+        { idProveedor: 7 },
+      );
+    });
+
+    it('debe incluir las relaciones leftJoinAndSelect con categoria y proveedor', async () => {
       qbGetManyAndCountSpy.mockResolvedValueOnce([[], 0]);
 
       await service.findAll({});
@@ -412,6 +613,10 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
       expect(qbLeftJoinAndSelectSpy).toHaveBeenCalledWith(
         'material.categoria',
         'categoria',
+      );
+      expect(qbLeftJoinAndSelectSpy).toHaveBeenCalledWith(
+        'material.proveedor',
+        'proveedor',
       );
     });
 
@@ -449,7 +654,7 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
 
       expect(repoFindOneSpy).toHaveBeenCalledWith({
         where: { id: 1 },
-        relations: { categoria: true },
+        relations: { categoria: true, proveedor: true },
       });
       expect(result.id).toBe(1);
       expect(result.nombre).toBe('Tubo PVC 1/2 pulgada');
@@ -684,6 +889,115 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
           id: 5,
           idCategoria: 4,
           stockMinimo: 15,
+        }),
+      );
+    });
+
+    it('debe permitir reasignar a otro proveedor activo', async () => {
+      repoFindOneSpy.mockResolvedValueOnce({
+        ...existingMaterial,
+        idProveedor: 1,
+      });
+      const nuevoProveedor: Proveedor = {
+        id: 2,
+        nombre: 'Distribuidora del Norte',
+        razonSocial: null,
+        identificacion: null,
+        telefono: null,
+        correo: null,
+        direccion: null,
+        personaContacto: null,
+        activo: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        validar: jest.fn(),
+      };
+      provRepoFindOneSpy.mockResolvedValueOnce(nuevoProveedor);
+
+      const dto: UpdateMaterialDto = { idProveedor: 2 };
+      const result = await service.update(5, dto);
+
+      expect(provRepoFindOneSpy).toHaveBeenCalledWith({ where: { id: 2 } });
+      expect(repoSaveSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 5,
+          idProveedor: 2,
+          proveedor: nuevoProveedor,
+        }),
+      );
+      expect(result.idProveedor).toBe(2);
+    });
+
+    it('debe desvincular el proveedor si idProveedor se envía como null', async () => {
+      repoFindOneSpy.mockResolvedValueOnce({
+        ...existingMaterial,
+        idProveedor: 3,
+      });
+
+      const dto: UpdateMaterialDto = { idProveedor: null };
+      const result = await service.update(5, dto);
+
+      expect(provRepoFindOneSpy).not.toHaveBeenCalled();
+      expect(repoSaveSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 5,
+          idProveedor: null,
+          proveedor: null,
+        }),
+      );
+      expect(result.idProveedor).toBeNull();
+    });
+
+    it('debe lanzar NotFoundException si el nuevo proveedor a asignar no existe', async () => {
+      repoFindOneSpy.mockResolvedValueOnce({
+        ...existingMaterial,
+        idProveedor: 1,
+      });
+      provRepoFindOneSpy.mockResolvedValueOnce(null);
+
+      const dto: UpdateMaterialDto = { idProveedor: 999 };
+      await expect(service.update(5, dto)).rejects.toThrow(
+        'El proveedor con ID 999 no existe',
+      );
+      expect(repoSaveSpy).not.toHaveBeenCalled();
+    });
+
+    it('debe lanzar BadRequestException si el nuevo proveedor a asignar se encuentra inactivo', async () => {
+      repoFindOneSpy.mockResolvedValueOnce({
+        ...existingMaterial,
+        idProveedor: 1,
+      });
+      provRepoFindOneSpy.mockResolvedValueOnce({
+        id: 4,
+        nombre: 'Proveedor Inactivo',
+        activo: false,
+      });
+
+      const dto: UpdateMaterialDto = { idProveedor: 4 };
+      await expect(service.update(5, dto)).rejects.toThrow(
+        'No se puede asignar un proveedor inactivo a un material',
+      );
+      expect(repoSaveSpy).not.toHaveBeenCalled();
+    });
+
+    it('debe permitir guardar manteniendo el mismo proveedor sin revalidar ni lanzar error aunque esté inactivo (histórico)', async () => {
+      repoFindOneSpy.mockResolvedValueOnce({
+        ...existingMaterial,
+        idProveedor: 4,
+      });
+
+      const dto: UpdateMaterialDto = {
+        idProveedor: 4,
+        stockMinimo: 20,
+      };
+      await service.update(5, dto);
+
+      expect(provRepoFindOneSpy).not.toHaveBeenCalled();
+      expect(repoSaveSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 5,
+          idProveedor: 4,
+          stockMinimo: 20,
         }),
       );
     });
@@ -994,4 +1308,527 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
       expect(catRepoSaveSpy).not.toHaveBeenCalled();
     });
   });
+
+  describe('createProveedor', () => {
+    it('debe registrar un proveedor exitosamente con activo = true', async () => {
+      const dto: CreateProveedorDto = {
+        nombre: '  Ferretería El Lagar  ',
+        razonSocial: '  El Lagar S.A.  ',
+        identificacion: '  3-101-123456  ',
+        telefono: '  2680-1122  ',
+        correo: '  VENTAS@LAGAR.CR  ',
+        direccion: '  Nicoya  ',
+        personaContacto: '  Carlos  ',
+      };
+
+      provQbGetOneSpy.mockResolvedValueOnce(null);
+
+      const result = await service.createProveedor(dto);
+
+      expect(provRepoCreateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          nombre: 'Ferretería El Lagar',
+          razonSocial: 'El Lagar S.A.',
+          identificacion: '3-101-123456',
+          telefono: '2680-1122',
+          correo: 'ventas@lagar.cr',
+          activo: true,
+        }),
+      );
+      expect(provRepoSaveSpy).toHaveBeenCalled();
+      expect(result.id).toBe(1);
+    });
+
+    it('debe lanzar ConflictException si ya existe un proveedor con el mismo nombre', async () => {
+      provQbGetOneSpy.mockResolvedValueOnce({
+        id: 2,
+        nombre: 'Ferretería El Lagar',
+      });
+
+      await expect(
+        service.createProveedor({ nombre: 'Ferretería El Lagar' }),
+      ).rejects.toThrow(
+        'Ya existe un proveedor registrado con el nombre "Ferretería El Lagar"',
+      );
+      expect(provRepoSaveSpy).not.toHaveBeenCalled();
+    });
+
+    it('debe lanzar ConflictException si ya existe un proveedor con la misma identificación', async () => {
+      provQbGetOneSpy.mockResolvedValueOnce({
+        id: 3,
+        nombre: 'Otro Proveedor',
+        identificacion: '3-101-123456',
+      });
+
+      await expect(
+        service.createProveedor({
+          nombre: 'Nuevo Proveedor',
+          identificacion: '3-101-123456',
+        }),
+      ).rejects.toThrow(
+        'Ya existe un proveedor registrado con la identificación "3-101-123456"',
+      );
+      expect(provRepoSaveSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('findAllProveedores', () => {
+    it('debe retornar lista paginada de proveedores', async () => {
+      const proveedores = [
+        { id: 1, nombre: 'Proveedor A', activo: true },
+        { id: 2, nombre: 'Proveedor B', activo: false },
+      ] as Proveedor[];
+
+      provQbGetManyAndCountSpy.mockResolvedValueOnce([proveedores, 2]);
+
+      const result = await service.findAllProveedores({ page: 1, limit: 10 });
+
+      expect(result.data).toEqual(proveedores);
+      expect(result.total).toBe(2);
+      expect(result.page).toBe(1);
+      expect(result.limit).toBe(10);
+      expect(result.totalPages).toBe(1);
+    });
+
+    it('debe aplicar filtro por activo y búsqueda por search', async () => {
+      provQbGetManyAndCountSpy.mockResolvedValueOnce([[], 0]);
+
+      const query: QueryProveedoresDto = {
+        activo: true,
+        nombre: 'Lagar',
+        search: '3-101',
+        page: 2,
+        limit: 10,
+      };
+
+      const result = await service.findAllProveedores(query);
+
+      expect(provQbAndWhereSpy).toHaveBeenCalledWith(
+        'proveedor.activo = :activo',
+        { activo: true },
+      );
+      expect(provQbAndWhereSpy).toHaveBeenCalledWith(
+        'LOWER(proveedor.nombre) LIKE LOWER(:nombre)',
+        { nombre: '%Lagar%' },
+      );
+      expect(provQbSkipSpy).toHaveBeenCalledWith(10);
+      expect(provQbTakeSpy).toHaveBeenCalledWith(10);
+      expect(result.total).toBe(0);
+      expect(result.data).toEqual([]);
+    });
+  });
+
+  describe('findOneProveedor', () => {
+    it('debe retornar el proveedor si existe', async () => {
+      const prov: Proveedor = {
+        id: 1,
+        nombre: 'Proveedor Existente',
+        activo: true,
+      } as Proveedor;
+
+      provRepoFindOneSpy.mockResolvedValueOnce(prov);
+
+      const result = await service.findOneProveedor(1);
+      expect(result).toEqual(prov);
+    });
+
+    it('debe lanzar NotFoundException si el proveedor no existe', async () => {
+      provRepoFindOneSpy.mockResolvedValueOnce(null);
+
+      await expect(service.findOneProveedor(99)).rejects.toThrow(
+        'No se encontró el proveedor con el ID 99',
+      );
+    });
+  });
+
+  describe('updateProveedor', () => {
+    const provActual: Proveedor = {
+      id: 5,
+      nombre: 'Proveedor Antiguo',
+      razonSocial: 'Antiguo S.A.',
+      identificacion: '3-101-000000',
+      telefono: '2222-2222',
+      correo: 'antiguo@correo.cr',
+      direccion: 'Central',
+      personaContacto: 'Mario',
+      activo: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as Proveedor;
+
+    it('debe actualizar campos válidos exitosamente', async () => {
+      provRepoFindOneSpy.mockResolvedValueOnce({ ...provActual });
+      provQbGetOneSpy.mockResolvedValueOnce(null); // Sin colisión de nombre
+      provQbGetOneSpy.mockResolvedValueOnce(null); // Sin colisión de iden
+
+      const dto: UpdateProveedorDto = {
+        nombre: 'Proveedor Modificado',
+        telefono: '8888-8888',
+      };
+
+      const result = await service.updateProveedor(5, dto);
+
+      expect(provRepoSaveSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 5,
+          nombre: 'Proveedor Modificado',
+          telefono: '8888-8888',
+        }),
+      );
+      expect(result).toBeDefined();
+    });
+
+    it('debe lanzar ConflictException si el nuevo nombre colisiona con otro proveedor', async () => {
+      provRepoFindOneSpy.mockResolvedValueOnce({ ...provActual });
+      provQbGetOneSpy.mockResolvedValueOnce({
+        id: 10,
+        nombre: 'Proveedor Colision',
+      });
+
+      await expect(
+        service.updateProveedor(5, { nombre: 'Proveedor Colision' }),
+      ).rejects.toThrow(
+        'Ya existe otro proveedor registrado con el nombre "Proveedor Colision"',
+      );
+      expect(provRepoSaveSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('cambiarEstadoProveedor', () => {
+    it('debe desactivar un proveedor activo (borrado lógico)', async () => {
+      provRepoFindOneSpy.mockResolvedValueOnce({
+        id: 5,
+        nombre: 'Prov',
+        activo: true,
+      });
+
+      const result = await service.cambiarEstadoProveedor(5, false);
+
+      expect(provRepoSaveSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 5,
+          activo: false,
+        }),
+      );
+      expect(result.activo).toBe(false);
+    });
+
+    it('debe reactivar un proveedor inactivo', async () => {
+      provRepoFindOneSpy.mockResolvedValueOnce({
+        id: 5,
+        nombre: 'Prov',
+        activo: false,
+      });
+
+      const result = await service.cambiarEstadoProveedor(5, true);
+
+      expect(provRepoSaveSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 5,
+          activo: true,
+        }),
+      );
+      expect(result.activo).toBe(true);
+    });
+
+    it('debe lanzar NotFoundException si el proveedor no existe', async () => {
+      provRepoFindOneSpy.mockResolvedValueOnce(null);
+
+      await expect(service.cambiarEstadoProveedor(999, false)).rejects.toThrow(
+        'No se encontró el proveedor con el ID 999',
+      );
+      expect(provRepoSaveSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('registrarEntrada', () => {
+    const adminUser: AuthenticatedUser = {
+      userId: '2',
+      email: 'admin@sigasj.cr',
+      role: Role.ADMINISTRADORA,
+      name: 'Administradora ASADA',
+    };
+
+    it('debe registrar una entrada física exitosamente aumentando el stock e insertando el movimiento', async () => {
+      const materialMock: Partial<Material> = {
+        id: 1,
+        nombre: 'Tubo PVC 1/2 pulgada',
+        stockActual: 20,
+        activo: true,
+      };
+      repoFindOneSpy.mockResolvedValueOnce(materialMock);
+
+      const dto: RegistrarEntradaDto = {
+        idMaterial: 1,
+        cantidad: 15,
+        observacion: 'Compra según factura F-4589',
+      };
+
+      const result = await service.registrarEntrada(dto, adminUser);
+
+      expect(repoFindOneSpy).toHaveBeenCalledWith({ where: { id: 1 } });
+      expect(repoSaveSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 1,
+          stockActual: 35,
+        }),
+      );
+      expect(movRepoCreateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tipo: TipoMovimientoInventario.ENTRADA,
+          cantidad: 15,
+          idMaterial: 1,
+          idUsuario: 2,
+          observacion: 'Compra según factura F-4589',
+          idProveedor: null,
+        }),
+      );
+      expect(movRepoSaveSpy).toHaveBeenCalled();
+      expect(result.stockAnterior).toBe(20);
+      expect(result.stockActual).toBe(35);
+      expect(result.material.stockActual).toBe(35);
+      expect(result.mensaje).toContain('Entrada física registrada exitosamente');
+    });
+
+    it('debe soportar materialId como alias de idMaterial', async () => {
+      const materialMock: Partial<Material> = {
+        id: 3,
+        nombre: 'Válvula de bola',
+        stockActual: 5,
+        activo: true,
+      };
+      repoFindOneSpy.mockResolvedValueOnce(materialMock);
+
+      const dto: RegistrarEntradaDto = {
+        materialId: 3,
+        cantidad: 10,
+      };
+
+      const result = await service.registrarEntrada(dto, adminUser);
+
+      expect(result.stockAnterior).toBe(5);
+      expect(result.stockActual).toBe(15);
+      expect(repoSaveSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 3, stockActual: 15 }),
+      );
+    });
+
+    it('debe lanzar BadRequestException si no se envía idMaterial ni materialId', async () => {
+      const dto = {
+        cantidad: 10,
+      } as RegistrarEntradaDto;
+
+      await expect(service.registrarEntrada(dto, adminUser)).rejects.toThrow(
+        'Debe especificar el identificador del material (idMaterial)',
+      );
+    });
+
+    it('debe lanzar BadRequestException si el usuario autenticado no tiene un identificador válido', async () => {
+      const dto: RegistrarEntradaDto = {
+        idMaterial: 1,
+        cantidad: 10,
+      };
+
+      const invalidUser = {
+        userId: 'no-es-un-numero',
+        email: 'test@sigasj.cr',
+        role: Role.ADMINISTRADORA,
+      } as unknown as AuthenticatedUser;
+
+      await expect(service.registrarEntrada(dto, invalidUser)).rejects.toThrow(
+        'No se pudo identificar el usuario responsable de la operación',
+      );
+    });
+
+    it('debe lanzar NotFoundException si el material no existe en la base de datos', async () => {
+      repoFindOneSpy.mockResolvedValueOnce(null);
+
+      const dto: RegistrarEntradaDto = {
+        idMaterial: 999,
+        cantidad: 10,
+      };
+
+      await expect(service.registrarEntrada(dto, adminUser)).rejects.toThrow(
+        'Material con ID 999 no encontrado en el inventario',
+      );
+    });
+
+    it('debe lanzar BadRequestException si el material está inactivo', async () => {
+      const materialMock: Partial<Material> = {
+        id: 1,
+        nombre: 'Codo PVC 90°',
+        stockActual: 10,
+        activo: false,
+      };
+      repoFindOneSpy.mockResolvedValueOnce(materialMock);
+
+      const dto: RegistrarEntradaDto = {
+        idMaterial: 1,
+        cantidad: 5,
+      };
+
+      await expect(service.registrarEntrada(dto, adminUser)).rejects.toThrow(
+        'No se pueden registrar entradas para el material "Codo PVC 90°" porque se encuentra inactivo',
+      );
+      expect(repoSaveSpy).not.toHaveBeenCalled();
+      expect(movRepoSaveSpy).not.toHaveBeenCalled();
+    });
+
+    it('debe asociar correctamente un proveedor activo cuando se especifica idProveedor', async () => {
+      const materialMock: Partial<Material> = {
+        id: 1,
+        nombre: 'Adaptador Macho',
+        stockActual: 0,
+        activo: true,
+      };
+      const proveedorMock: Partial<Proveedor> = {
+        id: 7,
+        nombre: 'Ferretería El Lagar',
+        activo: true,
+      };
+
+      repoFindOneSpy.mockResolvedValueOnce(materialMock);
+      provRepoFindOneSpy.mockResolvedValueOnce(proveedorMock);
+
+      const dto: RegistrarEntradaDto = {
+        idMaterial: 1,
+        cantidad: 25,
+        idProveedor: 7,
+      };
+
+      const result = await service.registrarEntrada(dto, adminUser);
+
+      expect(provRepoFindOneSpy).toHaveBeenCalledWith({ where: { id: 7 } });
+      expect(movRepoCreateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          idProveedor: 7,
+        }),
+      );
+      expect(result.stockActual).toBe(25);
+    });
+
+    it('debe soportar proveedorId como alias de idProveedor', async () => {
+      const materialMock: Partial<Material> = {
+        id: 1,
+        nombre: 'Adaptador Hembra',
+        stockActual: 0,
+        activo: true,
+      };
+      const proveedorMock: Partial<Proveedor> = {
+        id: 8,
+        nombre: 'Distribuidora Fontanería CR',
+        activo: true,
+      };
+
+      repoFindOneSpy.mockResolvedValueOnce(materialMock);
+      provRepoFindOneSpy.mockResolvedValueOnce(proveedorMock);
+
+      const dto: RegistrarEntradaDto = {
+        idMaterial: 1,
+        cantidad: 12,
+        proveedorId: 8,
+      };
+
+      await service.registrarEntrada(dto, adminUser);
+
+      expect(provRepoFindOneSpy).toHaveBeenCalledWith({ where: { id: 8 } });
+      expect(movRepoCreateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          idProveedor: 8,
+        }),
+      );
+    });
+
+    it('debe lanzar NotFoundException si el proveedor especificado no existe', async () => {
+      const materialMock: Partial<Material> = {
+        id: 1,
+        nombre: 'Tubo PVC',
+        stockActual: 10,
+        activo: true,
+      };
+      repoFindOneSpy.mockResolvedValueOnce(materialMock);
+      provRepoFindOneSpy.mockResolvedValueOnce(null);
+
+      const dto: RegistrarEntradaDto = {
+        idMaterial: 1,
+        cantidad: 10,
+        idProveedor: 999,
+      };
+
+      await expect(service.registrarEntrada(dto, adminUser)).rejects.toThrow(
+        'Proveedor con ID 999 no encontrado en el catálogo',
+      );
+      expect(repoSaveSpy).not.toHaveBeenCalled();
+      expect(movRepoSaveSpy).not.toHaveBeenCalled();
+    });
+
+    it('debe lanzar BadRequestException si el proveedor especificado está inactivo', async () => {
+      const materialMock: Partial<Material> = {
+        id: 1,
+        nombre: 'Tubo PVC',
+        stockActual: 10,
+        activo: true,
+      };
+      const proveedorInactivoMock: Partial<Proveedor> = {
+        id: 9,
+        nombre: 'Ferretería Cerrada',
+        activo: false,
+      };
+      repoFindOneSpy.mockResolvedValueOnce(materialMock);
+      provRepoFindOneSpy.mockResolvedValueOnce(proveedorInactivoMock);
+
+      const dto: RegistrarEntradaDto = {
+        idMaterial: 1,
+        cantidad: 10,
+        idProveedor: 9,
+      };
+
+      await expect(service.registrarEntrada(dto, adminUser)).rejects.toThrow(
+        'El proveedor "Ferretería Cerrada" se encuentra inactivo y no puede ser seleccionado para entradas',
+      );
+      expect(repoSaveSpy).not.toHaveBeenCalled();
+      expect(movRepoSaveSpy).not.toHaveBeenCalled();
+    });
+
+    it('debe respetar la fechaMovimiento provista explícitamente', async () => {
+      const materialMock: Partial<Material> = {
+        id: 1,
+        nombre: 'Tubo PVC',
+        stockActual: 5,
+        activo: true,
+      };
+      repoFindOneSpy.mockResolvedValueOnce(materialMock);
+
+      const fecha = new Date('2026-08-22T08:30:00Z');
+      const dto: RegistrarEntradaDto = {
+        idMaterial: 1,
+        cantidad: 10,
+        fechaMovimiento: fecha,
+      };
+
+      await service.registrarEntrada(dto, adminUser);
+
+      expect(movRepoCreateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fechaMovimiento: fecha,
+        }),
+      );
+    });
+
+    it('debe lanzar InternalServerErrorException si la base de datos lanza un error no controlado', async () => {
+      mockManager.transaction.mockRejectedValueOnce(
+        new Error('Conexión perdida con el servidor SQL'),
+      );
+
+      const dto: RegistrarEntradaDto = {
+        idMaterial: 1,
+        cantidad: 10,
+      };
+
+      await expect(service.registrarEntrada(dto, adminUser)).rejects.toThrow(
+        'No se pudo registrar la entrada de inventario',
+      );
+    });
+  });
 });
+

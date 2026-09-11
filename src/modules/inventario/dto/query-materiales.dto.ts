@@ -157,4 +157,43 @@ export class QueryMaterialesDto {
   @IsInt({ message: 'idCategoria debe ser un número entero' })
   @Min(1, { message: 'idCategoria debe ser mayor a cero' })
   categoriaId?: number;
+
+  @ApiPropertyOptional({
+    example: 1,
+    description: 'Filtrar materiales por identificador de proveedor',
+  })
+  @Transform((params: TransformFnParams) => {
+    const raw = rawValue(params);
+    if (raw === undefined || raw === null || raw === '') return undefined;
+    if (typeof raw === 'number') return raw;
+    if (typeof raw === 'string') {
+      const parsed = Number(raw.trim());
+      return Number.isInteger(parsed) ? parsed : raw;
+    }
+    return raw;
+  })
+  @IsOptional()
+  @IsInt({ message: 'idProveedor debe ser un número entero' })
+  @Min(1, { message: 'idProveedor debe ser mayor a cero' })
+  idProveedor?: number;
+
+  @ApiPropertyOptional({
+    example: 1,
+    description:
+      'Alias de idProveedor para filtrar materiales por proveedor (compatibilidad)',
+  })
+  @Transform((params: TransformFnParams) => {
+    const raw = rawValue(params);
+    if (raw === undefined || raw === null || raw === '') return undefined;
+    if (typeof raw === 'number') return raw;
+    if (typeof raw === 'string') {
+      const parsed = Number(raw.trim());
+      return Number.isInteger(parsed) ? parsed : raw;
+    }
+    return raw;
+  })
+  @IsOptional()
+  @IsInt({ message: 'idProveedor debe ser un número entero' })
+  @Min(1, { message: 'idProveedor debe ser mayor a cero' })
+  proveedorId?: number;
 }
