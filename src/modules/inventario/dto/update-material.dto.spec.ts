@@ -137,6 +137,28 @@ describe('UpdateMaterialDto — validaciones de entrada', () => {
     expect(res2.errors.some((e) => e.property === 'idCategoria')).toBe(true);
   });
 
+  it('acepta idProveedor numérico, null para desvincular y alias proveedorId', async () => {
+    const res1 = await validateUpdate({ idProveedor: 7 });
+    expect(res1.errors).toHaveLength(0);
+    expect(res1.dto.idProveedor).toBe(7);
+
+    const res2 = await validateUpdate({ idProveedor: null });
+    expect(res2.errors).toHaveLength(0);
+    expect(res2.dto.idProveedor).toBeNull();
+
+    const res3 = await validateUpdate({ proveedorId: '8' });
+    expect(res3.errors).toHaveLength(0);
+    expect(res3.dto.proveedorId ?? res3.dto.idProveedor).toBe(8);
+  });
+
+  it('rechaza idProveedor si es menor a 1 o no es entero', async () => {
+    const res1 = await validateUpdate({ idProveedor: 0 });
+    expect(res1.errors.some((e) => e.property === 'idProveedor')).toBe(true);
+
+    const res2 = await validateUpdate({ idProveedor: 3.14 });
+    expect(res2.errors.some((e) => e.property === 'idProveedor')).toBe(true);
+  });
+
   it('no expone campos de existencias físicas stockActual ni IDs', () => {
     const dto = new UpdateMaterialDto();
     expect(dto).not.toHaveProperty('stockActual');

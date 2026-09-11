@@ -12,13 +12,16 @@ import { AuthModule } from '../auth/auth.module';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { CategoriaMaterial } from './entities/categoria-material.entity';
 import { Material } from './entities/material.entity';
+import { DocumentoMovimientoInventario } from './entities/documento-movimiento-inventario.entity';
+import { MovimientoInventario } from './entities/movimiento-inventario.entity';
+import { Proveedor } from './entities/proveedor.entity';
 import { InventarioModule } from './inventario.module';
 
 const inventarioQaTypeOrmModule = TypeOrmModule.forRoot({
   type: 'sqljs',
   autoSave: false,
   dropSchema: true,
-  entities: [Usuario, Material, CategoriaMaterial],
+  entities: [Usuario, Material, CategoriaMaterial, Proveedor, MovimientoInventario, DocumentoMovimientoInventario],
   synchronize: true,
 });
 

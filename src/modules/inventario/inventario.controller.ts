@@ -10,32 +10,50 @@ import {
   Post,
   Put,
   Query,
+  StreamableFile,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
+  ApiConsumes,
   ApiOperation,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { createReadStream } from 'fs';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/enums/role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
+import type { MovimientoDocumentFile } from '../../common/media/public-media';
 import { CambiarEstadoCategoriaDto } from './dto/cambiar-estado-categoria.dto';
 import { CambiarEstadoMaterialDto } from './dto/cambiar-estado-material.dto';
+import { CambiarEstadoProveedorDto } from './dto/cambiar-estado-proveedor.dto';
 import { CreateCategoriaDto } from './dto/create-categoria.dto';
 import { CreateMaterialDto } from './dto/create-material.dto';
+import { CreateProveedorDto } from './dto/create-proveedor.dto';
 import { QueryCategoriasDto } from './dto/query-categorias.dto';
 import { QueryMaterialesDto } from './dto/query-materiales.dto';
+import { QueryProveedoresDto } from './dto/query-proveedores.dto';
+import { RegistrarEntradaDto } from './dto/registrar-entrada.dto';
 import { UpdateCategoriaDto } from './dto/update-categoria.dto';
 import { UpdateMaterialDto } from './dto/update-material.dto';
+import { UpdateProveedorDto } from './dto/update-proveedor.dto';
 import { CategoriaMaterial } from './entities/categoria-material.entity';
+import { DocumentoMovimientoInventario } from './entities/documento-movimiento-inventario.entity';
 import { Material } from './entities/material.entity';
+import { Proveedor } from './entities/proveedor.entity';
 import {
   CategoriasPaginadas,
+  ConfirmacionEntradaInventario,
   InventarioService,
   MaterialesPaginados,
+  ProveedoresPaginados,
 } from './inventario.service';
 
 @ApiTags('Inventario')
@@ -473,4 +491,357 @@ export class InventarioController {
   ): Promise<CategoriaMaterial> {
     return this.inventarioService.cambiarEstadoCategoria(id, dto.activo);
   }
+
+  // =========================================================================
+  // ENDPOINTS DE PROVEEDORES
+  // =========================================================================
+
+  @Post('proveedores')
+  @HttpCode(HttpStatus.CREATED)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMINISTRADORA)
+  @ApiOperation({
+    summary: 'Registrar un nuevo proveedor de materiales (Administradora)',
+    description:
+      'Crea un nuevo proveedor en el catálogo para compras y reposiciones. Requiere rol ADMINISTRADORA.',
+  })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'Proveedor registrado exitosamente.',
+    type: Proveedor,
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Datos inválidos o campos requeridos faltantes.',
+  })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description: 'Ya existe un proveedor con el mismo nombre o identificación.',
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'No autenticado.',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Requiere rol ADMINISTRADORA.',
+  })
+  createProveedor(@Body() dto: CreateProveedorDto): Promise<Proveedor> {
+    return this.inventarioService.createProveedor(dto);
+  }
+
+  @Get('proveedores')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA, Role.FONTANERO)
+  @ApiOperation({
+    summary: 'Listar proveedores con paginación y filtros (Personal ASADA)',
+    description:
+      'Permite listar proveedores activos o inactivos, con búsqueda parcial por nombre o identificación y paginación.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Listado paginado de proveedores obtenido exitosamente.',
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'No autenticado.',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Rol no autorizado.',
+  })
+  findAllProveedores(
+    @Query() query: QueryProveedoresDto,
+  ): Promise<ProveedoresPaginados> {
+    return this.inventarioService.findAllProveedores(query);
+  }
+
+  @Get('proveedores/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA, Role.FONTANERO)
+  @ApiOperation({
+    summary: 'Consultar el detalle de un proveedor por ID (Personal ASADA)',
+    description: 'Obtiene la información completa de un proveedor específico.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Detalle del proveedor obtenido exitosamente.',
+    type: Proveedor,
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Proveedor no encontrado.',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'ID inválido.',
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'No autenticado.',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Rol no autorizado.',
+  })
+  findOneProveedor(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<Proveedor> {
+    return this.inventarioService.findOneProveedor(id);
+  }
+
+  @Patch('proveedores/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMINISTRADORA)
+  @ApiOperation({
+    summary: 'Actualizar los datos de un proveedor (Administradora)',
+    description:
+      'Actualiza campos comerciales, identificación o contacto de un proveedor existente.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Proveedor actualizado exitosamente.',
+    type: Proveedor,
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Datos inválidos o ID no numérico.',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Proveedor no encontrado.',
+  })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description: 'Colisión de nombre o identificación con otro proveedor.',
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'No autenticado.',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Requiere rol ADMINISTRADORA.',
+  })
+  updateProveedor(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateProveedorDto,
+  ): Promise<Proveedor> {
+    return this.inventarioService.updateProveedor(id, dto);
+  }
+
+  @Patch('proveedores/:id/estado')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMINISTRADORA)
+  @ApiOperation({
+    summary: 'Activar o desactivar un proveedor (Administradora)',
+    description:
+      'Cambia el estado operativo de un proveedor sin eliminarlo físicamente, preservando el histórico.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Estado del proveedor actualizado exitosamente.',
+    type: Proveedor,
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'El estado enviado es inválido.',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Proveedor no encontrado.',
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'No autenticado.',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Requiere rol ADMINISTRADORA.',
+  })
+  cambiarEstadoProveedor(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CambiarEstadoProveedorDto,
+  ): Promise<Proveedor> {
+    return this.inventarioService.cambiarEstadoProveedor(id, dto.activo);
+  }
+
+  @Post('entradas')
+  @HttpCode(HttpStatus.CREATED)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMINISTRADORA)
+  @ApiOperation({
+    summary:
+      'Registrar una entrada física de materiales a bodega (Administradora)',
+    description:
+      'Aumenta atómicamente la existencia física disponible del material y genera el registro en MovimientoInventario con trazabilidad del responsable y motivo.',
+  })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description:
+      'Entrada registrada con éxito, existencias actualizadas y movimiento generado.',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description:
+      'Datos inválidos (cantidad menor o igual a 0, material inactivo, proveedor inactivo).',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Material o Proveedor no encontrado.',
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'No autenticado.',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Requiere rol ADMINISTRADORA.',
+  })
+  registrarEntrada(
+    @Body() dto: RegistrarEntradaDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ConfirmacionEntradaInventario> {
+    return this.inventarioService.registrarEntrada(dto, user);
+  }
+
+  @Post('movimientos/:id/documentos')
+  @HttpCode(HttpStatus.CREATED)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMINISTRADORA)
+  @UseInterceptors(FileInterceptor('archivo'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary:
+      'Adjuntar documento de respaldo a un movimiento de inventario (Administradora)',
+    description:
+      'Permite adjuntar facturas, recibos, guías de entrega o comprobantes (PDF, JPG, PNG, WebP) de hasta 10 MB.',
+  })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'Documento adjuntado exitosamente al movimiento.',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description:
+      'Archivo no proporcionado, tamaño superior a 10 MB o formato no permitido.',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Movimiento no encontrado.',
+  })
+  adjuntarDocumentoMovimiento(
+    @Param('id', ParseIntPipe) id: number,
+    @UploadedFile() file: MovimientoDocumentFile,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<DocumentoMovimientoInventario> {
+    return this.inventarioService.adjuntarDocumentoMovimiento(id, file, user);
+  }
+
+  @Post('entradas/:id/documentos')
+  @HttpCode(HttpStatus.CREATED)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMINISTRADORA)
+  @UseInterceptors(FileInterceptor('archivo'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary:
+      'Adjuntar documento de respaldo a una entrada de inventario (Administradora)',
+    description:
+      'Alias para adjuntar facturas, recibos o comprobantes a una entrada de bodega.',
+  })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'Documento adjuntado exitosamente a la entrada.',
+  })
+  adjuntarDocumentoEntrada(
+    @Param('id', ParseIntPipe) id: number,
+    @UploadedFile() file: MovimientoDocumentFile,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<DocumentoMovimientoInventario> {
+    return this.inventarioService.adjuntarDocumentoMovimiento(id, file, user);
+  }
+
+  @Get('movimientos/:id/documentos')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA, Role.FONTANERO)
+  @ApiOperation({
+    summary: 'Listar documentos de respaldo asociados a un movimiento de inventario',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Lista de documentos asociados al movimiento.',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Movimiento no encontrado.',
+  })
+  listarDocumentosMovimiento(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<DocumentoMovimientoInventario[]> {
+    return this.inventarioService.listarDocumentosMovimiento(id);
+  }
+
+  @Get('entradas/:id/documentos')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA, Role.FONTANERO)
+  @ApiOperation({
+    summary: 'Listar documentos de respaldo asociados a una entrada de inventario',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Lista de documentos asociados a la entrada.',
+  })
+  listarDocumentosEntrada(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<DocumentoMovimientoInventario[]> {
+    return this.inventarioService.listarDocumentosMovimiento(id);
+  }
+
+  @Get('movimientos/:id/documentos/:filename')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA, Role.FONTANERO)
+  @ApiOperation({
+    summary:
+      'Descargar o visualizar un documento de respaldo de un movimiento de inventario',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Transmisión segura del archivo solicitado.',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Documento o archivo físico no encontrado.',
+  })
+  async descargarDocumentoMovimiento(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('filename') filename: string,
+  ): Promise<StreamableFile> {
+    const { absolutePath, mimeType, documento } =
+      await this.inventarioService.obtenerArchivoDocumento(id, filename);
+
+    return new StreamableFile(createReadStream(absolutePath), {
+      type: mimeType,
+      disposition: `inline; filename="${encodeURIComponent(documento.nombreOriginal)}"`,
+    });
+  }
+
+  @Get('entradas/:id/documentos/:filename')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA, Role.FONTANERO)
+  @ApiOperation({
+    summary:
+      'Descargar o visualizar un documento de respaldo de una entrada de inventario',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Transmisión segura del archivo solicitado.',
+  })
+  descargarDocumentoEntrada(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('filename') filename: string,
+  ): Promise<StreamableFile> {
+    return this.descargarDocumentoMovimiento(id, filename);
+  }
 }
+

@@ -6,11 +6,14 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { BadRequestException } from '@nestjs/common';
 import { CategoriaMaterial } from './categoria-material.entity';
+import { Proveedor } from './proveedor.entity';
+import { MovimientoInventario } from './movimiento-inventario.entity';
 
 /**
  * Entidad principal que representa los materiales administrados dentro de la bodega de la ASADA.
@@ -80,19 +83,21 @@ export class Material {
   @JoinColumn({ name: 'idCategoria' })
   categoria?: CategoriaMaterial | null;
 
-  /* =========================================================================
-   * PREPARACIÓN PARA FUTURAS RELACIONES (Backlog 4.3 y Movimientos):
-   * =========================================================================
-   *
-   * // Backlog 4.3: Proveedor asignado o frecuente
-   * @ManyToOne(() => Proveedor, { nullable: true })
-   * @JoinColumn({ name: 'idProveedor' })
-   * proveedor?: Proveedor | null;
-   *
-   * // Movimientos de inventario (Entradas y Salidas autorizadas)
-   * @OneToMany(() => MovimientoInventario, (mov) => mov.material)
-   * movimientos?: MovimientoInventario[];
-   * ========================================================================= */
+  @Column({ type: 'int', nullable: true })
+  idProveedor?: number | null;
+
+  @ManyToOne(() => Proveedor, (prov) => prov.materiales, {
+    nullable: true,
+    onDelete: 'NO ACTION',
+  })
+  @JoinColumn({ name: 'idProveedor' })
+  proveedor?: Proveedor | null;
+
+  /**
+   * Registro histórico de entradas y salidas que han afectado las existencias del material.
+   */
+  @OneToMany(() => MovimientoInventario, (mov) => mov.material)
+  movimientos?: MovimientoInventario[];
 
   /**
    * Validaciones de integridad básicas a nivel de entidad antes de persistir.

@@ -396,3 +396,165 @@ export function deleteActividadDocument(
   );
   if (existsSync(filePath)) unlinkSync(filePath);
 }
+
+export type MovimientoDocumentFile = {
+  originalname: string;
+  mimetype: string;
+  size: number;
+  buffer: Buffer;
+};
+
+export const MAX_MOVIMIENTO_DOCUMENT_BYTES = 10 * 1024 * 1024; // 10 MB
+
+const MOVIMIENTO_DOCUMENT_MIME_TYPES: Record<string, string> = {
+  'application/pdf': '.pdf',
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/webp': '.webp',
+};
+
+const MOVIMIENTO_DOCUMENT_EXTENSIONS: Record<string, string[]> = {
+  'application/pdf': ['.pdf'],
+  'image/jpeg': ['.jpg', '.jpeg'],
+  'image/png': ['.png'],
+  'image/webp': ['.webp'],
+};
+
+export function validateMovimientoDocument(
+  file: MovimientoDocumentFile | undefined,
+): asserts file is MovimientoDocumentFile {
+  if (!file?.buffer || file.buffer.length === 0) {
+    throw new BadRequestException('Debe adjuntar un archivo de respaldo.');
+  }
+
+  if (!file.originalname || file.originalname.length > 255) {
+    throw new BadRequestException(
+      'El nombre original del archivo no es válido o excede 255 caracteres.',
+    );
+  }
+
+  const expectedExtension = MOVIMIENTO_DOCUMENT_MIME_TYPES[file.mimetype];
+  const suppliedExtension = extname(file.originalname).toLowerCase();
+  const allowedExtensions = MOVIMIENTO_DOCUMENT_EXTENSIONS[file.mimetype];
+
+  if (!expectedExtension || !allowedExtensions?.includes(suppliedExtension)) {
+    throw new BadRequestException(
+      'Solo se permiten archivos PDF, JPG, PNG o WebP con una extensión válida.',
+    );
+  }
+
+  if (!Number.isSafeInteger(file.size) || file.size <= 0) {
+    throw new BadRequestException('El tamaño del archivo no es válido.');
+  }
+
+  if (file.size !== file.buffer.length) {
+    throw new BadRequestException(
+      'El tamaño declarado del archivo no coincide con su contenido.',
+    );
+  }
+
+  if (file.size > MAX_MOVIMIENTO_DOCUMENT_BYTES) {
+    throw new BadRequestException(
+      'El archivo de respaldo no puede superar 10 MB.',
+    );
+  }
+
+  // Comprobación de cabeceras binarias (magic numbers)
+  const isWebp =
+    file.mimetype === 'image/webp' &&
+    file.buffer.length >= 12 &&
+    file.buffer.subarray(0, 4).toString('ascii') === 'RIFF' &&
+    file.buffer.subarray(8, 12).toString('ascii') === 'WEBP';
+
+  if (!hasExpectedSignature(file.mimetype, file.buffer) && !isWebp) {
+    throw new BadRequestException(
+      'El contenido del archivo no coincide con su formato declarado.',
+    );
+  }
+}
+
+/**
+ * Guarda un documento de respaldo (factura, recibo, guía de entrega) asociado a un movimiento de inventario.
+ * Guarda en uploads/movimientos-inventario/<idMovimiento>/<timestamp>-<uuid>.<ext>.
+ * Devuelve la ruta relativa persistible y el nombre de archivo seguro.
+ */
+export function saveMovimientoDocument(
+  movimientoId: number,
+  file: MovimientoDocumentFile,
+): { rutaReferenciaArchivo: string; filename: string } {
+  validateMovimientoDocument(file);
+  const extension = MOVIMIENTO_DOCUMENT_MIME_TYPES[file.mimetype];
+
+  const folder = join(
+    UPLOAD_ROOT,
+    'movimientos-inventario',
+    String(movimientoId),
+  );
+  mkdirSync(folder, { recursive: true });
+
+  const filename = `${Date.now()}-${randomUUID()}${extension}`;
+  writeFileSync(join(folder, filename), file.buffer);
+
+  const rutaReferenciaArchivo = `/api/v1/inventario/movimientos/${movimientoId}/documentos/${filename}`;
+  return { rutaReferenciaArchivo, filename };
+}
+
+/**
+ * Elimina físicamente el archivo guardado de un movimiento (usado en rollback ante fallos en BD o borrado).
+ */
+export function deleteMovimientoDocument(
+  movimientoId: number,
+  rutaReferenciaArchivo: string,
+): void {
+  const prefix = `/api/v1/inventario/movimientos/${movimientoId}/documentos/`;
+  if (!rutaReferenciaArchivo.startsWith(prefix)) return;
+
+  const filename = rutaReferenciaArchivo.substring(prefix.length);
+  const safeName = basename(filename);
+  if (!safeName || safeName !== filename || safeName.includes('..')) return;
+
+  const filePath = join(
+    UPLOAD_ROOT,
+    'movimientos-inventario',
+    String(movimientoId),
+    safeName,
+  );
+  if (existsSync(filePath)) {
+    unlinkSync(filePath);
+  }
+}
+
+/**
+ * Retorna la ruta física absoluta de un documento de movimiento previa verificación
+ * de seguridad para evitar path traversal (..). Lanza NotFoundException si no existe.
+ */
+export function getMovimientoDocumentFilePath(
+  movimientoId: number,
+  filename: string,
+): { absolutePath: string; mimeType: string } {
+  const safeName = basename(filename);
+  if (!safeName || safeName !== filename || safeName.includes('..')) {
+    throw new BadRequestException('Nombre de archivo inválido.');
+  }
+
+  const filePath = join(
+    UPLOAD_ROOT,
+    'movimientos-inventario',
+    String(movimientoId),
+    safeName,
+  );
+
+  if (!existsSync(filePath)) {
+    throw new NotFoundException('Documento no encontrado en el servidor.');
+  }
+
+  const ext = extname(safeName).toLowerCase();
+  let mimeType = 'application/octet-stream';
+  if (ext === '.pdf') mimeType = 'application/pdf';
+  else if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
+  else if (ext === '.png') mimeType = 'image/png';
+  else if (ext === '.webp') mimeType = 'image/webp';
+
+  return { absolutePath: filePath, mimeType };
+}
+

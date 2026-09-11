@@ -167,4 +167,62 @@ export class UpdateMaterialDto {
     message: 'El identificador de categoría debe ser mayor a cero',
   })
   categoriaId?: number | null;
+
+  @ApiPropertyOptional({
+    example: 1,
+    description:
+      'Identificador del proveedor asignado (número entero positivo o null para desvincular)',
+  })
+  @Transform((params: TransformFnParams) => {
+    const raw = rawValue(params);
+    if (raw === undefined || raw === '') return undefined;
+    if (raw === null) return null;
+    if (typeof raw === 'number') return raw;
+    if (typeof raw === 'string') {
+      const trimmed = raw.trim();
+      if (trimmed === '') return undefined;
+      if (trimmed === 'null') return null;
+      const parsed = Number(trimmed);
+      return Number.isInteger(parsed) ? parsed : raw;
+    }
+    return raw;
+  })
+  @IsOptional()
+  @ValidateIf((_, val) => val !== null)
+  @IsInt({
+    message: 'El identificador de proveedor debe ser un número entero',
+  })
+  @Min(1, {
+    message: 'El identificador de proveedor debe ser mayor a cero',
+  })
+  idProveedor?: number | null;
+
+  @ApiPropertyOptional({
+    example: 1,
+    description:
+      'Alias de idProveedor para compatibilidad con clientes frontend (opcional o null para desvincular)',
+  })
+  @Transform((params: TransformFnParams) => {
+    const raw = rawValue(params);
+    if (raw === undefined || raw === '') return undefined;
+    if (raw === null) return null;
+    if (typeof raw === 'number') return raw;
+    if (typeof raw === 'string') {
+      const trimmed = raw.trim();
+      if (trimmed === '') return undefined;
+      if (trimmed === 'null') return null;
+      const parsed = Number(trimmed);
+      return Number.isInteger(parsed) ? parsed : raw;
+    }
+    return raw;
+  })
+  @IsOptional()
+  @ValidateIf((_, val) => val !== null)
+  @IsInt({
+    message: 'El identificador de proveedor debe ser un número entero',
+  })
+  @Min(1, {
+    message: 'El identificador de proveedor debe ser mayor a cero',
+  })
+  proveedorId?: number | null;
 }

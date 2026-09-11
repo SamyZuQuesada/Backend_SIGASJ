@@ -236,35 +236,43 @@ describe('Pruebas de Base de Datos e Integridad: Migración Material', () => {
       expect(colMap.get('updatedAt')?.IS_NULLABLE).toBe('NO');
     });
 
-    it('debe permitir insertar, consultar y eliminar un registro de prueba en SQL Server', async () => {
+    it('debe permitir insertar, consultar y eliminar un registro de prueba en SQL Server (Rollback Garantizado)', async () => {
       if (!isConnected || !dataSource) {
         return;
       }
 
-      const insertResult = await dataSource.query<InsertIdRow[]>(`
-        INSERT INTO Material (nombre, unidadMedida, stockMinimo, stockActual, activo)
-        OUTPUT INSERTED.id
-        VALUES ('Material Prueba Migración QA', 'Unidad', 5, 10, 1)
-      `);
+      const queryRunner = dataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
 
-      const insertedId = insertResult[0]?.id;
-      expect(insertedId).toBeDefined();
+      const uniqueSuffix = `${Date.now()}_${Math.floor(Math.random() * 10000)}`;
 
-      const selectResult = await dataSource.query<MaterialSelectRow[]>(
-        `SELECT id, nombre, unidadMedida, stockMinimo, stockActual, activo FROM Material WHERE id = @0`,
-        [insertedId],
-      );
+      try {
+        const insertResult = (await queryRunner.query(`
+          INSERT INTO Material (nombre, unidadMedida, stockMinimo, stockActual, activo)
+          OUTPUT INSERTED.id
+          VALUES ('TEST_TEMP_Material_QA_${uniqueSuffix}', 'Unidad', 5, 10, 1)
+        `)) as InsertIdRow[];
 
-      expect(selectResult.length).toBe(1);
-      expect(selectResult[0]?.nombre).toBe('Material Prueba Migración QA');
-      expect(selectResult[0]?.stockMinimo).toBe(5);
-      expect(selectResult[0]?.stockActual).toBe(10);
-      expect(selectResult[0]?.activo).toBe(true);
+        const insertedId = insertResult[0]?.id;
+        expect(insertedId).toBeDefined();
 
-      // Limpieza de datos
-      await dataSource.query(`DELETE FROM Material WHERE id = @0`, [
-        insertedId,
-      ]);
+        const selectResult = (await queryRunner.query(
+          `SELECT id, nombre, unidadMedida, stockMinimo, stockActual, activo FROM Material WHERE id = @0`,
+          [insertedId],
+        )) as MaterialSelectRow[];
+
+        expect(selectResult.length).toBe(1);
+        expect(selectResult[0]?.nombre).toBe(`TEST_TEMP_Material_QA_${uniqueSuffix}`);
+        expect(selectResult[0]?.stockMinimo).toBe(5);
+        expect(selectResult[0]?.stockActual).toBe(10);
+        expect(selectResult[0]?.activo).toBe(true);
+      } finally {
+        if (queryRunner.isTransactionActive) {
+          await queryRunner.rollbackTransaction();
+        }
+        await queryRunner.release();
+      }
     });
   });
 });
