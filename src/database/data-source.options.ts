@@ -17,6 +17,8 @@ const mssqlOptions = {
   enableArithAbort: true,
   connectTimeout: 30_000,
   requestTimeout: 30_000,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 10_000,
 };
 
 const tryLoadMssqlNativeDriver = (): unknown | undefined => {
@@ -36,9 +38,9 @@ export function buildMigrationDataSourceOptions(): DataSourceOptions {
   const host = process.env.DB_HOST || 'localhost';
   const port = parseInt(process.env.DB_PORT || String(defaultPort), 10);
   const database =
-    (process.env.NODE_ENV === 'test' && process.env.DB_DATABASE_TEST)
+    process.env.NODE_ENV === 'test' && process.env.DB_DATABASE_TEST
       ? process.env.DB_DATABASE_TEST
-      : (process.env.DB_DATABASE || 'sigasj_db');
+      : process.env.DB_DATABASE || 'sigasj_db';
   const trustedConnection = process.env.DB_TRUSTED_CONNECTION === 'true';
   const isLocalDb =
     dbType === 'mssql' && host.toLowerCase().includes('localdb');

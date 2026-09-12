@@ -180,32 +180,11 @@ export class ContenidoPublicoService implements OnModuleInit {
       }
 
       const allGallery = await this.galeriaRepo.find();
-      if (allGallery.length === 0) {
-        await this.galeriaRepo.save([
-          this.galeriaRepo.create({
-            titulo: 'Tanque Principal',
-            descripcion: 'Infraestructura principal del acueducto comunal.',
-            url: '/uploads/galeria/tanque.jpg',
-            textoAlternativo: 'Tanque elevado de la ASADA San Juan',
-            ordenVisualizacion: 0,
-            activa: true,
-          }),
-          this.galeriaRepo.create({
-            titulo: 'Oficina Central',
-            descripcion: 'Instalaciones de atención al abonado.',
-            url: '/uploads/galeria/oficina.jpg',
-            textoAlternativo: 'Oficina central de la ASADA San Juan',
-            ordenVisualizacion: 1,
-            activa: true,
-          }),
-        ]);
-      } else {
-        for (const item of allGallery) {
-          const normalized = normalizeMediaUrl(item.url, 'galeria');
-          if (normalized && normalized !== item.url) {
-            item.url = normalized;
-            await this.galeriaRepo.save(item);
-          }
+      for (const item of allGallery) {
+        const normalized = normalizeMediaUrl(item.url, 'galeria');
+        if (normalized && normalized !== item.url) {
+          item.url = normalized;
+          await this.galeriaRepo.save(item);
         }
       }
     });

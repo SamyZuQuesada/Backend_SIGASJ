@@ -17,6 +17,7 @@ import { Proveedor } from './entities/proveedor.entity';
 import { TipoMovimientoInventario } from '../../common/enums/tipo-movimiento-inventario.enum';
 import { Role } from '../../common/enums/role.enum';
 import { RegistrarEntradaDto } from './dto/registrar-entrada.dto';
+import { RegistrarSalidaDto } from './dto/registrar-salida.dto';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { InventarioService } from './inventario.service';
 
@@ -199,7 +200,9 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
 
     const mockDocRepo = {
       create: jest.fn().mockImplementation((data: any) => data),
-      save: jest.fn().mockImplementation((data: any) => Promise.resolve({ id: 1, ...data })),
+      save: jest
+        .fn()
+        .mockImplementation((data: any) => Promise.resolve({ id: 1, ...data })),
       find: jest.fn().mockResolvedValue([]),
       findOne: jest.fn().mockResolvedValue(null),
     };
@@ -1587,7 +1590,9 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
       expect(result.stockAnterior).toBe(20);
       expect(result.stockActual).toBe(35);
       expect(result.material.stockActual).toBe(35);
-      expect(result.mensaje).toContain('Entrada física registrada exitosamente');
+      expect(result.mensaje).toContain(
+        'Entrada física registrada exitosamente',
+      );
     });
 
     it('debe soportar materialId como alias de idMaterial', async () => {
@@ -1830,5 +1835,401 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
       );
     });
   });
-});
 
+  describe('registrarSalida', () => {
+    const fontaneroUser: AuthenticatedUser = {
+      userId: '3',
+      email: 'fontanero@sigasj.cr',
+      role: Role.FONTANERO,
+      name: 'Fontanero ASADA',
+    };
+
+    const adminUser: AuthenticatedUser = {
+      userId: '2',
+      email: 'admin@sigasj.cr',
+      role: Role.ADMINISTRADORA,
+      name: 'Administradora ASADA',
+    };
+
+    it('debe registrar una salida física exitosamente disminuyendo el stock e insertando el movimiento SALIDA', async () => {
+      const materialMock: Partial<Material> = {
+        id: 1,
+        nombre: 'Tubo PVC 1/2 pulgada',
+        stockActual: 30,
+        activo: true,
+      };
+      repoFindOneSpy.mockResolvedValueOnce(materialMock);
+
+      const dto: RegistrarSalidaDto = {
+        idMaterial: 1,
+        cantidad: 5,
+        observacion: 'Reparación de fuga en sector centro',
+      };
+
+      const result = await service.registrarSalida(dto, fontaneroUser);
+
+      expect(repoFindOneSpy).toHaveBeenCalledWith({ where: { id: 1 } });
+      expect(repoSaveSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 1,
+          stockActual: 25,
+        }),
+      );
+      expect(movRepoCreateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tipo: TipoMovimientoInventario.SALIDA,
+          cantidad: 5,
+          idMaterial: 1,
+          idUsuario: 3,
+          observacion: 'Reparación de fuga en sector centro',
+          idAveria: null,
+          idSolicitud: null,
+        }),
+      );
+      expect(movRepoSaveSpy).toHaveBeenCalled();
+      expect(result.stockAnterior).toBe(30);
+      expect(result.stockActual).toBe(25);
+      expect(result.material.stockActual).toBe(25);
+      expect(result.mensaje).toContain('Salida física registrada exitosamente');
+      expect(result.mensaje).toContain('Stock actualizado de 30 a 25');
+    });
+
+    it('debe soportar materialId como alias de idMaterial', async () => {
+      const materialMock: Partial<Material> = {
+        id: 2,
+        nombre: 'Llave de paso 1 pulgada',
+        stockActual: 10,
+        activo: true,
+      };
+      repoFindOneSpy.mockResolvedValueOnce(materialMock);
+
+      const dto: RegistrarSalidaDto = {
+        materialId: 2,
+        cantidad: 3,
+      };
+
+      const result = await service.registrarSalida(dto, fontaneroUser);
+
+      expect(repoFindOneSpy).toHaveBeenCalledWith({ where: { id: 2 } });
+      expect(result.stockActual).toBe(7);
+      expect(repoSaveSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 2, stockActual: 7 }),
+      );
+    });
+
+    it('debe lanzar BadRequestException si no se envía idMaterial ni materialId', async () => {
+      const dto: RegistrarSalidaDto = {
+        cantidad: 5,
+      };
+
+      await expect(service.registrarSalida(dto, fontaneroUser)).rejects.toThrow(
+        'Debe especificar el identificador del material (idMaterial)',
+      );
+      expect(repoFindOneSpy).not.toHaveBeenCalled();
+      expect(repoSaveSpy).not.toHaveBeenCalled();
+    });
+
+    it('debe lanzar BadRequestException si el usuario autenticado no tiene un identificador válido', async () => {
+      const invalidUser = {
+        email: 'anonimo@sigasj.cr',
+        role: Role.FONTANERO,
+      } as AuthenticatedUser;
+
+      const dto: RegistrarSalidaDto = {
+        idMaterial: 1,
+        cantidad: 5,
+      };
+
+      await expect(service.registrarSalida(dto, invalidUser)).rejects.toThrow(
+        'No se pudo identificar el usuario responsable de la operación',
+      );
+      expect(repoFindOneSpy).not.toHaveBeenCalled();
+    });
+
+    it('debe lanzar NotFoundException si el material no existe en la base de datos', async () => {
+      repoFindOneSpy.mockResolvedValueOnce(null);
+
+      const dto: RegistrarSalidaDto = {
+        idMaterial: 999,
+        cantidad: 5,
+      };
+
+      await expect(service.registrarSalida(dto, fontaneroUser)).rejects.toThrow(
+        'Material con ID 999 no encontrado en el inventario',
+      );
+      expect(repoSaveSpy).not.toHaveBeenCalled();
+      expect(movRepoCreateSpy).not.toHaveBeenCalled();
+    });
+
+    it('debe lanzar BadRequestException si el material está inactivo', async () => {
+      const materialMock: Partial<Material> = {
+        id: 1,
+        nombre: 'Material Obsoleto',
+        stockActual: 50,
+        activo: false,
+      };
+      repoFindOneSpy.mockResolvedValueOnce(materialMock);
+
+      const dto: RegistrarSalidaDto = {
+        idMaterial: 1,
+        cantidad: 2,
+      };
+
+      await expect(service.registrarSalida(dto, fontaneroUser)).rejects.toThrow(
+        'No se pueden registrar salidas para el material "Material Obsoleto" porque se encuentra inactivo',
+      );
+      expect(repoSaveSpy).not.toHaveBeenCalled();
+      expect(movRepoCreateSpy).not.toHaveBeenCalled();
+    });
+
+    it('debe aplicar la regla 4.5.2 y rechazar con BadRequestException si la cantidad supera el stock disponible', async () => {
+      const materialMock: Partial<Material> = {
+        id: 1,
+        nombre: 'Tubo PVC 1/2 pulgada',
+        stockActual: 10,
+        activo: true,
+      };
+      repoFindOneSpy.mockResolvedValueOnce(materialMock);
+
+      const dto: RegistrarSalidaDto = {
+        idMaterial: 1,
+        cantidad: 15,
+      };
+
+      await expect(service.registrarSalida(dto, fontaneroUser)).rejects.toThrow(
+        'Stock insuficiente para realizar la salida. Existencias disponibles: 10, cantidad solicitada: 15',
+      );
+      // Garantizar que no se modifica el stock ni se persiste nada (consistencia)
+      expect(repoSaveSpy).not.toHaveBeenCalled();
+      expect(movRepoCreateSpy).not.toHaveBeenCalled();
+      expect(movRepoSaveSpy).not.toHaveBeenCalled();
+    });
+
+    it('debe rechazar con BadRequestException si el stock actual es cero', async () => {
+      const materialMock: Partial<Material> = {
+        id: 1,
+        nombre: 'Codo PVC 90°',
+        stockActual: 0,
+        activo: true,
+      };
+      repoFindOneSpy.mockResolvedValueOnce(materialMock);
+
+      const dto: RegistrarSalidaDto = {
+        idMaterial: 1,
+        cantidad: 1,
+      };
+
+      await expect(service.registrarSalida(dto, fontaneroUser)).rejects.toThrow(
+        'Stock insuficiente para realizar la salida. Existencias disponibles: 0, cantidad solicitada: 1',
+      );
+      expect(repoSaveSpy).not.toHaveBeenCalled();
+    });
+
+    it('debe conservar la referencia a una avería cuando se especifica idAveria o averiaId', async () => {
+      const materialMock: Partial<Material> = {
+        id: 1,
+        nombre: 'Unión rápida 1/2',
+        stockActual: 20,
+        activo: true,
+      };
+      repoFindOneSpy.mockResolvedValueOnce(materialMock);
+
+      const dto: RegistrarSalidaDto = {
+        idMaterial: 1,
+        cantidad: 2,
+        idAveria: 42,
+      };
+
+      await service.registrarSalida(dto, fontaneroUser);
+
+      expect(movRepoCreateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          idAveria: 42,
+        }),
+      );
+    });
+
+    it('debe conservar la referencia a una solicitud cuando se especifica idSolicitud o solicitudId', async () => {
+      const materialMock: Partial<Material> = {
+        id: 1,
+        nombre: 'Medidor de agua 1/2',
+        stockActual: 8,
+        activo: true,
+      };
+      repoFindOneSpy.mockResolvedValueOnce(materialMock);
+
+      const dto: RegistrarSalidaDto = {
+        idMaterial: 1,
+        cantidad: 1,
+        solicitudId: 105,
+      };
+
+      await service.registrarSalida(dto, adminUser);
+
+      expect(movRepoCreateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          idSolicitud: 105,
+        }),
+      );
+    });
+
+    it('debe respetar la fechaMovimiento provista explícitamente', async () => {
+      const materialMock: Partial<Material> = {
+        id: 1,
+        nombre: 'Teflón industrial',
+        stockActual: 10,
+        activo: true,
+      };
+      repoFindOneSpy.mockResolvedValueOnce(materialMock);
+
+      const fecha = new Date('2026-08-22T09:15:00Z');
+      const dto: RegistrarSalidaDto = {
+        idMaterial: 1,
+        cantidad: 2,
+        fechaMovimiento: fecha,
+      };
+
+      await service.registrarSalida(dto, fontaneroUser);
+
+      expect(movRepoCreateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fechaMovimiento: fecha,
+        }),
+      );
+    });
+
+    it('debe lanzar InternalServerErrorException si la base de datos lanza un error no controlado', async () => {
+      mockManager.transaction.mockRejectedValueOnce(
+        new Error('Fallo crítico en motor SQL Server'),
+      );
+
+      const dto: RegistrarSalidaDto = {
+        idMaterial: 1,
+        cantidad: 3,
+      };
+
+      await expect(service.registrarSalida(dto, fontaneroUser)).rejects.toThrow(
+        'No se pudo registrar la salida de inventario',
+      );
+    });
+  });
+
+  describe('validarDisponibilidadStock (Regla 4.5.2)', () => {
+    it('debe retornar validación exitosa cuando el stock es suficiente', async () => {
+      const materialMock: Partial<Material> = {
+        id: 1,
+        nombre: 'Tubo PVC 1/2 pulgada',
+        stockActual: 10,
+        stockMinimo: 2,
+        activo: true,
+      };
+      repoFindOneSpy.mockResolvedValueOnce(materialMock);
+
+      const res = await service.validarDisponibilidadStock(1, 4);
+
+      expect(res.esValido).toBe(true);
+      expect(res.stockActual).toBe(10);
+      expect(res.cantidadSolicitada).toBe(4);
+      expect(res.stockFinal).toBe(6);
+      expect(res.esAgotamientoTotal).toBe(false);
+      expect(res.alcanzaStockMinimo).toBe(false);
+      expect(res.material.id).toBe(1);
+    });
+
+    it('debe permitir salida exacta que deje el stock en cero', async () => {
+      const materialMock: Partial<Material> = {
+        id: 2,
+        nombre: 'Codo PVC 90°',
+        stockActual: 5,
+        stockMinimo: 1,
+        activo: true,
+      };
+      repoFindOneSpy.mockResolvedValueOnce(materialMock);
+
+      const res = await service.validarDisponibilidadStock(2, 5);
+
+      expect(res.esValido).toBe(true);
+      expect(res.stockFinal).toBe(0);
+      expect(res.esAgotamientoTotal).toBe(true);
+      expect(res.alcanzaStockMinimo).toBe(true);
+    });
+
+    it('debe detectar que se alcanza el nivel de stock mínimo (Backlog 4.8)', async () => {
+      const materialMock: Partial<Material> = {
+        id: 3,
+        nombre: 'Válvula de retención',
+        stockActual: 8,
+        stockMinimo: 4,
+        activo: true,
+      };
+      repoFindOneSpy.mockResolvedValueOnce(materialMock);
+
+      const res = await service.validarDisponibilidadStock(3, 5); // 8 - 5 = 3 <= 4
+
+      expect(res.esValido).toBe(true);
+      expect(res.stockFinal).toBe(3);
+      expect(res.alcanzaStockMinimo).toBe(true);
+      expect(res.esAgotamientoTotal).toBe(false);
+    });
+
+    it('debe lanzar BadRequestException si la cantidad supera el stock disponible', async () => {
+      const materialMock: Partial<Material> = {
+        id: 4,
+        nombre: 'Pegamento PVC',
+        stockActual: 3,
+        stockMinimo: 1,
+        activo: true,
+      };
+      repoFindOneSpy.mockResolvedValueOnce(materialMock);
+
+      await expect(service.validarDisponibilidadStock(4, 10)).rejects.toThrow(
+        'Stock insuficiente para realizar la salida. Existencias disponibles: 3, cantidad solicitada: 10',
+      );
+    });
+
+    it('debe lanzar BadRequestException si la cantidad es cero o negativa', async () => {
+      const materialMock: Partial<Material> = {
+        id: 5,
+        nombre: 'Abrazadera',
+        stockActual: 10,
+        activo: true,
+      };
+      repoFindOneSpy.mockResolvedValue(materialMock);
+
+      await expect(service.validarDisponibilidadStock(5, 0)).rejects.toThrow(
+        'La cantidad a retirar debe ser un número entero mayor a cero',
+      );
+      await expect(service.validarDisponibilidadStock(5, -2)).rejects.toThrow(
+        'La cantidad a retirar debe ser un número entero mayor a cero',
+      );
+    });
+
+    it('debe lanzar BadRequestException si el material se encuentra inactivo', async () => {
+      const materialMock: Partial<Material> = {
+        id: 6,
+        nombre: 'Tubería de asbesto',
+        stockActual: 20,
+        activo: false,
+      };
+      repoFindOneSpy.mockResolvedValueOnce(materialMock);
+
+      await expect(service.validarDisponibilidadStock(6, 2)).rejects.toThrow(
+        'No se pueden registrar salidas para el material "Tubería de asbesto" porque se encuentra inactivo',
+      );
+    });
+
+    it('debe lanzar NotFoundException si el material no existe', async () => {
+      repoFindOneSpy.mockResolvedValueOnce(null);
+
+      await expect(service.validarDisponibilidadStock(999, 5)).rejects.toThrow(
+        'Material con ID 999 no encontrado en el inventario',
+      );
+    });
+
+    it('debe lanzar BadRequestException si el ID del material es menor o igual a 0', async () => {
+      await expect(service.validarDisponibilidadStock(0, 5)).rejects.toThrow(
+        'El identificador del material debe ser un número entero mayor a cero',
+      );
+    });
+  });
+});

@@ -344,7 +344,9 @@ describe('Pruebas de Base de Datos e Integridad: Migración Proveedor', () => {
         )) as ProveedorSelectRow[];
 
         expect(selectResult.length).toBe(1);
-        expect(selectResult[0]?.nombre).toBe(`TEST_TEMP_Proveedor_${uniqueSuffix}`);
+        expect(selectResult[0]?.nombre).toBe(
+          `TEST_TEMP_Proveedor_${uniqueSuffix}`,
+        );
         expect(selectResult[0]?.identificacion).toBe('3-101-778899');
         expect(selectResult[0]?.activo).toBe(true);
       } finally {

@@ -288,4 +288,3 @@ describe('Pruebas de Base de Datos e Integridad en SQL Server: Entradas y Movimi
     }
   });
 });
-

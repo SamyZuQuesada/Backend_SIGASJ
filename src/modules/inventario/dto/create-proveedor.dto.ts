@@ -58,7 +58,9 @@ export class CreateProveedorDto {
   @IsString({
     message: 'El nombre del proveedor debe ser una cadena de texto',
   })
-  @IsNotEmpty({ message: 'El nombre o razón social del proveedor es obligatorio' })
+  @IsNotEmpty({
+    message: 'El nombre o razón social del proveedor es obligatorio',
+  })
   @MaxLength(150, {
     message: 'El nombre del proveedor no puede exceder 150 caracteres',
   })

@@ -263,7 +263,9 @@ describe('Pruebas de Base de Datos e Integridad: Migración Material', () => {
         )) as MaterialSelectRow[];
 
         expect(selectResult.length).toBe(1);
-        expect(selectResult[0]?.nombre).toBe(`TEST_TEMP_Material_QA_${uniqueSuffix}`);
+        expect(selectResult[0]?.nombre).toBe(
+          `TEST_TEMP_Material_QA_${uniqueSuffix}`,
+        );
         expect(selectResult[0]?.stockMinimo).toBe(5);
         expect(selectResult[0]?.stockActual).toBe(10);
         expect(selectResult[0]?.activo).toBe(true);

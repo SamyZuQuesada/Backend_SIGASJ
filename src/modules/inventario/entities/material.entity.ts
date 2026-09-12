@@ -14,6 +14,7 @@ import { BadRequestException } from '@nestjs/common';
 import { CategoriaMaterial } from './categoria-material.entity';
 import { Proveedor } from './proveedor.entity';
 import { MovimientoInventario } from './movimiento-inventario.entity';
+import { DetalleSolicitudMaterial } from './detalle-solicitud-material.entity';
 
 /**
  * Entidad principal que representa los materiales administrados dentro de la bodega de la ASADA.
@@ -98,6 +99,12 @@ export class Material {
    */
   @OneToMany(() => MovimientoInventario, (mov) => mov.material)
   movimientos?: MovimientoInventario[];
+
+  /**
+   * Detalles de solicitudes de materiales donde se ha requerido este material.
+   */
+  @OneToMany(() => DetalleSolicitudMaterial, (detalle) => detalle.material)
+  detallesSolicitud?: DetalleSolicitudMaterial[];
 
   /**
    * Validaciones de integridad básicas a nivel de entidad antes de persistir.

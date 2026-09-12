@@ -128,7 +128,12 @@ describe('QA Criterios de Aceptación — Relación Material con Proveedores', (
       .useValue({
         canActivate: (context: any) => {
           const req = context.switchToHttp().getRequest();
-          req.user = { id: 1, email: 'admin@asada.cr', role: currentRole, rol: currentRole };
+          req.user = {
+            id: 1,
+            email: 'admin@asada.cr',
+            role: currentRole,
+            rol: currentRole,
+          };
           return true;
         },
       })
@@ -171,7 +176,9 @@ describe('QA Criterios de Aceptación — Relación Material con Proveedores', (
         where: jest.fn().mockReturnThis(),
         getOne: jest.fn().mockResolvedValue(null),
       });
-      mockProveedorRepository.findOne.mockResolvedValueOnce(mockProveedorActivo);
+      mockProveedorRepository.findOne.mockResolvedValueOnce(
+        mockProveedorActivo,
+      );
 
       const dto: CreateMaterialDto = {
         nombre: 'Tubo PVC 1/2" SDR 13.5',
@@ -254,7 +261,9 @@ describe('QA Criterios de Aceptación — Relación Material con Proveedores', (
         where: jest.fn().mockReturnThis(),
         getOne: jest.fn().mockResolvedValue(null),
       });
-      mockProveedorRepository.findOne.mockResolvedValueOnce(mockProveedorActivo);
+      mockProveedorRepository.findOne.mockResolvedValueOnce(
+        mockProveedorActivo,
+      );
 
       const dto: CreateMaterialDto = {
         nombre: 'Tubo PEAD 1/2"',
@@ -407,9 +416,7 @@ describe('QA Criterios de Aceptación — Relación Material con Proveedores', (
       // No debe disparar consulta de validación ni rechazar por inactividad
       expect(mockProveedorRepository.findOne).not.toHaveBeenCalled();
       expect(result.idProveedor).toBe(20);
-      expect(result.descripcion).toBe(
-        'Actualización técnica de descripción',
-      );
+      expect(result.descripcion).toBe('Actualización técnica de descripción');
     });
   });
 
@@ -470,7 +477,9 @@ describe('QA Criterios de Aceptación — Relación Material con Proveedores', (
         addOrderBy: jest.fn().mockReturnThis(),
         skip: jest.fn().mockReturnThis(),
         take: jest.fn().mockReturnThis(),
-        getManyAndCount: jest.fn().mockResolvedValue([[mockMaterialConProveedor], 1]),
+        getManyAndCount: jest
+          .fn()
+          .mockResolvedValue([[mockMaterialConProveedor], 1]),
       };
       mockMaterialRepository.createQueryBuilder.mockReturnValue(qbMock);
 
@@ -499,7 +508,9 @@ describe('QA Criterios de Aceptación — Relación Material con Proveedores', (
         where: jest.fn().mockReturnThis(),
         getOne: jest.fn().mockResolvedValue(null),
       });
-      mockProveedorRepository.findOne.mockResolvedValueOnce(mockProveedorActivo);
+      mockProveedorRepository.findOne.mockResolvedValueOnce(
+        mockProveedorActivo,
+      );
 
       const response = await request(app.getHttpServer())
         .post('/api/v1/inventario/materiales')

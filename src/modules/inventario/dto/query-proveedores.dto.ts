@@ -84,12 +84,15 @@ export class QueryProveedoresDto {
   activo?: boolean;
 
   @ApiPropertyOptional({
-    description: 'Búsqueda por nombre comercial o razón social (coincidencia parcial)',
+    description:
+      'Búsqueda por nombre comercial o razón social (coincidencia parcial)',
     example: 'Lagar',
   })
   @Transform(trimOptionalString)
   @IsOptional()
-  @IsString({ message: 'El término de búsqueda por nombre debe ser una cadena de texto' })
+  @IsString({
+    message: 'El término de búsqueda por nombre debe ser una cadena de texto',
+  })
   @MaxLength(100, {
     message: 'El término de búsqueda no puede exceder 100 caracteres',
   })

@@ -22,6 +22,9 @@ import { DocumentoMovimientoInventario } from './entities/documento-movimiento-i
 import { Material } from './entities/material.entity';
 import { MovimientoInventario } from './entities/movimiento-inventario.entity';
 import { Proveedor } from './entities/proveedor.entity';
+import { SolicitudMaterial } from './entities/solicitud-material.entity';
+import { DetalleSolicitudMaterial } from './entities/detalle-solicitud-material.entity';
+import { Averia } from '../averias/entities/averia.entity';
 import { InventarioModule } from './inventario.module';
 import { InventarioService } from './inventario.service';
 
@@ -36,6 +39,9 @@ const integralQaTypeOrmModule = TypeOrmModule.forRoot({
     Proveedor,
     MovimientoInventario,
     DocumentoMovimientoInventario,
+    SolicitudMaterial,
+    DetalleSolicitudMaterial,
+    Averia,
   ],
   synchronize: true,
 });
@@ -106,9 +112,9 @@ describe('Backlog 4.4: Registro de Entradas de Materiales — Pruebas Funcionale
     usuarioRepository = moduleRef.get<Repository<Usuario>>(
       getRepositoryToken(Usuario),
     );
-    documentoRepository = moduleRef.get<Repository<DocumentoMovimientoInventario>>(
-      getRepositoryToken(DocumentoMovimientoInventario),
-    );
+    documentoRepository = moduleRef.get<
+      Repository<DocumentoMovimientoInventario>
+    >(getRepositoryToken(DocumentoMovimientoInventario));
 
     // Sembrar usuario Administradora
     adminUser = await usuarioRepository.save(
@@ -185,7 +191,9 @@ describe('Backlog 4.4: Registro de Entradas de Materiales — Pruebas Funcionale
       expect(response.body).toBeDefined();
       expect(response.body.stockAnterior).toBe(20);
       expect(response.body.stockActual).toBe(35);
-      expect(response.body.mensaje).toContain('Entrada física registrada exitosamente');
+      expect(response.body.mensaje).toContain(
+        'Entrada física registrada exitosamente',
+      );
       expect(response.body.mensaje).toContain('35');
 
       // Confirmar movimiento generado
@@ -197,7 +205,9 @@ describe('Backlog 4.4: Registro de Entradas de Materiales — Pruebas Funcionale
       expect(movimiento.idMaterial).toBe(materialActivo.id);
       expect(movimiento.idUsuario).toBe(adminUser.idUsuario);
       expect(movimiento.idProveedor).toBe(proveedorActivo.id);
-      expect(movimiento.observacion).toBe('Ingreso por compra según factura F-4589');
+      expect(movimiento.observacion).toBe(
+        'Ingreso por compra según factura F-4589',
+      );
       expect(new Date(movimiento.fechaMovimiento)).toBeInstanceOf(Date);
 
       // Confirmar persistencia en BD
@@ -354,10 +364,16 @@ describe('Backlog 4.4: Registro de Entradas de Materiales — Pruebas Funcionale
       const response = await request(app.getHttpServer())
         .post('/api/v1/inventario/entradas')
         .set('Authorization', `Bearer ${signAs(Role.ADMINISTRADORA)}`)
-        .send({ idMaterial: materialActivo.id, cantidad: 10, idProveedor: 888888 })
+        .send({
+          idMaterial: materialActivo.id,
+          cantidad: 10,
+          idProveedor: 888888,
+        })
         .expect(404);
 
-      expect(response.body.message).toContain('Proveedor con ID 888888 no encontrado');
+      expect(response.body.message).toContain(
+        'Proveedor con ID 888888 no encontrado',
+      );
     });
 
     it('debe rechazar con 400 Bad Request si el proveedor especificado se encuentra inactivo', async () => {
@@ -463,7 +479,9 @@ describe('Backlog 4.4: Registro de Entradas de Materiales — Pruebas Funcionale
     });
 
     it('adjunta una factura en PDF válida a la entrada registrada (201 Created)', async () => {
-      const pdfBuffer = Buffer.from('%PDF-1.4 Factura oficial #9001 de compra de materiales');
+      const pdfBuffer = Buffer.from(
+        '%PDF-1.4 Factura oficial #9001 de compra de materiales',
+      );
 
       const response = await request(app.getHttpServer())
         .post(`/api/v1/inventario/entradas/${entradaId}/documentos`)
@@ -483,7 +501,9 @@ describe('Backlog 4.4: Registro de Entradas de Materiales — Pruebas Funcionale
     });
 
     it('adjunta una guía de entrega en formato PNG válido a la misma entrada (201 Created)', async () => {
-      const pngBuffer = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
+      const pngBuffer = Buffer.from([
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00,
+      ]);
 
       const response = await request(app.getHttpServer())
         .post(`/api/v1/inventario/entradas/${entradaId}/documentos`)
@@ -516,7 +536,9 @@ describe('Backlog 4.4: Registro de Entradas de Materiales — Pruebas Funcionale
 
     it('permite visualizar o descargar el archivo adjunto en stream (200 OK)', async () => {
       await request(app.getHttpServer())
-        .get(`/api/v1/inventario/entradas/${entradaId}/documentos/${savedFilename}`)
+        .get(
+          `/api/v1/inventario/entradas/${entradaId}/documentos/${savedFilename}`,
+        )
         .set('Authorization', `Bearer ${signAs(Role.ADMINISTRADORA)}`)
         .expect(200);
     });

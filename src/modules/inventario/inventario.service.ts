@@ -1,14 +1,18 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   HttpException,
   Injectable,
   InternalServerErrorException,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { EstadoSolicitudMaterial } from '../../common/enums/estado-solicitud-material.enum';
+import { Role } from '../../common/enums/role.enum';
 import { TipoMovimientoInventario } from '../../common/enums/tipo-movimiento-inventario.enum';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { withDbRetry } from '../../common/persistence/with-db-retry';
@@ -24,15 +28,27 @@ import {
   type MovimientoDocumentFile,
 } from '../../common/media/public-media';
 import { QueryProveedoresDto } from './dto/query-proveedores.dto';
+import { QuerySolicitudesMaterialDto } from './dto/query-solicitudes-material.dto';
 import { RegistrarEntradaDto } from './dto/registrar-entrada.dto';
+import { RegistrarSalidaDto } from './dto/registrar-salida.dto';
+import { RegistrarSolicitudMaterialDto } from './dto/registrar-solicitud-material.dto';
 import { UpdateCategoriaDto } from './dto/update-categoria.dto';
 import { UpdateMaterialDto } from './dto/update-material.dto';
 import { UpdateProveedorDto } from './dto/update-proveedor.dto';
+import { Averia } from '../averias/entities/averia.entity';
 import { CategoriaMaterial } from './entities/categoria-material.entity';
 import { DocumentoMovimientoInventario } from './entities/documento-movimiento-inventario.entity';
 import { Material } from './entities/material.entity';
 import { MovimientoInventario } from './entities/movimiento-inventario.entity';
 import { Proveedor } from './entities/proveedor.entity';
+import { SolicitudMaterial } from './entities/solicitud-material.entity';
+import { DetalleSolicitudMaterial } from './entities/detalle-solicitud-material.entity';
+import {
+  assertStockDisponible,
+  ResultadoValidacionStock,
+} from './utils/validar-stock.util';
+
+export type { ResultadoValidacionStock };
 
 export type MaterialesPaginados = {
   data: Material[];
@@ -66,6 +82,14 @@ export type ConfirmacionEntradaInventario = {
   mensaje: string;
 };
 
+export type ConfirmacionSalidaInventario = {
+  movimiento: MovimientoInventario;
+  material: Material;
+  stockAnterior: number;
+  stockActual: number;
+  mensaje: string;
+};
+
 @Injectable()
 export class InventarioService {
   private readonly logger = new Logger(InventarioService.name);
@@ -81,6 +105,15 @@ export class InventarioService {
     private readonly movimientoRepository: Repository<MovimientoInventario>,
     @InjectRepository(DocumentoMovimientoInventario)
     private readonly documentoMovimientoRepository: Repository<DocumentoMovimientoInventario>,
+    @Optional()
+    @InjectRepository(SolicitudMaterial)
+    private readonly solicitudMaterialRepository?: Repository<SolicitudMaterial>,
+    @Optional()
+    @InjectRepository(DetalleSolicitudMaterial)
+    private readonly detalleSolicitudRepository?: Repository<DetalleSolicitudMaterial>,
+    @Optional()
+    @InjectRepository(Averia)
+    private readonly averiaRepository?: Repository<Averia>,
   ) {}
 
   /**
@@ -142,7 +175,9 @@ export class InventarioService {
         );
 
         if (!proveedor) {
-          throw new NotFoundException(`El proveedor con ID ${idProv} no existe`);
+          throw new NotFoundException(
+            `El proveedor con ID ${idProv} no existe`,
+          );
         }
 
         if (!proveedor.activo) {
@@ -371,7 +406,9 @@ export class InventarioService {
         );
 
         if (!proveedor) {
-          throw new NotFoundException(`El proveedor con ID ${idProv} no existe`);
+          throw new NotFoundException(
+            `El proveedor con ID ${idProv} no existe`,
+          );
         }
 
         if (!proveedor.activo) {
@@ -482,22 +519,25 @@ export class InventarioService {
     const skip = (page - 1) * limit;
 
     try {
-      const qb = this.categoriaRepository.createQueryBuilder('categoria');
+      const [data, total] = await withDbRetry(async () => {
+        const qb = this.categoriaRepository.createQueryBuilder('categoria');
 
-      if (query.activo !== undefined) {
-        qb.andWhere('categoria.activo = :activo', { activo: query.activo });
-      }
+        if (query.activo !== undefined) {
+          qb.andWhere('categoria.activo = :activo', { activo: query.activo });
+        }
 
-      if (query.nombre) {
-        qb.andWhere('LOWER(categoria.nombre) LIKE LOWER(:nombre)', {
-          nombre: `%${query.nombre.trim()}%`,
-        });
-      }
+        if (query.nombre) {
+          qb.andWhere('LOWER(categoria.nombre) LIKE LOWER(:nombre)', {
+            nombre: `%${query.nombre.trim()}%`,
+          });
+        }
 
-      qb.orderBy('categoria.nombre', 'ASC');
-      qb.skip(skip).take(limit);
+        qb.orderBy('categoria.nombre', 'ASC');
+        qb.skip(skip).take(limit);
 
-      const [data, total] = await withDbRetry(() => qb.getManyAndCount());
+        return await qb.getManyAndCount();
+      });
+
       const totalPages = Math.ceil(total / limit);
 
       return {
@@ -704,30 +744,33 @@ export class InventarioService {
     const skip = (page - 1) * limit;
 
     try {
-      const qb = this.proveedorRepository.createQueryBuilder('proveedor');
+      const [data, total] = await withDbRetry(async () => {
+        const qb = this.proveedorRepository.createQueryBuilder('proveedor');
 
-      if (query.activo !== undefined) {
-        qb.andWhere('proveedor.activo = :activo', { activo: query.activo });
-      }
+        if (query.activo !== undefined) {
+          qb.andWhere('proveedor.activo = :activo', { activo: query.activo });
+        }
 
-      if (query.nombre) {
-        qb.andWhere('LOWER(proveedor.nombre) LIKE LOWER(:nombre)', {
-          nombre: `%${query.nombre.trim()}%`,
-        });
-      }
+        if (query.nombre) {
+          qb.andWhere('LOWER(proveedor.nombre) LIKE LOWER(:nombre)', {
+            nombre: `%${query.nombre.trim()}%`,
+          });
+        }
 
-      if (query.search) {
-        const searchPattern = `%${query.search.trim()}%`;
-        qb.andWhere(
-          '(LOWER(proveedor.nombre) LIKE LOWER(:search) OR LOWER(proveedor.razonSocial) LIKE LOWER(:search) OR LOWER(proveedor.identificacion) LIKE LOWER(:search))',
-          { search: searchPattern },
-        );
-      }
+        if (query.search) {
+          const searchPattern = `%${query.search.trim()}%`;
+          qb.andWhere(
+            '(LOWER(proveedor.nombre) LIKE LOWER(:search) OR LOWER(proveedor.razonSocial) LIKE LOWER(:search) OR LOWER(proveedor.identificacion) LIKE LOWER(:search))',
+            { search: searchPattern },
+          );
+        }
 
-      qb.orderBy('proveedor.nombre', 'ASC');
-      qb.skip(skip).take(limit);
+        qb.orderBy('proveedor.nombre', 'ASC');
+        qb.skip(skip).take(limit);
 
-      const [data, total] = await withDbRetry(() => qb.getManyAndCount());
+        return await qb.getManyAndCount();
+      });
+
       const totalPages = Math.ceil(total / limit);
 
       return {
@@ -738,7 +781,10 @@ export class InventarioService {
         totalPages: totalPages === 0 && total === 0 ? 0 : totalPages,
       };
     } catch (error) {
-      this.logger.error('Error al consultar el catálogo de proveedores:', error);
+      this.logger.error(
+        'Error al consultar el catálogo de proveedores:',
+        error,
+      );
       throw new InternalServerErrorException(
         'No se pudo obtener el listado de proveedores',
       );
@@ -810,15 +856,17 @@ export class InventarioService {
       const idenNormalizada = dto.identificacion.trim();
       if (
         !proveedor.identificacion ||
-        idenNormalizada.toLowerCase() !==
-          proveedor.identificacion.toLowerCase()
+        idenNormalizada.toLowerCase() !== proveedor.identificacion.toLowerCase()
       ) {
         const duplicado = await withDbRetry(() =>
           this.proveedorRepository
             .createQueryBuilder('proveedor')
-            .where('LOWER(TRIM(proveedor.identificacion)) = LOWER(:identificacion)', {
-              identificacion: idenNormalizada,
-            })
+            .where(
+              'LOWER(TRIM(proveedor.identificacion)) = LOWER(:identificacion)',
+              {
+                identificacion: idenNormalizada,
+              },
+            )
             .andWhere('proveedor.id != :id', { id })
             .getOne(),
         );
@@ -925,10 +973,7 @@ export class InventarioService {
 
     const userAny = user as unknown as Record<string, unknown>;
     const rawUserId =
-      user?.userId ??
-      userAny?.id ??
-      userAny?.idUsuario ??
-      userAny?.sub;
+      user?.userId ?? userAny?.id ?? userAny?.idUsuario ?? userAny?.sub;
     const idUsuario = Number(rawUserId);
     if (!idUsuario || isNaN(idUsuario)) {
       throw new BadRequestException(
@@ -994,7 +1039,7 @@ export class InventarioService {
               observacion: dto.observacion ? dto.observacion.trim() : null,
               idMaterial: material.id,
               idUsuario,
-              idProveedor: proveedor ? proveedor.id : (idProveedor || null),
+              idProveedor: proveedor ? proveedor.id : idProveedor || null,
             });
 
             const movimientoGuardado = await movimientoRepo.save(movimiento);
@@ -1026,6 +1071,238 @@ export class InventarioService {
         'No se pudo registrar la entrada de inventario',
       );
     }
+  }
+
+  /**
+   * Registra una salida física de materiales de la bodega (disminución de existencias).
+   *
+   * Reglas de negocio críticas:
+   * 1. La operación requiere que el material exista y esté activo.
+   * 2. La cantidad debe ser un entero estrictamente positivo (> 0).
+   * 3. Se verifica la existencia disponible (Regla 4.5.2): si la cantidad solicitada excede el stock actual,
+   *    la operación se rechaza inmediatamente para evitar stock negativo.
+   * 4. El usuario responsable se extrae estrictamente de la sesión autenticada (JWT), nunca de un parámetro manipulable.
+   * 5. Se conserva opcionalmente la referencia a una avería (idAveria) o a una solicitud (idSolicitud).
+   * 6. La disminución de stock y la creación del MovimientoInventario (tipo SALIDA) se ejecutan dentro
+   *    de una transacción atómica consistente con reintentos para evitar inconsistencias o actualizaciones parciales.
+   */
+  async registrarSalida(
+    dto: RegistrarSalidaDto,
+    user: AuthenticatedUser,
+  ): Promise<ConfirmacionSalidaInventario> {
+    const idMaterial = dto.idMaterial ?? dto.materialId;
+    if (!idMaterial) {
+      throw new BadRequestException(
+        'Debe especificar el identificador del material (idMaterial)',
+      );
+    }
+
+    const userAny = user as unknown as Record<string, unknown>;
+    const rawUserId =
+      user?.userId ?? userAny?.id ?? userAny?.idUsuario ?? userAny?.sub;
+    const idUsuario = Number(rawUserId);
+    if (!idUsuario || isNaN(idUsuario)) {
+      throw new BadRequestException(
+        'No se pudo identificar el usuario responsable de la operación',
+      );
+    }
+
+    const idAveria = dto.idAveria ?? dto.averiaId ?? null;
+    const idSolicitud = dto.idSolicitud ?? dto.solicitudId ?? null;
+
+    try {
+      return await withDbRetry(async () => {
+        return await this.materialRepository.manager.transaction(
+          async (manager) => {
+            const materialRepo = manager.getRepository(Material);
+            const movimientoRepo = manager.getRepository(MovimientoInventario);
+
+            const material = await materialRepo.findOne({
+              where: { id: idMaterial },
+            });
+
+            if (!material) {
+              throw new NotFoundException(
+                `Material con ID ${idMaterial} no encontrado en el inventario`,
+              );
+            }
+
+            // Aplicación centralizada de la regla 4.5.2 de existencias disponibles
+            const validacionStock = assertStockDisponible(
+              material,
+              dto.cantidad,
+            );
+
+            if (validacionStock.alcanzaStockMinimo) {
+              this.logger.warn(
+                `Alerta de stock mínimo (Backlog 4.8): Material "${material.nombre}" (ID: ${material.id}) alcanzará nivel crítico (${validacionStock.stockFinal} <= ${material.stockMinimo}) tras la salida.`,
+              );
+            }
+
+            // Validar existencia de Avería y asignación de Fontanero si se envía idAveria
+            if (idAveria !== null && idAveria !== undefined) {
+              const averiaIdNum = Number(idAveria);
+              if (typeof manager.query === 'function') {
+                try {
+                  const averias: Array<{
+                    id: number;
+                    idFontaneroAsignado?: number | null;
+                  }> = await manager.query(
+                    `SELECT id, idFontaneroAsignado FROM Averia WHERE id = ${averiaIdNum}`,
+                  );
+                  if (Array.isArray(averias)) {
+                    if (averias.length === 0) {
+                      throw new NotFoundException(
+                        `Avería con ID ${averiaIdNum} no encontrada`,
+                      );
+                    }
+                    const averiaAsignada = averias[0];
+                    if (
+                      user?.role === Role.FONTANERO &&
+                      averiaAsignada.idFontaneroAsignado !== null &&
+                      averiaAsignada.idFontaneroAsignado !== undefined &&
+                      Number(averiaAsignada.idFontaneroAsignado) !== idUsuario
+                    ) {
+                      throw new BadRequestException(
+                        'No puede registrar salidas de materiales para una avería que no tiene asignada',
+                      );
+                    }
+                  }
+                } catch (err) {
+                  if (err instanceof HttpException) throw err;
+                }
+              }
+            }
+
+            // Validar existencia de Solicitud si se envía idSolicitud
+            if (idSolicitud !== null && idSolicitud !== undefined) {
+              const solicitudIdNum = Number(idSolicitud);
+              if (typeof manager.query === 'function') {
+                try {
+                  const solicitudes: Array<{
+                    idSolicitud: number;
+                    estado?: string | null;
+                  }> = await manager.query(
+                    `SELECT idSolicitud, estado FROM SolicitudServicio WHERE idSolicitud = ${solicitudIdNum}`,
+                  );
+                  if (Array.isArray(solicitudes)) {
+                    if (solicitudes.length === 0) {
+                      throw new NotFoundException(
+                        `Solicitud con ID ${solicitudIdNum} no encontrada`,
+                      );
+                    }
+                  }
+                } catch (err) {
+                  if (err instanceof HttpException) throw err;
+                }
+              }
+            }
+
+            const stockAnterior = material.stockActual;
+            const stockActual = validacionStock.stockFinal;
+
+            material.stockActual = stockActual;
+            await materialRepo.save(material);
+
+            const movimiento = movimientoRepo.create({
+              tipo: TipoMovimientoInventario.SALIDA,
+              cantidad: dto.cantidad,
+              fechaMovimiento: dto.fechaMovimiento ?? new Date(),
+              observacion: dto.observacion ? dto.observacion.trim() : null,
+              idMaterial: material.id,
+              idUsuario,
+              idAveria: idAveria ? Number(idAveria) : null,
+              idSolicitud: idSolicitud ? Number(idSolicitud) : null,
+            });
+
+            const movimientoGuardado = await movimientoRepo.save(movimiento);
+
+            this.logger.log(
+              `Salida registrada con éxito: Material "${material.nombre}" (ID: ${material.id}), -${dto.cantidad} unidades (Stock: ${stockAnterior} -> ${stockActual}), Movimiento ID: ${movimientoGuardado.id}, Usuario ID: ${idUsuario}`,
+            );
+
+            return {
+              movimiento: movimientoGuardado,
+              material,
+              stockAnterior,
+              stockActual,
+              mensaje: `Salida física registrada exitosamente. Se retiraron ${dto.cantidad} unidades de "${material.nombre}". Stock actualizado de ${stockAnterior} a ${stockActual}.`,
+            };
+          },
+        );
+      });
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(
+        `Error al registrar salida de inventario para el material con ID ${idMaterial}:`,
+        error,
+      );
+      throw new InternalServerErrorException(
+        'No se pudo registrar la salida de inventario',
+      );
+    }
+  }
+
+  /**
+   * Consulta y valida de manera centralizada la existencia física disponible de un material
+   * antes de autorizar cualquier operación de salida (Regla 4.5.2).
+   *
+   * @param idMaterial Identificador del material en catálogo
+   * @param cantidad Cantidad física solicitada a retirar
+   * @param customRepo Repositorio opcional (por ejemplo dentro de una transacción activa)
+   * @returns Resultado detallado de la validación, cálculo de stock final y datos del material
+   */
+  async validarDisponibilidadStock(
+    idMaterial: number,
+    cantidad: number,
+    customRepo?: Repository<Material>,
+  ): Promise<ResultadoValidacionStock & { material: Material }> {
+    if (!idMaterial || isNaN(idMaterial) || idMaterial <= 0) {
+      throw new BadRequestException(
+        'El identificador del material debe ser un número entero mayor a cero',
+      );
+    }
+
+    const repo = customRepo ?? this.materialRepository;
+    const material = await withDbRetry(() =>
+      repo.findOne({
+        where: { id: idMaterial },
+      }),
+    );
+
+    if (!material) {
+      throw new NotFoundException(
+        `Material con ID ${idMaterial} no encontrado en el inventario`,
+      );
+    }
+
+    const validacion = assertStockDisponible(material, cantidad);
+
+    return {
+      ...validacion,
+      material,
+    };
+  }
+
+  /**
+   * Consulta los movimientos de salida vinculados a una avería específica.
+   */
+  async findMovimientosByAveria(
+    idAveria: number,
+  ): Promise<MovimientoInventario[]> {
+    if (!idAveria || isNaN(idAveria) || idAveria <= 0) {
+      throw new BadRequestException('ID de avería inválido');
+    }
+    return withDbRetry(() =>
+      this.movimientoRepository.find({
+        where: { idAveria, tipo: TipoMovimientoInventario.SALIDA },
+        relations: { material: true },
+        order: { id: 'DESC' },
+      }),
+    );
   }
 
   /**
@@ -1076,7 +1353,7 @@ export class InventarioService {
       );
 
       this.logger.log(
-        `Documento adjuntado exitosamente al movimiento ${movimientoId}: "${nuevoDoc.nombreOriginal}" (ID: ${documentoGuardado.id}) por usuario ${user?.userId ?? (user as any)?.idUsuario ?? 'sistema'}`,
+        `Documento adjuntado exitosamente al movimiento ${movimientoId}: "${nuevoDoc.nombreOriginal}" (ID: ${documentoGuardado.id}) por usuario ${user?.userId ?? (user as { idUsuario?: number | string } | undefined)?.idUsuario ?? 'sistema'}`,
       );
 
       return documentoGuardado;
@@ -1179,5 +1456,380 @@ export class InventarioService {
       documento: docEncontrado,
     };
   }
-}
 
+  /**
+   * Registra una solicitud de materiales realizada por un Fontanero.
+   *
+   * Reglas de negocio fundamentales:
+   * 1. La identidad del fontanero solicitante se extrae obligatoriamente del token JWT (no manipulable).
+   * 2. Se debe incluir al menos un material, cada uno con cantidad entera estrictamente mayor a 0.
+   * 3. Cada material debe existir en el inventario y encontrarse activo (activo === true).
+   * 4. Si se especifica una avería, esta debe existir y estar asignada al Fontanero solicitante.
+   * 5. Si se repiten materiales en la solicitud, se consolidan automáticamente sumando sus cantidades.
+   * 6. Regla crítica de inventario: REGISTRAR UNA SOLICITUD NO MODIFICA NI RESERVA STOCK.
+   *    El stockActual de los materiales permanece inmutable; el egreso físico se ejecutará
+   *    posteriormente en una salida real autorizada.
+   */
+  async registrarSolicitudMaterial(
+    dto: RegistrarSolicitudMaterialDto,
+    user: AuthenticatedUser,
+  ): Promise<SolicitudMaterial> {
+    const userAny = user as unknown as Record<string, unknown>;
+    const rawUserId =
+      user?.userId ?? userAny?.id ?? userAny?.idUsuario ?? userAny?.sub;
+    const idFontanero = Number(rawUserId);
+
+    if (!idFontanero || isNaN(idFontanero)) {
+      throw new BadRequestException(
+        'No se pudo identificar el usuario fontanero responsable de la solicitud',
+      );
+    }
+
+    if (
+      !dto.materiales ||
+      !Array.isArray(dto.materiales) ||
+      dto.materiales.length === 0
+    ) {
+      throw new BadRequestException(
+        'La solicitud debe incluir al menos un material requerido',
+      );
+    }
+
+    type ItemConsolidado = {
+      idMaterial: number;
+      cantidad: number;
+      observacion: string | null;
+    };
+
+    const consolidadoMap = new Map<number, ItemConsolidado>();
+
+    for (const item of dto.materiales) {
+      const idMat = item.idMaterial ?? item.materialId;
+      if (
+        !idMat ||
+        typeof idMat !== 'number' ||
+        !Number.isInteger(idMat) ||
+        idMat <= 0
+      ) {
+        throw new BadRequestException(
+          'Cada ítem debe especificar un identificador de material válido',
+        );
+      }
+
+      if (
+        item.cantidad === undefined ||
+        item.cantidad === null ||
+        typeof item.cantidad !== 'number' ||
+        !Number.isInteger(item.cantidad) ||
+        item.cantidad <= 0
+      ) {
+        throw new BadRequestException(
+          'La cantidad solicitada para cada material debe ser un número entero mayor a cero',
+        );
+      }
+
+      const itemObs = item.observacion ? item.observacion.trim() : null;
+      const existing = consolidadoMap.get(idMat);
+
+      if (existing) {
+        existing.cantidad += item.cantidad;
+        if (itemObs) {
+          existing.observacion = existing.observacion
+            ? `${existing.observacion}; ${itemObs}`
+            : itemObs;
+        }
+      } else {
+        consolidadoMap.set(idMat, {
+          idMaterial: idMat,
+          cantidad: item.cantidad,
+          observacion: itemObs,
+        });
+      }
+    }
+
+    const itemsConsolidados = Array.from(consolidadoMap.values());
+    const idAveria = dto.idAveria ?? dto.averiaId ?? null;
+
+    return await withDbRetry(async () => {
+      return await this.materialRepository.manager.transaction(
+        async (manager) => {
+          const materialRepo = manager.getRepository(Material);
+          const averiaRepo = manager.getRepository(Averia);
+          const solicitudRepo = manager.getRepository(SolicitudMaterial);
+          const detalleRepo = manager.getRepository(DetalleSolicitudMaterial);
+
+          // 1. Validar cada material en la lista consolidada
+          for (const item of itemsConsolidados) {
+            const material = await materialRepo.findOne({
+              where: { id: item.idMaterial },
+            });
+
+            if (!material) {
+              throw new NotFoundException(
+                `Material con ID ${item.idMaterial} no encontrado en el inventario`,
+              );
+            }
+
+            if (!material.activo) {
+              throw new BadRequestException(
+                `El material "${material.nombre}" se encuentra inactivo y no puede ser solicitado`,
+              );
+            }
+          }
+
+          // 2. Validar avería si viene provista
+          let averiaAsociada: Averia | null = null;
+          if (idAveria !== null && idAveria !== undefined) {
+            averiaAsociada = await averiaRepo.findOne({
+              where: { id: idAveria },
+            });
+
+            if (!averiaAsociada) {
+              throw new NotFoundException(
+                `Avería con ID ${idAveria} no encontrada`,
+              );
+            }
+
+            if (averiaAsociada.idFontaneroAsignado !== idFontanero) {
+              throw new ForbiddenException(
+                'La avería indicada no está asignada al Fontanero autenticado',
+              );
+            }
+          }
+
+          // 3. Generar código correlativo amigable
+          const totalSolicitudes = await solicitudRepo.count();
+          const codigo = `SOL-${String(totalSolicitudes + 1).padStart(4, '0')}`;
+
+          // 4. Instanciar y persistir cabecera
+          const nuevaSolicitud = solicitudRepo.create({
+            codigo,
+            fechaSolicitud: new Date(),
+            estado: EstadoSolicitudMaterial.PENDIENTE,
+            observacion: dto.observacion ? dto.observacion.trim() : null,
+            idFontanero,
+            idAveria: averiaAsociada ? averiaAsociada.id : null,
+          });
+
+          // 5. Instanciar renglones de detalle (sin alterar existencias)
+          nuevaSolicitud.detalles = itemsConsolidados.map((item) =>
+            detalleRepo.create({
+              idMaterial: item.idMaterial,
+              cantidad: item.cantidad,
+              observacion: item.observacion,
+            }),
+          );
+
+          const solicitudGuardada = await solicitudRepo.save(nuevaSolicitud);
+
+          return (await solicitudRepo.findOne({
+            where: { id: solicitudGuardada.id },
+            relations: {
+              detalles: {
+                material: true,
+              },
+              averia: true,
+              fontanero: true,
+            },
+          }))!;
+        },
+      );
+    });
+  }
+
+  /**
+   * Consulta las solicitudes de materiales registradas por el Fontanero autenticado.
+   *
+   * Admite respuesta directa en arreglo o estructura paginada { data, total, page, limit, totalPages }.
+   */
+  async listarSolicitudesMaterialFontanero(
+    user: AuthenticatedUser,
+    query?: QuerySolicitudesMaterialDto,
+  ): Promise<any> {
+    const idFontanero = Number(user.userId);
+
+    const solicitudRepo =
+      this.solicitudMaterialRepository ??
+      this.materialRepository.manager.getRepository(SolicitudMaterial);
+
+    return withDbRetry(async () => {
+      const qb = solicitudRepo
+        .createQueryBuilder('solicitud')
+        .leftJoinAndSelect('solicitud.averia', 'averia')
+        .leftJoinAndSelect('solicitud.detalles', 'detalles')
+        .leftJoinAndSelect('detalles.material', 'material')
+        .where('solicitud.idFontanero = :idFontanero', { idFontanero });
+
+      if (query?.estado) {
+        qb.andWhere('solicitud.estado = :estado', { estado: query.estado });
+      }
+
+      const averiaFiltro = query?.idAveria ?? query?.averiaId;
+      if (averiaFiltro) {
+        qb.andWhere('solicitud.idAveria = :idAveria', {
+          idAveria: averiaFiltro,
+        });
+      }
+
+      qb.orderBy('solicitud.fechaSolicitud', 'DESC').addOrderBy(
+        'solicitud.id',
+        'DESC',
+      );
+
+      const total = await qb.getCount();
+
+      const isPaginated =
+        query?.page !== undefined || query?.limit !== undefined;
+      const take = query?.limit && query.limit > 0 ? Number(query.limit) : 10;
+      const pageNum = query?.page && query.page > 0 ? Number(query.page) : 1;
+      let solicitudes: SolicitudMaterial[];
+
+      if (isPaginated) {
+        const skip = (pageNum - 1) * take;
+
+        qb.skip(skip).take(take);
+        solicitudes = await qb.getMany();
+      } else {
+        solicitudes = await qb.getMany();
+      }
+
+      const mapItem = (sol: SolicitudMaterial) => {
+        const cantidadMateriales = sol.detalles?.length ?? 0;
+        const totalMateriales =
+          sol.detalles?.reduce((acc, d) => acc + (d.cantidad || 0), 0) ?? 0;
+
+        return {
+          id: sol.id,
+          codigo: sol.codigo,
+          fechaSolicitud: sol.fechaSolicitud,
+          estado: sol.estado,
+          idFontanero: sol.idFontanero,
+          idAveria: sol.idAveria,
+          observacion: sol.observacion,
+          cantidadMateriales,
+          totalMateriales,
+          averia: sol.averia
+            ? {
+                id: sol.averia.id,
+                codigo: sol.averia.codigoSeguimiento,
+                numero: sol.averia.codigoSeguimiento,
+                referencia: sol.averia.codigoSeguimiento,
+                codigoSeguimiento: sol.averia.codigoSeguimiento,
+              }
+            : null,
+          detalles: (sol.detalles || []).map((d) => ({
+            id: d.id,
+            idSolicitud: d.idSolicitud,
+            idMaterial: d.idMaterial,
+            cantidad: d.cantidad,
+            observacion: d.observacion,
+            material: d.material
+              ? {
+                  id: d.material.id,
+                  nombre: d.material.nombre,
+                  unidadMedida: d.material.unidadMedida,
+                  stockActual: d.material.stockActual,
+                }
+              : null,
+          })),
+        };
+      };
+
+      const mappedData = solicitudes.map(mapItem);
+
+      if (isPaginated) {
+        const totalPages = Math.ceil(total / take) || 0;
+
+        return {
+          data: mappedData,
+          total,
+          page: pageNum,
+          limit: take,
+          totalPages,
+        };
+      }
+
+      return mappedData;
+    });
+  }
+
+  /**
+   * Obtiene el detalle de una solicitud de material específica para el Fontanero autenticado.
+   */
+  async obtenerSolicitudMaterialFontanero(
+    id: number,
+    user: AuthenticatedUser,
+  ): Promise<any> {
+    const idFontanero = Number(user.userId);
+
+    const solicitudRepo =
+      this.solicitudMaterialRepository ??
+      this.materialRepository.manager.getRepository(SolicitudMaterial);
+
+    return withDbRetry(async () => {
+      const solicitud = await solicitudRepo.findOne({
+        where: { id },
+        relations: {
+          averia: true,
+          detalles: {
+            material: true,
+          },
+        },
+      });
+
+      if (!solicitud) {
+        throw new NotFoundException(
+          `Solicitud de material con ID ${id} no encontrada`,
+        );
+      }
+
+      if (Number(solicitud.idFontanero) !== idFontanero) {
+        throw new ForbiddenException(
+          'No tiene permiso para consultar esta solicitud de materiales',
+        );
+      }
+
+      const cantidadMateriales = solicitud.detalles?.length ?? 0;
+      const totalMateriales =
+        solicitud.detalles?.reduce((acc, d) => acc + (d.cantidad || 0), 0) ?? 0;
+
+      return {
+        id: solicitud.id,
+        codigo: solicitud.codigo,
+        fechaSolicitud: solicitud.fechaSolicitud,
+        estado: solicitud.estado,
+        idFontanero: solicitud.idFontanero,
+        idAveria: solicitud.idAveria,
+        observacion: solicitud.observacion,
+        createdAt: solicitud.createdAt,
+        updatedAt: solicitud.updatedAt,
+        cantidadMateriales,
+        totalMateriales,
+        averia: solicitud.averia
+          ? {
+              id: solicitud.averia.id,
+              codigo: solicitud.averia.codigoSeguimiento,
+              numero: solicitud.averia.codigoSeguimiento,
+              referencia: solicitud.averia.codigoSeguimiento,
+              codigoSeguimiento: solicitud.averia.codigoSeguimiento,
+            }
+          : null,
+        detalles: (solicitud.detalles || []).map((d) => ({
+          id: d.id,
+          idSolicitud: d.idSolicitud,
+          idMaterial: d.idMaterial,
+          cantidad: d.cantidad,
+          observacion: d.observacion,
+          material: d.material
+            ? {
+                id: d.material.id,
+                nombre: d.material.nombre,
+                unidadMedida: d.material.unidadMedida,
+                stockActual: d.material.stockActual,
+              }
+            : null,
+        })),
+      };
+    });
+  }
+}

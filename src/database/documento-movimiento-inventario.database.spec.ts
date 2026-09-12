@@ -1,5 +1,11 @@
 import { config as loadEnv } from 'dotenv';
-import { DataSource, QueryRunner, Table, TableForeignKey, TableIndex } from 'typeorm';
+import {
+  DataSource,
+  QueryRunner,
+  Table,
+  TableForeignKey,
+  TableIndex,
+} from 'typeorm';
 import { buildMigrationDataSourceOptions } from './data-source.options';
 import { CreateDocumentoMovimientoInventarioTable1724685000000 } from './migrations/1724685000000-CreateDocumentoMovimientoInventarioTable';
 
@@ -135,12 +141,8 @@ describe('Pruebas de Base de Datos: Migración DocumentoMovimientoInventario', (
       const dropTableSpy = jest.fn().mockResolvedValue(undefined);
 
       const mockTable = {
-        indices: [
-          { name: 'IX_DocumentoMovimientoInventario_idMovimiento' },
-        ],
-        foreignKeys: [
-          { name: 'FK_DocumentoMovimientoInventario_Movimiento' },
-        ],
+        indices: [{ name: 'IX_DocumentoMovimientoInventario_idMovimiento' }],
+        foreignKeys: [{ name: 'FK_DocumentoMovimientoInventario_Movimiento' }],
       };
 
       const mockQueryRunner = {
@@ -257,7 +259,9 @@ describe('Pruebas de Base de Datos: Migración DocumentoMovimientoInventario', (
 
       expect(fks.length).toBeGreaterThanOrEqual(1);
       const fkMov = fks.find(
-        (f) => f.COLUMN_NAME === 'idMovimiento' && f.REF_TABLE === 'MovimientoInventario',
+        (f) =>
+          f.COLUMN_NAME === 'idMovimiento' &&
+          f.REF_TABLE === 'MovimientoInventario',
       );
       expect(fkMov).toBeDefined();
       expect(fkMov?.COLUMN_NAME).toBe('idMovimiento');

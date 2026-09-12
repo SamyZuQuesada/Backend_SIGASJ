@@ -3,7 +3,7 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { existsSync, mkdirSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { AppModule } from './app.module';
 
@@ -26,20 +26,6 @@ async function bootstrap() {
       mkdirSync(subDir, { recursive: true });
     }
   });
-
-  // Asegurar archivos de imagen requeridos para pruebas y frontend
-  const sampleJpegBase64 =
-    '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=';
-  const sampleImages = [
-    join(uploadDir, 'galeria', 'tanque.jpg'),
-    join(uploadDir, 'galeria', 'oficina.jpg'),
-    join(uploadDir, 'comunicados', 'aviso.jpg'),
-  ];
-  for (const imgPath of sampleImages) {
-    if (!existsSync(imgPath)) {
-      writeFileSync(imgPath, Buffer.from(sampleJpegBase64, 'base64'));
-    }
-  }
 
   // Servir archivos estáticos en /uploads/ directamente fuera del prefijo /api/v1
   app.useStaticAssets(uploadDir, {

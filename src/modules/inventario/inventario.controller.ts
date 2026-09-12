@@ -41,19 +41,23 @@ import { QueryCategoriasDto } from './dto/query-categorias.dto';
 import { QueryMaterialesDto } from './dto/query-materiales.dto';
 import { QueryProveedoresDto } from './dto/query-proveedores.dto';
 import { RegistrarEntradaDto } from './dto/registrar-entrada.dto';
+import { RegistrarSalidaDto } from './dto/registrar-salida.dto';
 import { UpdateCategoriaDto } from './dto/update-categoria.dto';
 import { UpdateMaterialDto } from './dto/update-material.dto';
 import { UpdateProveedorDto } from './dto/update-proveedor.dto';
 import { CategoriaMaterial } from './entities/categoria-material.entity';
 import { DocumentoMovimientoInventario } from './entities/documento-movimiento-inventario.entity';
 import { Material } from './entities/material.entity';
+import { MovimientoInventario } from './entities/movimiento-inventario.entity';
 import { Proveedor } from './entities/proveedor.entity';
 import {
   CategoriasPaginadas,
   ConfirmacionEntradaInventario,
+  ConfirmacionSalidaInventario,
   InventarioService,
   MaterialesPaginados,
   ProveedoresPaginados,
+  ResultadoValidacionStock,
 } from './inventario.service';
 
 @ApiTags('Inventario')
@@ -154,6 +158,43 @@ export class InventarioController {
   })
   findOne(@Param('id', ParseIntPipe) id: number): Promise<Material> {
     return this.inventarioService.findOne(id);
+  }
+
+  @Get('materiales/:id/disponibilidad')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA, Role.FONTANERO)
+  @ApiOperation({
+    summary:
+      'Consultar y verificar disponibilidad de existencias para una salida (Regla 4.5.2)',
+    description:
+      'Verifica en Backend si un material cuenta con stock suficiente para una cantidad solicitada sin alterar existencias ni registrar movimientos. Evalúa si el stock resultante alcanzaría el umbral de stock mínimo.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Disponibilidad verificada exitosamente.',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Cantidad inválida, material inactivo o stock insuficiente.',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Material no encontrado.',
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'No autenticado.',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Acceso denegado.',
+  })
+  validarDisponibilidad(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('cantidad', ParseIntPipe) cantidad: number,
+  ): Promise<ResultadoValidacionStock & { material: Material }> {
+    return this.inventarioService.validarDisponibilidadStock(id, cantidad);
   }
 
   @Put('materiales/:id')
@@ -584,9 +625,7 @@ export class InventarioController {
     status: HttpStatus.FORBIDDEN,
     description: 'Rol no autorizado.',
   })
-  findOneProveedor(
-    @Param('id', ParseIntPipe) id: number,
-  ): Promise<Proveedor> {
+  findOneProveedor(@Param('id', ParseIntPipe) id: number): Promise<Proveedor> {
     return this.inventarioService.findOneProveedor(id);
   }
 
@@ -705,6 +744,60 @@ export class InventarioController {
     return this.inventarioService.registrarEntrada(dto, user);
   }
 
+  @Post('salidas')
+  @HttpCode(HttpStatus.CREATED)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.FONTANERO, Role.ADMINISTRADORA)
+  @ApiOperation({
+    summary:
+      'Registrar una salida física de materiales de bodega (Fontanero / Administradora)',
+    description:
+      'Disminuye atómicamente la existencia física disponible del material, valida stock disponible para evitar stock negativo, y genera el registro en MovimientoInventario con tipo SALIDA, identificando al responsable desde la sesión y conservando referencias opcionales a Avería o Solicitud.',
+  })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description:
+      'Salida registrada con éxito, existencias disminuidas y movimiento generado.',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description:
+      'Datos inválidos (cantidad menor o igual a 0, material inactivo, stock insuficiente).',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Material no encontrado.',
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'No autenticado.',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Requiere rol FONTANERO o ADMINISTRADORA.',
+  })
+  registrarSalida(
+    @Body() dto: RegistrarSalidaDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ConfirmacionSalidaInventario> {
+    return this.inventarioService.registrarSalida(dto, user);
+  }
+
+  @Get('salidas/averia/:idAveria')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA, Role.FONTANERO)
+  @ApiOperation({
+    summary: 'Consultar salidas de materiales asociadas a una avería',
+    description:
+      'Retorna los movimientos de inventario de tipo SALIDA vinculados a una avería específica.',
+  })
+  findMovimientosByAveria(
+    @Param('idAveria', ParseIntPipe) idAveria: number,
+  ): Promise<MovimientoInventario[]> {
+    return this.inventarioService.findMovimientosByAveria(idAveria);
+  }
+
   @Post('movimientos/:id/documentos')
   @HttpCode(HttpStatus.CREATED)
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -766,7 +859,8 @@ export class InventarioController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMINISTRADORA, Role.SECRETARIA, Role.FONTANERO)
   @ApiOperation({
-    summary: 'Listar documentos de respaldo asociados a un movimiento de inventario',
+    summary:
+      'Listar documentos de respaldo asociados a un movimiento de inventario',
   })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -786,7 +880,8 @@ export class InventarioController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMINISTRADORA, Role.SECRETARIA, Role.FONTANERO)
   @ApiOperation({
-    summary: 'Listar documentos de respaldo asociados a una entrada de inventario',
+    summary:
+      'Listar documentos de respaldo asociados a una entrada de inventario',
   })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -844,4 +939,3 @@ export class InventarioController {
     return this.descargarDocumentoMovimiento(id, filename);
   }
 }
-
