@@ -17,13 +17,26 @@ import { DocumentoMovimientoInventario } from './entities/documento-movimiento-i
 import { Material } from './entities/material.entity';
 import { MovimientoInventario } from './entities/movimiento-inventario.entity';
 import { Proveedor } from './entities/proveedor.entity';
+import { SolicitudMaterial } from './entities/solicitud-material.entity';
+import { DetalleSolicitudMaterial } from './entities/detalle-solicitud-material.entity';
+import { Averia } from '../averias/entities/averia.entity';
 import { InventarioModule } from './inventario.module';
 
 const entradasQaTypeOrmModule = TypeOrmModule.forRoot({
   type: 'sqljs',
   autoSave: false,
   dropSchema: true,
-  entities: [Usuario, Material, CategoriaMaterial, Proveedor, MovimientoInventario, DocumentoMovimientoInventario],
+  entities: [
+    Usuario,
+    Material,
+    CategoriaMaterial,
+    Proveedor,
+    MovimientoInventario,
+    DocumentoMovimientoInventario,
+    SolicitudMaterial,
+    DetalleSolicitudMaterial,
+    Averia,
+  ],
   synchronize: true,
 });
 
@@ -155,7 +168,9 @@ describe('Entradas de Inventario — QA Integral, Validación Funcional y Transa
       expect(response.body).toHaveProperty('material');
       expect(response.body.stockAnterior).toBe(20);
       expect(response.body.stockActual).toBe(35);
-      expect(response.body.mensaje).toContain('Entrada física registrada exitosamente');
+      expect(response.body.mensaje).toContain(
+        'Entrada física registrada exitosamente',
+      );
 
       // 3. Verificar persistencia en base de datos del material actualizado
       const materialEnDb = await materialRepository.findOne({
@@ -356,10 +371,14 @@ describe('Entradas de Inventario — QA Integral, Validación Funcional y Transa
         });
 
       expect(res.status).toBe(HttpStatus.NOT_FOUND);
-      expect(res.body.message).toContain('Proveedor con ID 99999 no encontrado');
+      expect(res.body.message).toContain(
+        'Proveedor con ID 99999 no encontrado',
+      );
 
       // Garantizar que no se alteró el stock
-      const matDb = await materialRepository.findOne({ where: { id: material.id } });
+      const matDb = await materialRepository.findOne({
+        where: { id: material.id },
+      });
       expect(matDb!.stockActual).toBe(10);
     });
 
@@ -395,7 +414,9 @@ describe('Entradas de Inventario — QA Integral, Validación Funcional y Transa
       expect(res.body.message).toContain('se encuentra inactivo');
 
       // Stock sin cambios
-      const matDb = await materialRepository.findOne({ where: { id: material.id } });
+      const matDb = await materialRepository.findOne({
+        where: { id: material.id },
+      });
       expect(matDb!.stockActual).toBe(10);
     });
   });

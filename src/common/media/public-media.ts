@@ -557,4 +557,3 @@ export function getMovimientoDocumentFilePath(
 
   return { absolutePath: filePath, mimeType };
 }
-

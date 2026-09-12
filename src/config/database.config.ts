@@ -19,6 +19,8 @@ const mssqlOptions = {
   enableArithAbort: true,
   connectTimeout: 30_000,
   requestTimeout: 30_000,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 10_000,
 };
 
 const tryLoadMssqlNativeDriver = (): unknown | undefined => {

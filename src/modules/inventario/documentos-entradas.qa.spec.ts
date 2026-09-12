@@ -17,6 +17,9 @@ import { DocumentoMovimientoInventario } from './entities/documento-movimiento-i
 import { Material } from './entities/material.entity';
 import { MovimientoInventario } from './entities/movimiento-inventario.entity';
 import { Proveedor } from './entities/proveedor.entity';
+import { SolicitudMaterial } from './entities/solicitud-material.entity';
+import { DetalleSolicitudMaterial } from './entities/detalle-solicitud-material.entity';
+import { Averia } from '../averias/entities/averia.entity';
 import { InventarioModule } from './inventario.module';
 
 const documentosQaTypeOrmModule = TypeOrmModule.forRoot({
@@ -30,6 +33,9 @@ const documentosQaTypeOrmModule = TypeOrmModule.forRoot({
     Proveedor,
     MovimientoInventario,
     DocumentoMovimientoInventario,
+    SolicitudMaterial,
+    DetalleSolicitudMaterial,
+    Averia,
   ],
   synchronize: true,
 });
@@ -163,7 +169,9 @@ describe('Documentos de Respaldo en Entradas de Inventario — QA Integral y Val
 
     it('adjunta exitosamente una imagen comprobante JPG a través del alias /entradas/:id/documentos (201 Created)', async () => {
       // Magic bytes de JPEG (\xFF\xD8\xFF)
-      const jpgBuffer = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00]);
+      const jpgBuffer = Buffer.from([
+        0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00,
+      ]);
 
       const response = await request(app.getHttpServer())
         .post(`/api/v1/inventario/entradas/${testMovimiento.id}/documentos`)
@@ -182,7 +190,9 @@ describe('Documentos de Respaldo en Entradas de Inventario — QA Integral y Val
 
     it('adjunta exitosamente un comprobante PNG con firma binaria válida (201 Created)', async () => {
       // Magic bytes de PNG (\x89PNG\r\n\x1a\n)
-      const pngBuffer = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00]);
+      const pngBuffer = Buffer.from([
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00,
+      ]);
 
       const response = await request(app.getHttpServer())
         .post(`/api/v1/inventario/movimientos/${testMovimiento.id}/documentos`)
@@ -200,7 +210,10 @@ describe('Documentos de Respaldo en Entradas de Inventario — QA Integral y Val
     it('adjunta exitosamente un comprobante WebP con firma válida RIFF...WEBP (201 Created)', async () => {
       // Cabecera WebP: "RIFF" (4 bytes) + 4 bytes length + "WEBP" (4 bytes)
       const webpHeader = Buffer.from('RIFF1234WEBP');
-      const webpBuffer = Buffer.concat([webpHeader, Buffer.from('image_payload')]);
+      const webpBuffer = Buffer.concat([
+        webpHeader,
+        Buffer.from('image_payload'),
+      ]);
 
       const response = await request(app.getHttpServer())
         .post(`/api/v1/inventario/movimientos/${testMovimiento.id}/documentos`)
@@ -283,7 +296,9 @@ describe('Documentos de Respaldo en Entradas de Inventario — QA Integral y Val
         .set('Authorization', `Bearer ${signAs(Role.ADMINISTRADORA)}`)
         .expect(400);
 
-      expect(response.body.message).toContain('Debe adjuntar un archivo de respaldo');
+      expect(response.body.message).toContain(
+        'Debe adjuntar un archivo de respaldo',
+      );
     });
 
     it('retorna 404 Not Found si se intenta adjuntar a un movimiento inexistente', async () => {

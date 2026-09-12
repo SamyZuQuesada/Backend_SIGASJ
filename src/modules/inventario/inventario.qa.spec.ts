@@ -15,13 +15,26 @@ import { Material } from './entities/material.entity';
 import { DocumentoMovimientoInventario } from './entities/documento-movimiento-inventario.entity';
 import { MovimientoInventario } from './entities/movimiento-inventario.entity';
 import { Proveedor } from './entities/proveedor.entity';
+import { SolicitudMaterial } from './entities/solicitud-material.entity';
+import { DetalleSolicitudMaterial } from './entities/detalle-solicitud-material.entity';
+import { Averia } from '../averias/entities/averia.entity';
 import { InventarioModule } from './inventario.module';
 
 const inventarioQaTypeOrmModule = TypeOrmModule.forRoot({
   type: 'sqljs',
   autoSave: false,
   dropSchema: true,
-  entities: [Usuario, Material, CategoriaMaterial, Proveedor, MovimientoInventario, DocumentoMovimientoInventario],
+  entities: [
+    Usuario,
+    Material,
+    CategoriaMaterial,
+    Proveedor,
+    MovimientoInventario,
+    DocumentoMovimientoInventario,
+    SolicitudMaterial,
+    DetalleSolicitudMaterial,
+    Averia,
+  ],
   synchronize: true,
 });
 

@@ -15,13 +15,26 @@ import { Material } from './entities/material.entity';
 import { DocumentoMovimientoInventario } from './entities/documento-movimiento-inventario.entity';
 import { MovimientoInventario } from './entities/movimiento-inventario.entity';
 import { Proveedor } from './entities/proveedor.entity';
+import { SolicitudMaterial } from './entities/solicitud-material.entity';
+import { DetalleSolicitudMaterial } from './entities/detalle-solicitud-material.entity';
+import { Averia } from '../averias/entities/averia.entity';
 import { InventarioModule } from './inventario.module';
 
 const proveedoresQaTypeOrmModule = TypeOrmModule.forRoot({
   type: 'sqljs',
   autoSave: false,
   dropSchema: true,
-  entities: [Usuario, Material, CategoriaMaterial, Proveedor, MovimientoInventario, DocumentoMovimientoInventario],
+  entities: [
+    Usuario,
+    Material,
+    CategoriaMaterial,
+    Proveedor,
+    MovimientoInventario,
+    DocumentoMovimientoInventario,
+    SolicitudMaterial,
+    DetalleSolicitudMaterial,
+    Averia,
+  ],
   synchronize: true,
 });
 
@@ -416,9 +429,9 @@ describe('Gestión de Proveedores de Inventario — QA Integral y Validación Fu
         .set('Authorization', `Bearer ${token}`);
 
       expect(response.status).toBe(HttpStatus.OK);
-      expect(response.body.data.some((p: ProveedorResponseBody) => p.id === 1)).toBe(
-        true,
-      );
+      expect(
+        response.body.data.some((p: ProveedorResponseBody) => p.id === 1),
+      ).toBe(true);
     });
 
     it('reactiva el proveedor exitosamente aceptando "Activo" (200 OK)', async () => {
@@ -523,7 +536,9 @@ describe('Gestión de Proveedores de Inventario — QA Integral y Validación Fu
         });
 
       expect(response.status).toBe(HttpStatus.NOT_FOUND);
-      expect(response.body.message).toContain('El proveedor con ID 99999 no existe');
+      expect(response.body.message).toContain(
+        'El proveedor con ID 99999 no existe',
+      );
     });
 
     it('desactiva el proveedor y comprueba que NO se elimine físicamente (borrado lógico)', async () => {

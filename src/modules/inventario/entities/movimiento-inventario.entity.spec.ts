@@ -47,7 +47,9 @@ describe('MovimientoInventario Entity (Inventario ASADA)', () => {
       expect(movimiento.tipo).toBe(TipoMovimientoInventario.ENTRADA);
       expect(movimiento.cantidad).toBe(30);
       expect(movimiento.fechaMovimiento).toEqual(fecha);
-      expect(movimiento.observacion).toBe('Ingreso de compra según factura F-4589');
+      expect(movimiento.observacion).toBe(
+        'Ingreso de compra según factura F-4589',
+      );
       expect(movimiento.idMaterial).toBe(1);
       expect(movimiento.material).toBe(material);
       expect(movimiento.idUsuario).toBe(2);
@@ -72,7 +74,8 @@ describe('MovimientoInventario Entity (Inventario ASADA)', () => {
       movimiento.tipo = TipoMovimientoInventario.SALIDA;
       movimiento.cantidad = 5;
       movimiento.fechaMovimiento = fecha;
-      movimiento.observacion = 'Despacho a fontanero para reparación de fuga en sector centro';
+      movimiento.observacion =
+        'Despacho a fontanero para reparación de fuga en sector centro';
       movimiento.idMaterial = 1;
       movimiento.material = material;
       movimiento.idUsuario = 3;
@@ -201,7 +204,9 @@ describe('MovimientoInventario Entity (Inventario ASADA)', () => {
 
     it('debe estar registrada como entidad con el nombre "MovimientoInventario"', () => {
       const table = storage.tables.find(
-        (t) => t.target === MovimientoInventario || t.name === 'MovimientoInventario',
+        (t) =>
+          t.target === MovimientoInventario ||
+          t.name === 'MovimientoInventario',
       );
       expect(table).toBeDefined();
       expect(table?.name).toBe('MovimientoInventario');
@@ -241,7 +246,8 @@ describe('MovimientoInventario Entity (Inventario ASADA)', () => {
 
     it('debe registrar createdAt como columna automática de fecha', () => {
       const createdCol = storage.columns.find(
-        (c) => c.target === MovimientoInventario && c.propertyName === 'createdAt',
+        (c) =>
+          c.target === MovimientoInventario && c.propertyName === 'createdAt',
       );
       expect(createdCol?.mode).toBe('createDate');
     });
@@ -257,7 +263,8 @@ describe('MovimientoInventario Entity (Inventario ASADA)', () => {
       expect(relation?.options?.nullable).toBe(false);
 
       const joinCol = storage.joinColumns.find(
-        (jc) => jc.target === MovimientoInventario && jc.propertyName === 'material',
+        (jc) =>
+          jc.target === MovimientoInventario && jc.propertyName === 'material',
       );
       expect(joinCol).toBeDefined();
       expect(joinCol?.name).toBe('idMaterial');
@@ -274,7 +281,8 @@ describe('MovimientoInventario Entity (Inventario ASADA)', () => {
       expect(relation?.options?.nullable).toBe(false);
 
       const joinCol = storage.joinColumns.find(
-        (jc) => jc.target === MovimientoInventario && jc.propertyName === 'usuario',
+        (jc) =>
+          jc.target === MovimientoInventario && jc.propertyName === 'usuario',
       );
       expect(joinCol).toBeDefined();
       expect(joinCol?.name).toBe('idUsuario');
@@ -291,7 +299,8 @@ describe('MovimientoInventario Entity (Inventario ASADA)', () => {
       expect(relation?.options?.nullable).toBe(true);
 
       const joinCol = storage.joinColumns.find(
-        (jc) => jc.target === MovimientoInventario && jc.propertyName === 'proveedor',
+        (jc) =>
+          jc.target === MovimientoInventario && jc.propertyName === 'proveedor',
       );
       expect(joinCol).toBeDefined();
       expect(joinCol?.name).toBe('idProveedor');

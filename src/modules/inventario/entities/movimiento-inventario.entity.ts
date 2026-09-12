@@ -164,7 +164,10 @@ export class MovimientoInventario {
     }
 
     if (this.cantidad !== undefined) {
-      if (typeof this.cantidad !== 'number' || !Number.isInteger(this.cantidad)) {
+      if (
+        typeof this.cantidad !== 'number' ||
+        !Number.isInteger(this.cantidad)
+      ) {
         throw new BadRequestException(
           'La cantidad del movimiento debe ser un número entero',
         );

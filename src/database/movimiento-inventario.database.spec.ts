@@ -1,5 +1,11 @@
 import { config as loadEnv } from 'dotenv';
-import { DataSource, QueryRunner, Table, TableForeignKey, TableIndex } from 'typeorm';
+import {
+  DataSource,
+  QueryRunner,
+  Table,
+  TableForeignKey,
+  TableIndex,
+} from 'typeorm';
 import { buildMigrationDataSourceOptions } from './data-source.options';
 import { CreateMovimientoInventarioTable1724684900000 } from './migrations/1724684900000-CreateMovimientoInventarioTable';
 
@@ -40,7 +46,9 @@ describe('Pruebas de Base de Datos e Integridad: Migración MovimientoInventario
   describe('1. Definición y Estructura de la Migración TypeORM', () => {
     it('debe contar con la migración CreateMovimientoInventarioTable1724684900000 bien nombrada', () => {
       const migration = new CreateMovimientoInventarioTable1724684900000();
-      expect(migration.name).toBe('CreateMovimientoInventarioTable1724684900000');
+      expect(migration.name).toBe(
+        'CreateMovimientoInventarioTable1724684900000',
+      );
       expect(typeof migration.up).toBe('function');
       expect(typeof migration.down).toBe('function');
     });
@@ -122,10 +130,14 @@ describe('Pruebas de Base de Datos e Integridad: Migración MovimientoInventario
       const usrCol = createdTable?.columns.find((c) => c.name === 'idUsuario');
       expect(usrCol?.isNullable).toBe(false);
 
-      const provCol = createdTable?.columns.find((c) => c.name === 'idProveedor');
+      const provCol = createdTable?.columns.find(
+        (c) => c.name === 'idProveedor',
+      );
       expect(provCol?.isNullable).toBe(true);
 
-      const obsCol = createdTable?.columns.find((c) => c.name === 'observacion');
+      const obsCol = createdTable?.columns.find(
+        (c) => c.name === 'observacion',
+      );
       expect(obsCol?.isNullable).toBe(true);
 
       // Verificación de Llaves Foráneas

@@ -315,8 +315,12 @@ describe('Pruebas de Base de Datos e Integridad: Migración CategoriaMaterial', 
         }[];
 
         expect(joinRows.length).toBe(1);
-        expect(joinRows[0]?.materialNombre).toBe(`TEST_TEMP_Mat_${uniqueSuffix}`);
-        expect(joinRows[0]?.categoriaNombre).toBe(`TEST_TEMP_Cat_${uniqueSuffix}`);
+        expect(joinRows[0]?.materialNombre).toBe(
+          `TEST_TEMP_Mat_${uniqueSuffix}`,
+        );
+        expect(joinRows[0]?.categoriaNombre).toBe(
+          `TEST_TEMP_Cat_${uniqueSuffix}`,
+        );
         expect(joinRows[0]?.categoriaActivo).toBe(true);
 
         // 4. Desactivar categoría lógicamente

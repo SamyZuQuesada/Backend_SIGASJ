@@ -109,30 +109,6 @@ export class ComunicadosService implements OnModuleInit {
           }
         }
       }
-
-      const activeCount = all.filter(
-        (c) => c.estado === 'Activo' && isPublicFlag(c.esPublico),
-      ).length;
-
-      if (activeCount === 0) {
-        await this.comunicados.save(
-          this.comunicados.create({
-            id: randomUUID(),
-            titulo: 'Aviso de Mantenimiento Preventivo',
-            descripcion:
-              'Mantenimiento en los sistemas de bombeo y distribución de agua potable.',
-            contenido:
-              'Estimados abonados, se informa que se realizarán trabajos de mantenimiento preventivo para garantizar la continuidad y calidad del servicio.',
-            tipo: 'Informativo',
-            prioridad: 'Media',
-            estado: 'Activo',
-            esPublico: true,
-            fechaPublicacion: new Date(),
-            fechaExpiracion: null,
-            imagenUrl: '/uploads/comunicados/aviso.jpg',
-          }),
-        );
-      }
     });
   }
 

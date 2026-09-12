@@ -6,7 +6,11 @@ import { DocumentoMovimientoInventario } from './entities/documento-movimiento-i
 import { Material } from './entities/material.entity';
 import { MovimientoInventario } from './entities/movimiento-inventario.entity';
 import { Proveedor } from './entities/proveedor.entity';
+import { SolicitudMaterial } from './entities/solicitud-material.entity';
+import { DetalleSolicitudMaterial } from './entities/detalle-solicitud-material.entity';
+import { Averia } from '../averias/entities/averia.entity';
 import { InventarioController } from './inventario.controller';
+import { SolicitudesMaterialesController } from './solicitudes-materiales.controller';
 import { InventarioService } from './inventario.service';
 
 @Module({
@@ -17,9 +21,12 @@ import { InventarioService } from './inventario.service';
       Proveedor,
       MovimientoInventario,
       DocumentoMovimientoInventario,
+      SolicitudMaterial,
+      DetalleSolicitudMaterial,
+      Averia,
     ]),
   ],
-  controllers: [InventarioController],
+  controllers: [InventarioController, SolicitudesMaterialesController],
   providers: [InventarioService, RolesGuard],
   exports: [TypeOrmModule, InventarioService],
 })
