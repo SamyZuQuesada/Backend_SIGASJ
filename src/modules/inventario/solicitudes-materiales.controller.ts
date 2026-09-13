@@ -164,4 +164,47 @@ export class SolicitudesMaterialesController {
   ): Promise<any> {
     return this.inventarioService.obtenerSolicitudMaterialFontanero(id, user);
   }
+
+  @Get([
+    'admin/solicitudes-materiales',
+    'inventario/admin/solicitudes-materiales',
+  ])
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.ADMINISTRADORA)
+  @ApiOperation({
+    summary: 'Listar solicitudes de materiales pendientes (Administradora)',
+    description:
+      'Consulta administrativa de solicitudes en estado PENDIENTE (o el estado indicado). ' +
+      'Incluye fontanero, fecha, cantidad de materiales y avería relacionada. No modifica stock.',
+  })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  @ApiQuery({
+    name: 'estado',
+    required: false,
+    enum: EstadoSolicitudMaterial,
+    example: EstadoSolicitudMaterial.PENDIENTE,
+  })
+  @ApiQuery({ name: 'idAveria', required: false, type: Number, example: 14 })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Listado paginado de solicitudes para revisión administrativa',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Parámetros de consulta inválidos',
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'No autenticado',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Acceso restringido al rol ADMINISTRADORA',
+  })
+  listarSolicitudesAdmin(
+    @Query() query: QuerySolicitudesMaterialDto,
+  ): Promise<any> {
+    return this.inventarioService.listarSolicitudesMaterialAdmin(query);
+  }
 }

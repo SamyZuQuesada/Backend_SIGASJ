@@ -193,6 +193,9 @@ describe('Solicitudes de Materiales por Fontanero (Backlog 4.6) — QA y Pruebas
               if (params?.idFontanero !== undefined) {
                 filterFontanero = Number(params.idFontanero);
               }
+              if (params?.estado !== undefined) {
+                filterEstado = String(params.estado);
+              }
               return builder;
             }),
           andWhere: jest
@@ -221,8 +224,9 @@ describe('Solicitudes de Materiales por Fontanero (Backlog 4.6) — QA y Pruebas
           }),
           getMany: jest.fn().mockImplementation(() => {
             const list = getFiltered();
-            const mapped = list.map((sol) => ({
+              const mapped = list.map((sol) => ({
               ...sol,
+              fontanero: { idUsuario: sol.idFontanero, nombre: `Fontanero ${sol.idFontanero}` },
               detalles: (sol.detalles || []).map((det: any) => ({
                 ...det,
                 material: materialesDb.get(det.idMaterial),
@@ -1040,6 +1044,161 @@ describe('Solicitudes de Materiales por Fontanero (Backlog 4.6) — QA y Pruebas
       expect(res.body).toHaveLength(2);
       expect(res.body[0].id).toBe(sol2.body.id);
       expect(res.body[1].id).toBe(sol1.body.id);
+    });
+  });
+
+  describe('3.7.1 Listado administrativo de solicitudes pendientes', () => {
+    const adminGet = (query = '', token?: string) => {
+      const req = request(app.getHttpServer()).get(
+        `/api/v1/admin/solicitudes-materiales${query}`,
+      );
+      if (token) {
+        req.set('Authorization', `Bearer ${token}`);
+      }
+      return req;
+    };
+
+    it('rechaza con 401 si no hay sesión', async () => {
+      await adminGet().expect(HttpStatus.UNAUTHORIZED);
+    });
+
+    it('rechaza con 403 si el rol es FONTANERO o SECRETARIA', async () => {
+      await adminGet('', signAs(Role.FONTANERO, '7')).expect(
+        HttpStatus.FORBIDDEN,
+      );
+      await adminGet('', signAs(Role.SECRETARIA, '2')).expect(
+        HttpStatus.FORBIDDEN,
+      );
+    });
+
+    it('retorna lista vacía paginada cuando no hay solicitudes pendientes', async () => {
+      const res = await adminGet('', signAs(Role.ADMINISTRADORA, '1')).expect(
+        HttpStatus.OK,
+      );
+
+      expect(res.body.data).toEqual([]);
+      expect(res.body.total).toBe(0);
+      expect(res.body.page).toBe(1);
+      expect(res.body.limit).toBe(10);
+      expect(res.body.totalPages).toBe(0);
+    });
+
+    it('lista solo PENDIENTE con fontanero, fecha, cantidad y avería opcional', async () => {
+      const pendienteConAveria = await request(app.getHttpServer())
+        .post('/api/v1/fontanero/solicitudes-materiales')
+        .set('Authorization', `Bearer ${signAs(Role.FONTANERO, '7')}`)
+        .send({
+          idAveria: 10,
+          materiales: [
+            { idMaterial: 1, cantidad: 2 },
+            { idMaterial: 2, cantidad: 1 },
+          ],
+        })
+        .expect(HttpStatus.CREATED);
+
+      const pendienteSinAveria = await request(app.getHttpServer())
+        .post('/api/v1/fontanero/solicitudes-materiales')
+        .set('Authorization', `Bearer ${signAs(Role.FONTANERO, '8')}`)
+        .send({ materiales: [{ idMaterial: 3, cantidad: 4 }] })
+        .expect(HttpStatus.CREATED);
+
+      const aprobada = await request(app.getHttpServer())
+        .post('/api/v1/fontanero/solicitudes-materiales')
+        .set('Authorization', `Bearer ${signAs(Role.FONTANERO, '7')}`)
+        .send({ materiales: [{ idMaterial: 1, cantidad: 1 }] })
+        .expect(HttpStatus.CREATED);
+
+      solicitudesDb.get(aprobada.body.id)!.estado =
+        EstadoSolicitudMaterial.APROBADA;
+
+      const res = await adminGet('?estado=Pendiente', signAs(Role.ADMINISTRADORA, '1')).expect(
+        HttpStatus.OK,
+      );
+
+      expect(res.body.total).toBe(2);
+      expect(res.body.data).toHaveLength(2);
+      expect(
+        res.body.data.every(
+          (item: { estado: string }) =>
+            item.estado === EstadoSolicitudMaterial.PENDIENTE,
+        ),
+      ).toBe(true);
+
+      const conAveria = res.body.data.find(
+        (item: { id: number }) => item.id === pendienteConAveria.body.id,
+      );
+      const sinAveria = res.body.data.find(
+        (item: { id: number }) => item.id === pendienteSinAveria.body.id,
+      );
+
+      expect(conAveria.fontanero.id).toBe(7);
+      expect(conAveria.cantidadMateriales).toBe(2);
+      expect(conAveria.fechaSolicitud).toBeDefined();
+      expect(conAveria.averia.codigoSeguimiento).toBe('AVR-2026-0010');
+      expect(sinAveria.fontanero.id).toBe(8);
+      expect(sinAveria.averia).toBeNull();
+      expect(res.body.data.map((item: { id: number }) => item.id)).not.toContain(
+        aprobada.body.id,
+      );
+    });
+
+    it('ordena de más reciente a más antigua y pagina', async () => {
+      const primera = await request(app.getHttpServer())
+        .post('/api/v1/fontanero/solicitudes-materiales')
+        .set('Authorization', `Bearer ${signAs(Role.FONTANERO, '7')}`)
+        .send({ materiales: [{ idMaterial: 1, cantidad: 1 }] })
+        .expect(HttpStatus.CREATED);
+
+      const segunda = await request(app.getHttpServer())
+        .post('/api/v1/fontanero/solicitudes-materiales')
+        .set('Authorization', `Bearer ${signAs(Role.FONTANERO, '7')}`)
+        .send({ materiales: [{ idMaterial: 2, cantidad: 1 }] })
+        .expect(HttpStatus.CREATED);
+
+      solicitudesDb.get(primera.body.id)!.fechaSolicitud = new Date(
+        '2026-09-01T10:00:00Z',
+      );
+      solicitudesDb.get(segunda.body.id)!.fechaSolicitud = new Date(
+        '2026-09-12T10:00:00Z',
+      );
+
+      const pagina1 = await adminGet(
+        '?page=1&limit=1',
+        signAs(Role.ADMINISTRADORA, '1'),
+      ).expect(HttpStatus.OK);
+
+      expect(pagina1.body.total).toBe(2);
+      expect(pagina1.body.page).toBe(1);
+      expect(pagina1.body.limit).toBe(1);
+      expect(pagina1.body.totalPages).toBe(2);
+      expect(pagina1.body.data).toHaveLength(1);
+      expect(pagina1.body.data[0].id).toBe(segunda.body.id);
+
+      const pagina2 = await adminGet(
+        '?page=2&limit=1',
+        signAs(Role.ADMINISTRADORA, '1'),
+      ).expect(HttpStatus.OK);
+
+      expect(pagina2.body.data[0].id).toBe(primera.body.id);
+    });
+
+    it('rechaza parámetros inválidos con 400', async () => {
+      await adminGet('?estado=hola', signAs(Role.ADMINISTRADORA, '1')).expect(
+        HttpStatus.BAD_REQUEST,
+      );
+      await adminGet('?page=0', signAs(Role.ADMINISTRADORA, '1')).expect(
+        HttpStatus.BAD_REQUEST,
+      );
+      await adminGet('?limit=abc', signAs(Role.ADMINISTRADORA, '1')).expect(
+        HttpStatus.BAD_REQUEST,
+      );
+    });
+
+    it('también responde en el alias /inventario/admin/solicitudes-materiales', async () => {
+      await request(app.getHttpServer())
+        .get('/api/v1/inventario/admin/solicitudes-materiales')
+        .set('Authorization', `Bearer ${signAs(Role.ADMINISTRADORA, '1')}`)
+        .expect(HttpStatus.OK);
     });
   });
 });
