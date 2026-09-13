@@ -1951,10 +1951,44 @@ export class InventarioService {
     return this.mapSolicitudAdminDecision(persistida ?? solicitud);
   }
 
+  /**
+   * Detalle administrativo de una solicitud (3.7.5).
+   * Incluye materiales, cantidades, unidad y stock actual. No modifica existencias.
+   */
+  async obtenerSolicitudMaterialAdmin(
+    id: number,
+  ): Promise<Record<string, unknown>> {
+    const solicitudRepo =
+      this.solicitudMaterialRepository ??
+      this.materialRepository.manager.getRepository(SolicitudMaterial);
+
+    return withDbRetry(async () => {
+      const solicitud = await solicitudRepo.findOne({
+        where: { id },
+        relations: {
+          averia: true,
+          fontanero: true,
+          usuarioAprobador: true,
+          detalles: { material: true },
+        },
+      });
+
+      if (!solicitud) {
+        throw new NotFoundException(
+          `Solicitud de material con ID ${id} no encontrada`,
+        );
+      }
+
+      return this.mapSolicitudAdminDecision(solicitud);
+    });
+  }
+
   private mapSolicitudAdminDecision(
     solicitud: SolicitudMaterial,
   ): Record<string, unknown> {
     const cantidadMateriales = solicitud.detalles?.length ?? 0;
+    const totalMateriales =
+      solicitud.detalles?.reduce((acc, d) => acc + (d.cantidad || 0), 0) ?? 0;
 
     return {
       id: solicitud.id,
@@ -1969,10 +2003,17 @@ export class InventarioService {
       idAveria: solicitud.idAveria,
       observacion: solicitud.observacion,
       cantidadMateriales,
+      totalMateriales,
       idUsuarioAprobador: solicitud.idUsuarioAprobador,
       fechaRevision: solicitud.fechaRevision,
       motivoRechazo: solicitud.motivoRechazo,
       updatedAt: solicitud.updatedAt,
+      usuarioAprobador: solicitud.idUsuarioAprobador
+        ? {
+            id: solicitud.idUsuarioAprobador,
+            nombre: this.nombreUsuarioResumen(solicitud.usuarioAprobador),
+          }
+        : null,
       averia: solicitud.averia
         ? {
             id: solicitud.averia.id,
@@ -1980,6 +2021,21 @@ export class InventarioService {
             codigoSeguimiento: solicitud.averia.codigoSeguimiento,
           }
         : null,
+      detalles: (solicitud.detalles || []).map((d) => ({
+        id: d.id,
+        idSolicitud: d.idSolicitud,
+        idMaterial: d.idMaterial,
+        cantidad: d.cantidad,
+        observacion: d.observacion,
+        material: d.material
+          ? {
+              id: d.material.id,
+              nombre: d.material.nombre,
+              unidadMedida: d.material.unidadMedida,
+              stockActual: d.material.stockActual,
+            }
+          : null,
+      })),
     };
   }
 

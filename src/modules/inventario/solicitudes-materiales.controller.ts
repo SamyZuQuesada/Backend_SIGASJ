@@ -210,6 +210,41 @@ export class SolicitudesMaterialesController {
     return this.inventarioService.listarSolicitudesMaterialAdmin(query);
   }
 
+  @Get([
+    'admin/solicitudes-materiales/:id',
+    'inventario/admin/solicitudes-materiales/:id',
+  ])
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.ADMINISTRADORA)
+  @ApiOperation({
+    summary: 'Consultar detalle de una solicitud de materiales (Administradora)',
+    description:
+      'Devuelve la solicitud completa con fontanero, avería, materiales, cantidades, ' +
+      'unidad de medida y existencia actual. Solo consulta: no modifica stock.',
+  })
+  @ApiParam({ name: 'id', description: 'ID de la solicitud', type: Number })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Detalle de la solicitud para revisión administrativa',
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'No autenticado',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Acceso restringido al rol ADMINISTRADORA',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Solicitud no encontrada',
+  })
+  obtenerDetalleAdmin(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<any> {
+    return this.inventarioService.obtenerSolicitudMaterialAdmin(id);
+  }
+
   @Patch([
     'admin/solicitudes-materiales/:id/aprobar',
     'inventario/admin/solicitudes-materiales/:id/aprobar',
