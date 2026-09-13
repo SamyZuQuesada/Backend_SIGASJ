@@ -1836,6 +1836,92 @@ export class InventarioService {
     });
   }
 
+  /**
+   * Aprueba una solicitud PENDIENTE (3.7.2).
+   * No modifica stock. Una solicitud ya procesada no puede aprobarse de nuevo.
+   */
+  async aprobarSolicitudMaterialAdmin(
+    id: number,
+    user: AuthenticatedUser,
+  ): Promise<Record<string, unknown>> {
+    const solicitudRepo =
+      this.solicitudMaterialRepository ??
+      this.materialRepository.manager.getRepository(SolicitudMaterial);
+
+    return withDbRetry(async () => {
+      const solicitud = await solicitudRepo.findOne({
+        where: { id },
+        relations: {
+          averia: true,
+          fontanero: true,
+          detalles: { material: true },
+        },
+      });
+
+      if (!solicitud) {
+        throw new NotFoundException(
+          `Solicitud de material con ID ${id} no encontrada`,
+        );
+      }
+
+      if (solicitud.estado !== EstadoSolicitudMaterial.PENDIENTE) {
+        throw new BadRequestException(
+          `Solo se puede aprobar una solicitud en estado PENDIENTE. Estado actual: ${solicitud.estado}`,
+        );
+      }
+
+      solicitud.estado = EstadoSolicitudMaterial.APROBADA;
+      solicitud.fechaRevision = new Date();
+      solicitud.idUsuarioAprobador = Number(user.userId);
+      solicitud.motivoRechazo = null;
+
+      await solicitudRepo.save(solicitud);
+
+      const persistida = await solicitudRepo.findOne({
+        where: { id },
+        relations: {
+          averia: true,
+          fontanero: true,
+          detalles: { material: true },
+        },
+      });
+
+      return this.mapSolicitudAdminDecision(persistida ?? solicitud);
+    });
+  }
+
+  private mapSolicitudAdminDecision(
+    solicitud: SolicitudMaterial,
+  ): Record<string, unknown> {
+    const cantidadMateriales = solicitud.detalles?.length ?? 0;
+
+    return {
+      id: solicitud.id,
+      codigo: solicitud.codigo,
+      fechaSolicitud: solicitud.fechaSolicitud,
+      estado: solicitud.estado,
+      idFontanero: solicitud.idFontanero,
+      fontanero: {
+        id: solicitud.idFontanero,
+        nombre: this.nombreUsuarioResumen(solicitud.fontanero),
+      },
+      idAveria: solicitud.idAveria,
+      observacion: solicitud.observacion,
+      cantidadMateriales,
+      idUsuarioAprobador: solicitud.idUsuarioAprobador,
+      fechaRevision: solicitud.fechaRevision,
+      motivoRechazo: solicitud.motivoRechazo,
+      updatedAt: solicitud.updatedAt,
+      averia: solicitud.averia
+        ? {
+            id: solicitud.averia.id,
+            codigo: solicitud.averia.codigoSeguimiento,
+            codigoSeguimiento: solicitud.averia.codigoSeguimiento,
+          }
+        : null,
+    };
+  }
+
   private nombreUsuarioResumen(usuario: unknown): string | null {
     if (!usuario || typeof usuario !== 'object') {
       return null;

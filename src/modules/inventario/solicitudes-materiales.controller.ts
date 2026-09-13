@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -206,5 +207,45 @@ export class SolicitudesMaterialesController {
     @Query() query: QuerySolicitudesMaterialDto,
   ): Promise<any> {
     return this.inventarioService.listarSolicitudesMaterialAdmin(query);
+  }
+
+  @Patch([
+    'admin/solicitudes-materiales/:id/aprobar',
+    'inventario/admin/solicitudes-materiales/:id/aprobar',
+  ])
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.ADMINISTRADORA)
+  @ApiOperation({
+    summary: 'Aprobar una solicitud de materiales (Administradora)',
+    description:
+      'Cambia una solicitud PENDIENTE a APROBADA. Registra fecha y responsable. ' +
+      'No modifica las existencias del inventario.',
+  })
+  @ApiParam({ name: 'id', description: 'ID de la solicitud', type: Number })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Solicitud aprobada',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'La solicitud no está en estado PENDIENTE',
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'No autenticado',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Acceso restringido al rol ADMINISTRADORA',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Solicitud no encontrada',
+  })
+  aprobarSolicitud(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<any> {
+    return this.inventarioService.aprobarSolicitudMaterialAdmin(id, user);
   }
 }
