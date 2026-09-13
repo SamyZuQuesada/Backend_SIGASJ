@@ -1864,20 +1864,30 @@ export class InventarioService {
         );
       }
 
-      if (solicitud.estado !== EstadoSolicitudMaterial.PENDIENTE) {
-        throw new BadRequestException(
-          `Solo se puede aprobar una solicitud en estado PENDIENTE. Estado actual: ${solicitud.estado}`,
-        );
-      }
+      return this.aplicarDecisionSolicitudAdmin(
+        solicitudRepo,
+        solicitud,
+        user,
+        EstadoSolicitudMaterial.APROBADA,
+      );
+    });
+  }
 
-      solicitud.estado = EstadoSolicitudMaterial.APROBADA;
-      solicitud.fechaRevision = new Date();
-      solicitud.idUsuarioAprobador = Number(user.userId);
-      solicitud.motivoRechazo = null;
+  /**
+   * Rechaza una solicitud PENDIENTE (3.7.3).
+   * Motivo opcional. No modifica stock. Una solicitud ya procesada no se reabre.
+   */
+  async rechazarSolicitudMaterialAdmin(
+    id: number,
+    user: AuthenticatedUser,
+    motivoRechazo?: string,
+  ): Promise<Record<string, unknown>> {
+    const solicitudRepo =
+      this.solicitudMaterialRepository ??
+      this.materialRepository.manager.getRepository(SolicitudMaterial);
 
-      await solicitudRepo.save(solicitud);
-
-      const persistida = await solicitudRepo.findOne({
+    return withDbRetry(async () => {
+      const solicitud = await solicitudRepo.findOne({
         where: { id },
         relations: {
           averia: true,
@@ -1886,8 +1896,59 @@ export class InventarioService {
         },
       });
 
-      return this.mapSolicitudAdminDecision(persistida ?? solicitud);
+      if (!solicitud) {
+        throw new NotFoundException(
+          `Solicitud de material con ID ${id} no encontrada`,
+        );
+      }
+
+      return this.aplicarDecisionSolicitudAdmin(
+        solicitudRepo,
+        solicitud,
+        user,
+        EstadoSolicitudMaterial.RECHAZADA,
+        motivoRechazo,
+      );
     });
+  }
+
+  private async aplicarDecisionSolicitudAdmin(
+    solicitudRepo: Repository<SolicitudMaterial>,
+    solicitud: SolicitudMaterial,
+    user: AuthenticatedUser,
+    estadoDestino: EstadoSolicitudMaterial,
+    motivoRechazo?: string,
+  ): Promise<Record<string, unknown>> {
+    if (solicitud.estado !== EstadoSolicitudMaterial.PENDIENTE) {
+      const accion =
+        estadoDestino === EstadoSolicitudMaterial.APROBADA
+          ? 'aprobar'
+          : 'rechazar';
+      throw new BadRequestException(
+        `Solo se puede ${accion} una solicitud en estado PENDIENTE. Estado actual: ${solicitud.estado}`,
+      );
+    }
+
+    solicitud.estado = estadoDestino;
+    solicitud.fechaRevision = new Date();
+    solicitud.idUsuarioAprobador = Number(user.userId);
+    solicitud.motivoRechazo =
+      estadoDestino === EstadoSolicitudMaterial.RECHAZADA
+        ? motivoRechazo?.trim() || null
+        : null;
+
+    await solicitudRepo.save(solicitud);
+
+    const persistida = await solicitudRepo.findOne({
+      where: { id: solicitud.id },
+      relations: {
+        averia: true,
+        fontanero: true,
+        detalles: { material: true },
+      },
+    });
+
+    return this.mapSolicitudAdminDecision(persistida ?? solicitud);
   }
 
   private mapSolicitudAdminDecision(

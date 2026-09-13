@@ -1298,4 +1298,104 @@ describe('Solicitudes de Materiales por Fontanero (Backlog 4.6) — QA y Pruebas
       );
     });
   });
+
+  describe('3.7.3 Rechazar solicitud de materiales', () => {
+    const adminRechazar = (
+      id: number | string,
+      token?: string,
+      body?: Record<string, unknown>,
+    ) => {
+      const req = request(app.getHttpServer()).patch(
+        `/api/v1/admin/solicitudes-materiales/${id}/rechazar`,
+      );
+      if (token) {
+        req.set('Authorization', `Bearer ${token}`);
+      }
+      if (body) {
+        req.send(body);
+      }
+      return req;
+    };
+
+    it('rechaza con 401 si no hay sesión', async () => {
+      await adminRechazar(1).expect(HttpStatus.UNAUTHORIZED);
+    });
+
+    it('rechaza con 403 si el rol no es Administradora', async () => {
+      await adminRechazar(1, signAs(Role.FONTANERO, '7')).expect(
+        HttpStatus.FORBIDDEN,
+      );
+    });
+
+    it('rechaza una solicitud PENDIENTE con motivo opcional y sin cambiar stock', async () => {
+      const stockAntes = materialesDb.get(2)!.stockActual;
+      const creada = await request(app.getHttpServer())
+        .post('/api/v1/fontanero/solicitudes-materiales')
+        .set('Authorization', `Bearer ${signAs(Role.FONTANERO, '7')}`)
+        .send({ materiales: [{ idMaterial: 2, cantidad: 3 }] })
+        .expect(HttpStatus.CREATED);
+
+      const res = await adminRechazar(
+        creada.body.id,
+        signAs(Role.ADMINISTRADORA, '1'),
+        { motivoRechazo: 'Material no justificado' },
+      ).expect(HttpStatus.OK);
+
+      expect(res.body.estado).toBe(EstadoSolicitudMaterial.RECHAZADA);
+      expect(res.body.motivoRechazo).toBe('Material no justificado');
+      expect(res.body.idUsuarioAprobador).toBe(1);
+      expect(res.body.fechaRevision).toBeDefined();
+      expect(materialesDb.get(2)!.stockActual).toBe(stockAntes);
+
+      const pendientes = await request(app.getHttpServer())
+        .get('/api/v1/admin/solicitudes-materiales')
+        .set('Authorization', `Bearer ${signAs(Role.ADMINISTRADORA, '1')}`)
+        .expect(HttpStatus.OK);
+
+      expect(
+        pendientes.body.data.map((item: { id: number }) => item.id),
+      ).not.toContain(creada.body.id);
+    });
+
+    it('permite rechazar sin motivo y no reabre solicitudes ya procesadas', async () => {
+      const pendiente = await request(app.getHttpServer())
+        .post('/api/v1/fontanero/solicitudes-materiales')
+        .set('Authorization', `Bearer ${signAs(Role.FONTANERO, '7')}`)
+        .send({ materiales: [{ idMaterial: 1, cantidad: 1 }] })
+        .expect(HttpStatus.CREATED);
+
+      const res = await adminRechazar(
+        pendiente.body.id,
+        signAs(Role.ADMINISTRADORA, '1'),
+      ).expect(HttpStatus.OK);
+
+      expect(res.body.estado).toBe(EstadoSolicitudMaterial.RECHAZADA);
+      expect(res.body.motivoRechazo).toBeNull();
+
+      await adminRechazar(
+        pendiente.body.id,
+        signAs(Role.ADMINISTRADORA, '1'),
+      ).expect(HttpStatus.BAD_REQUEST);
+
+      const aprobada = await request(app.getHttpServer())
+        .post('/api/v1/fontanero/solicitudes-materiales')
+        .set('Authorization', `Bearer ${signAs(Role.FONTANERO, '7')}`)
+        .send({ materiales: [{ idMaterial: 1, cantidad: 1 }] })
+        .expect(HttpStatus.CREATED);
+
+      solicitudesDb.get(aprobada.body.id)!.estado =
+        EstadoSolicitudMaterial.APROBADA;
+
+      await adminRechazar(
+        aprobada.body.id,
+        signAs(Role.ADMINISTRADORA, '1'),
+      ).expect(HttpStatus.BAD_REQUEST);
+    });
+
+    it('devuelve 404 si la solicitud no existe', async () => {
+      await adminRechazar(999, signAs(Role.ADMINISTRADORA, '1')).expect(
+        HttpStatus.NOT_FOUND,
+      );
+    });
+  });
 });
