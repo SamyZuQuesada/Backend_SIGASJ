@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -26,6 +27,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { QuerySolicitudesMaterialDto } from './dto/query-solicitudes-material.dto';
+import { RechazarSolicitudMaterialDto } from './dto/rechazar-solicitud-material.dto';
 import { RegistrarSolicitudMaterialDto } from './dto/registrar-solicitud-material.dto';
 import { SolicitudMaterial } from './entities/solicitud-material.entity';
 import { InventarioService } from './inventario.service';
@@ -163,5 +165,168 @@ export class SolicitudesMaterialesController {
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<any> {
     return this.inventarioService.obtenerSolicitudMaterialFontanero(id, user);
+  }
+
+  @Get([
+    'admin/solicitudes-materiales',
+    'inventario/admin/solicitudes-materiales',
+  ])
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.ADMINISTRADORA)
+  @ApiOperation({
+    summary: 'Listar solicitudes de materiales pendientes (Administradora)',
+    description:
+      'Consulta administrativa de solicitudes en estado PENDIENTE (o el estado indicado). ' +
+      'Incluye fontanero, fecha, cantidad de materiales y avería relacionada. No modifica stock.',
+  })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  @ApiQuery({
+    name: 'estado',
+    required: false,
+    enum: EstadoSolicitudMaterial,
+    example: EstadoSolicitudMaterial.PENDIENTE,
+  })
+  @ApiQuery({ name: 'idAveria', required: false, type: Number, example: 14 })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Listado paginado de solicitudes para revisión administrativa',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Parámetros de consulta inválidos',
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'No autenticado',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Acceso restringido al rol ADMINISTRADORA',
+  })
+  listarSolicitudesAdmin(
+    @Query() query: QuerySolicitudesMaterialDto,
+  ): Promise<any> {
+    return this.inventarioService.listarSolicitudesMaterialAdmin(query);
+  }
+
+  @Get([
+    'admin/solicitudes-materiales/:id',
+    'inventario/admin/solicitudes-materiales/:id',
+  ])
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.ADMINISTRADORA)
+  @ApiOperation({
+    summary: 'Consultar detalle de una solicitud de materiales (Administradora)',
+    description:
+      'Devuelve la solicitud completa con fontanero, avería, materiales, cantidades, ' +
+      'unidad de medida y existencia actual. Solo consulta: no modifica stock.',
+  })
+  @ApiParam({ name: 'id', description: 'ID de la solicitud', type: Number })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Detalle de la solicitud para revisión administrativa',
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'No autenticado',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Acceso restringido al rol ADMINISTRADORA',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Solicitud no encontrada',
+  })
+  obtenerDetalleAdmin(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<any> {
+    return this.inventarioService.obtenerSolicitudMaterialAdmin(id);
+  }
+
+  @Patch([
+    'admin/solicitudes-materiales/:id/aprobar',
+    'inventario/admin/solicitudes-materiales/:id/aprobar',
+  ])
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.ADMINISTRADORA)
+  @ApiOperation({
+    summary: 'Aprobar una solicitud de materiales (Administradora)',
+    description:
+      'Cambia una solicitud PENDIENTE a APROBADA. Registra fecha y responsable. ' +
+      'No modifica las existencias del inventario.',
+  })
+  @ApiParam({ name: 'id', description: 'ID de la solicitud', type: Number })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Solicitud aprobada',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'La solicitud no está en estado PENDIENTE',
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'No autenticado',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Acceso restringido al rol ADMINISTRADORA',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Solicitud no encontrada',
+  })
+  aprobarSolicitud(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<any> {
+    return this.inventarioService.aprobarSolicitudMaterialAdmin(id, user);
+  }
+
+  @Patch([
+    'admin/solicitudes-materiales/:id/rechazar',
+    'inventario/admin/solicitudes-materiales/:id/rechazar',
+  ])
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.ADMINISTRADORA)
+  @ApiOperation({
+    summary: 'Rechazar una solicitud de materiales (Administradora)',
+    description:
+      'Cambia una solicitud PENDIENTE a RECHAZADA. El motivo es opcional. ' +
+      'Registra fecha y responsable. No modifica las existencias del inventario.',
+  })
+  @ApiParam({ name: 'id', description: 'ID de la solicitud', type: Number })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Solicitud rechazada',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'La solicitud no está en estado PENDIENTE',
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'No autenticado',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Acceso restringido al rol ADMINISTRADORA',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Solicitud no encontrada',
+  })
+  rechazarSolicitud(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: RechazarSolicitudMaterialDto = new RechazarSolicitudMaterialDto(),
+  ): Promise<any> {
+    return this.inventarioService.rechazarSolicitudMaterialAdmin(
+      id,
+      user,
+      dto.motivoRechazo,
+    );
   }
 }

@@ -1754,6 +1754,306 @@ export class InventarioService {
   }
 
   /**
+   * Listado administrativo de solicitudes de materiales (3.7.1).
+   * Por defecto muestra solo PENDIENTE. No modifica stock.
+   */
+  async listarSolicitudesMaterialAdmin(
+    query?: QuerySolicitudesMaterialDto,
+  ): Promise<{
+    data: Record<string, unknown>[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const solicitudRepo =
+      this.solicitudMaterialRepository ??
+      this.materialRepository.manager.getRepository(SolicitudMaterial);
+
+    const estado = query?.estado ?? EstadoSolicitudMaterial.PENDIENTE;
+    const take = query?.limit && query.limit > 0 ? Number(query.limit) : 10;
+    const pageNum = query?.page && query.page > 0 ? Number(query.page) : 1;
+
+    return withDbRetry(async () => {
+      const qb = solicitudRepo
+        .createQueryBuilder('solicitud')
+        .leftJoinAndSelect('solicitud.averia', 'averia')
+        .leftJoinAndSelect('solicitud.fontanero', 'fontanero')
+        .leftJoinAndSelect('solicitud.detalles', 'detalles')
+        .leftJoinAndSelect('detalles.material', 'material')
+        .where('solicitud.estado = :estado', { estado });
+
+      const averiaFiltro = query?.idAveria ?? query?.averiaId;
+      if (averiaFiltro) {
+        qb.andWhere('solicitud.idAveria = :idAveria', {
+          idAveria: averiaFiltro,
+        });
+      }
+
+      qb.orderBy('solicitud.fechaSolicitud', 'DESC').addOrderBy(
+        'solicitud.id',
+        'DESC',
+      );
+
+      const total = await qb.getCount();
+      const skip = (pageNum - 1) * take;
+      qb.skip(skip).take(take);
+      const solicitudes = await qb.getMany();
+
+      const data = solicitudes.map((sol) => {
+        const cantidadMateriales = sol.detalles?.length ?? 0;
+        const fontaneroNombre = this.nombreUsuarioResumen(sol.fontanero);
+
+        return {
+          id: sol.id,
+          codigo: sol.codigo,
+          fechaSolicitud: sol.fechaSolicitud,
+          estado: sol.estado,
+          idFontanero: sol.idFontanero,
+          fontanero: {
+            id: sol.idFontanero,
+            nombre: fontaneroNombre,
+          },
+          idAveria: sol.idAveria,
+          cantidadMateriales,
+          averia: sol.averia
+            ? {
+                id: sol.averia.id,
+                codigo: sol.averia.codigoSeguimiento,
+                codigoSeguimiento: sol.averia.codigoSeguimiento,
+              }
+            : null,
+        };
+      });
+
+      return {
+        data,
+        total,
+        page: pageNum,
+        limit: take,
+        totalPages: Math.ceil(total / take) || 0,
+      };
+    });
+  }
+
+  /**
+   * Aprueba una solicitud PENDIENTE (3.7.2).
+   * No modifica stock. Una solicitud ya procesada no puede aprobarse de nuevo.
+   */
+  async aprobarSolicitudMaterialAdmin(
+    id: number,
+    user: AuthenticatedUser,
+  ): Promise<Record<string, unknown>> {
+    const solicitudRepo =
+      this.solicitudMaterialRepository ??
+      this.materialRepository.manager.getRepository(SolicitudMaterial);
+
+    return withDbRetry(async () => {
+      const solicitud = await solicitudRepo.findOne({
+        where: { id },
+        relations: {
+          averia: true,
+          fontanero: true,
+          detalles: { material: true },
+        },
+      });
+
+      if (!solicitud) {
+        throw new NotFoundException(
+          `Solicitud de material con ID ${id} no encontrada`,
+        );
+      }
+
+      return this.aplicarDecisionSolicitudAdmin(
+        solicitudRepo,
+        solicitud,
+        user,
+        EstadoSolicitudMaterial.APROBADA,
+      );
+    });
+  }
+
+  /**
+   * Rechaza una solicitud PENDIENTE (3.7.3).
+   * Motivo opcional. No modifica stock. Una solicitud ya procesada no se reabre.
+   */
+  async rechazarSolicitudMaterialAdmin(
+    id: number,
+    user: AuthenticatedUser,
+    motivoRechazo?: string,
+  ): Promise<Record<string, unknown>> {
+    const solicitudRepo =
+      this.solicitudMaterialRepository ??
+      this.materialRepository.manager.getRepository(SolicitudMaterial);
+
+    return withDbRetry(async () => {
+      const solicitud = await solicitudRepo.findOne({
+        where: { id },
+        relations: {
+          averia: true,
+          fontanero: true,
+          detalles: { material: true },
+        },
+      });
+
+      if (!solicitud) {
+        throw new NotFoundException(
+          `Solicitud de material con ID ${id} no encontrada`,
+        );
+      }
+
+      return this.aplicarDecisionSolicitudAdmin(
+        solicitudRepo,
+        solicitud,
+        user,
+        EstadoSolicitudMaterial.RECHAZADA,
+        motivoRechazo,
+      );
+    });
+  }
+
+  private async aplicarDecisionSolicitudAdmin(
+    solicitudRepo: Repository<SolicitudMaterial>,
+    solicitud: SolicitudMaterial,
+    user: AuthenticatedUser,
+    estadoDestino: EstadoSolicitudMaterial,
+    motivoRechazo?: string,
+  ): Promise<Record<string, unknown>> {
+    if (solicitud.estado !== EstadoSolicitudMaterial.PENDIENTE) {
+      const accion =
+        estadoDestino === EstadoSolicitudMaterial.APROBADA
+          ? 'aprobar'
+          : 'rechazar';
+      throw new BadRequestException(
+        `Solo se puede ${accion} una solicitud en estado PENDIENTE. Estado actual: ${solicitud.estado}`,
+      );
+    }
+
+    solicitud.estado = estadoDestino;
+    solicitud.fechaRevision = new Date();
+    solicitud.idUsuarioAprobador = Number(user.userId);
+    solicitud.motivoRechazo =
+      estadoDestino === EstadoSolicitudMaterial.RECHAZADA
+        ? motivoRechazo?.trim() || null
+        : null;
+
+    await solicitudRepo.save(solicitud);
+
+    const persistida = await solicitudRepo.findOne({
+      where: { id: solicitud.id },
+      relations: {
+        averia: true,
+        fontanero: true,
+        detalles: { material: true },
+      },
+    });
+
+    return this.mapSolicitudAdminDecision(persistida ?? solicitud);
+  }
+
+  /**
+   * Detalle administrativo de una solicitud (3.7.5).
+   * Incluye materiales, cantidades, unidad y stock actual. No modifica existencias.
+   */
+  async obtenerSolicitudMaterialAdmin(
+    id: number,
+  ): Promise<Record<string, unknown>> {
+    const solicitudRepo =
+      this.solicitudMaterialRepository ??
+      this.materialRepository.manager.getRepository(SolicitudMaterial);
+
+    return withDbRetry(async () => {
+      const solicitud = await solicitudRepo.findOne({
+        where: { id },
+        relations: {
+          averia: true,
+          fontanero: true,
+          usuarioAprobador: true,
+          detalles: { material: true },
+        },
+      });
+
+      if (!solicitud) {
+        throw new NotFoundException(
+          `Solicitud de material con ID ${id} no encontrada`,
+        );
+      }
+
+      return this.mapSolicitudAdminDecision(solicitud);
+    });
+  }
+
+  private mapSolicitudAdminDecision(
+    solicitud: SolicitudMaterial,
+  ): Record<string, unknown> {
+    const cantidadMateriales = solicitud.detalles?.length ?? 0;
+    const totalMateriales =
+      solicitud.detalles?.reduce((acc, d) => acc + (d.cantidad || 0), 0) ?? 0;
+
+    return {
+      id: solicitud.id,
+      codigo: solicitud.codigo,
+      fechaSolicitud: solicitud.fechaSolicitud,
+      estado: solicitud.estado,
+      idFontanero: solicitud.idFontanero,
+      fontanero: {
+        id: solicitud.idFontanero,
+        nombre: this.nombreUsuarioResumen(solicitud.fontanero),
+      },
+      idAveria: solicitud.idAveria,
+      observacion: solicitud.observacion,
+      cantidadMateriales,
+      totalMateriales,
+      idUsuarioAprobador: solicitud.idUsuarioAprobador,
+      fechaRevision: solicitud.fechaRevision,
+      motivoRechazo: solicitud.motivoRechazo,
+      updatedAt: solicitud.updatedAt,
+      usuarioAprobador: solicitud.idUsuarioAprobador
+        ? {
+            id: solicitud.idUsuarioAprobador,
+            nombre: this.nombreUsuarioResumen(solicitud.usuarioAprobador),
+          }
+        : null,
+      averia: solicitud.averia
+        ? {
+            id: solicitud.averia.id,
+            codigo: solicitud.averia.codigoSeguimiento,
+            codigoSeguimiento: solicitud.averia.codigoSeguimiento,
+          }
+        : null,
+      detalles: (solicitud.detalles || []).map((d) => ({
+        id: d.id,
+        idSolicitud: d.idSolicitud,
+        idMaterial: d.idMaterial,
+        cantidad: d.cantidad,
+        observacion: d.observacion,
+        material: d.material
+          ? {
+              id: d.material.id,
+              nombre: d.material.nombre,
+              unidadMedida: d.material.unidadMedida,
+              stockActual: d.material.stockActual,
+            }
+          : null,
+      })),
+    };
+  }
+
+  private nombreUsuarioResumen(usuario: unknown): string | null {
+    if (!usuario || typeof usuario !== 'object') {
+      return null;
+    }
+    const record = usuario as Record<string, unknown>;
+    const partes = [record.nombre, record.name, record.apellidos, record.lastName]
+      .filter((value): value is string => typeof value === 'string' && value.trim() !== '')
+      .map((value) => value.trim());
+    if (partes.length === 0) {
+      return null;
+    }
+    return [...new Set(partes)].join(' ');
+  }
+
+  /**
    * Obtiene el detalle de una solicitud de material específica para el Fontanero autenticado.
    */
   async obtenerSolicitudMaterialFontanero(
