@@ -1,52 +1,97 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { LoginDto } from './dto/login.dto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { Role } from '../../common/enums/role.enum';
 import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
+import { LoginDto } from './dto/login.dto';
+import { verifyPassword } from './password.util';
+import { Usuario } from '../usuarios/entities/usuario.entity';
+
+const CREDENCIALES_INVALIDAS = 'Credenciales inválidas';
+const USUARIO_INACTIVO = 'El usuario se encuentra inactivo.';
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly jwtService: JwtService) {}
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+    @InjectRepository(Usuario)
+    private readonly usuarioRepository: Repository<Usuario>,
+  ) {}
 
-  login(loginDto: LoginDto) {
-    // La validación real contra entidad de Usuario se integrará con el backlog correspondiente.
-    const { email, password } = loginDto;
+  private devLoginWithoutPassword(): boolean {
+    return (
+      this.configService.get<boolean>('auth.devLoginWithoutPassword') === true
+    );
+  }
 
-    // Validación base para la infraestructura de Auth
-    if (!email || !password) {
-      throw new UnauthorizedException('Credenciales inválidas');
+  async login(loginDto: LoginDto) {
+    const correo = loginDto.email.trim().toLowerCase();
+    const devSinPassword = this.devLoginWithoutPassword();
+    const qb = this.usuarioRepository
+      .createQueryBuilder('usuario')
+      .leftJoinAndSelect('usuario.rol', 'rol')
+      .where('LOWER(usuario.correo) = :correo', { correo });
+
+    if (!devSinPassword) {
+      qb.addSelect('usuario.passwordHash');
+    }
+
+    const usuario = await qb.getOne();
+
+    if (!usuario) {
+      throw new UnauthorizedException(CREDENCIALES_INVALIDAS);
+    }
+
+    if (!devSinPassword) {
+      if (!usuario.passwordHash) {
+        throw new UnauthorizedException(CREDENCIALES_INVALIDAS);
+      }
+
+      const passwordOk = await verifyPassword(
+        loginDto.password,
+        usuario.passwordHash,
+      );
+      if (!passwordOk) {
+        throw new UnauthorizedException(CREDENCIALES_INVALIDAS);
+      }
+    }
+
+    if (!usuario.activo) {
+      throw new UnauthorizedException(USUARIO_INACTIVO);
+    }
+
+    const role = this.asRole(usuario.rol?.nombre);
+    if (!role) {
+      throw new UnauthorizedException(CREDENCIALES_INVALIDAS);
     }
 
     const payload: JwtPayload = {
-      sub: 'demo-user-id',
-      email,
-      role: this.resolveDemoRole(email),
-      name: 'Usuario Administrador',
+      sub: usuario.idUsuario,
+      email: usuario.correo,
+      role,
+      name: usuario.nombre,
     };
 
     return {
       accessToken: this.jwtService.sign(payload),
       user: {
-        id: payload.sub,
-        email: payload.email,
-        role: payload.role,
-        name: payload.name,
+        id: usuario.idUsuario,
+        email: usuario.correo,
+        role,
+        name: usuario.nombre,
       },
     };
   }
 
-  /**
-   * Login demo: el rol sale del correo. El login de Abonado sigue como
-   * Administradora para no cambiar el contrato de las pruebas e2e actuales.
-   */
-  private resolveDemoRole(email: string): Role {
-    const normalized = email.trim().toLowerCase();
-    if (normalized.includes('secretaria')) {
-      return Role.SECRETARIA;
+  private asRole(nombre: string | undefined): Role | null {
+    if (!nombre) {
+      return null;
     }
-    if (normalized.includes('fontanero')) {
-      return Role.FONTANERO;
-    }
-    return Role.ADMINISTRADORA;
+    return (Object.values(Role) as string[]).includes(nombre)
+      ? (nombre as Role)
+      : null;
   }
 }

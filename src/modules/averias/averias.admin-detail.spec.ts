@@ -13,7 +13,13 @@ import { HttpExceptionFilter } from '../../common/filters/http-exception.filter'
 import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
 import jwtConfig from '../../config/jwt.config';
 import { AuthModule } from '../auth/auth.module';
+import { Rol } from '../usuarios/entities/rol.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
+import {
+  crearUsuarioPrueba,
+  seedRolesBase,
+  seedStaffLoginUsers,
+} from '../usuarios/usuarios.test-helpers';
 import { AveriasModule } from './averias.module';
 import {
   AVERIA_ADMIN_NOT_FOUND,
@@ -36,9 +42,12 @@ describe('GET /api/v1/admin/averias/:id — detalle administrativo', () => {
   let jwtService: JwtService;
   let averias: Repository<Averia>;
   let usuarios: Repository<Usuario>;
+  let rolesMap: Record<Role, Rol>;
   let adminToken: string;
   let secretariaToken: string;
   let fontaneroId: number;
+  let fontaneroNombre: string;
+  let usuarioSeq = 0;
 
   const signAs = (role: Role, sub = '1') => {
     const payload: JwtPayload = {
@@ -119,7 +128,7 @@ describe('GET /api/v1/admin/averias/:id — detalle administrativo', () => {
           type: 'sqljs',
           autoSave: false,
           dropSchema: true,
-          entities: [Averia, Usuario],
+          entities: [Averia, Usuario, Rol],
           synchronize: true,
         }),
         AuthModule,
@@ -144,6 +153,8 @@ describe('GET /api/v1/admin/averias/:id — detalle administrativo', () => {
     const dataSource = moduleFixture.get(DataSource);
     averias = dataSource.getRepository(Averia);
     usuarios = dataSource.getRepository(Usuario);
+    rolesMap = await seedRolesBase(dataSource.getRepository(Rol));
+    await seedStaffLoginUsers(usuarios, rolesMap);
 
     const adminLogin = await request(app.getHttpServer())
       .post('/api/v1/auth/login')
@@ -169,8 +180,14 @@ describe('GET /api/v1/admin/averias/:id — detalle administrativo', () => {
   beforeEach(async () => {
     await averias.clear();
     await usuarios.clear();
-    const fontanero = await usuarios.save(usuarios.create({}));
+    usuarioSeq += 1;
+    const fontanero = await crearUsuarioPrueba(usuarios, rolesMap, {
+      nombre: 'Carlos Pérez',
+      correo: `fontanero.det.${usuarioSeq}.${Date.now()}@asadasanjuan.cr`,
+      role: Role.FONTANERO,
+    });
     fontaneroId = fontanero.idUsuario;
+    fontaneroNombre = fontanero.nombre;
   });
 
   it('Administradora recibe 200 con avería recién recibida y nulls administrativos', async () => {
@@ -245,7 +262,7 @@ describe('GET /api/v1/admin/averias/:id — detalle administrativo', () => {
       descripcion: LONG_DESCRIPTION,
       tipoAveria: 'TUBERIA',
       prioridad: 'ALTA',
-      fontanero: { id: fontaneroId },
+      fontanero: { id: fontaneroId, nombre: fontaneroNombre },
       observacionesAtencion: 'Se reemplazó el tramo afectado.',
     });
     expect(
@@ -263,7 +280,10 @@ describe('GET /api/v1/admin/averias/:id — detalle administrativo', () => {
     expect(body).not.toHaveProperty('password');
     expect(body).not.toHaveProperty('passwordHash');
     expect(body).not.toHaveProperty('refreshToken');
-    expect(body.fontanero).toEqual({ id: fontaneroId });
+    expect(body.fontanero).toEqual({
+      id: fontaneroId,
+      nombre: fontaneroNombre,
+    });
     expect(body.abonado).toEqual({ id: 14 });
   });
 
@@ -277,7 +297,10 @@ describe('GET /api/v1/admin/averias/:id — detalle administrativo', () => {
     });
     const body = (await getDetalle(saved.id, adminToken).expect(200))
       .body as AveriaAdminDetail;
-    expect(body.fontanero).toEqual({ id: fontaneroId });
+    expect(body.fontanero).toEqual({
+      id: fontaneroId,
+      nombre: fontaneroNombre,
+    });
     expect(body.fechaAsignacion).toBeTruthy();
     expect(body.fechaInicioAtencion).toBeNull();
     expect(body.fechaResolucion).toBeNull();
@@ -294,7 +317,10 @@ describe('GET /api/v1/admin/averias/:id — detalle administrativo', () => {
     });
     const body = (await getDetalle(saved.id, adminToken).expect(200))
       .body as AveriaAdminDetail;
-    expect(body.fontanero).toEqual({ id: fontaneroId });
+    expect(body.fontanero).toEqual({
+      id: fontaneroId,
+      nombre: fontaneroNombre,
+    });
     expect(body.tipoAveria).toBe('TUBERIA');
     expect(body.prioridad).toBe('ALTA');
     expect(body.fechaInicioAtencion).toBeTruthy();
@@ -372,7 +398,14 @@ describe('GET /api/v1/admin/averias/:id — detalle administrativo', () => {
     expect(response.body).not.toHaveProperty('fontanero');
   });
 
-  it('no hay estados oficiales Asignada/En atención/Resuelta en EstadoAveria', () => {
-    expect(Object.values(EstadoAveria)).toEqual([EstadoAveria.RECIBIDA]);
+  it('el detalle expone estados administrativos persistidos', async () => {
+    const saved = await persist({
+      codigoSeguimiento: 'AV-DET-EST',
+      estado: EstadoAveria.EN_REVISION,
+    });
+    const response = await getDetalle(saved.id, adminToken).expect(200);
+    expect((response.body as AveriaAdminDetail).estado).toBe(
+      EstadoAveria.EN_REVISION,
+    );
   });
 });

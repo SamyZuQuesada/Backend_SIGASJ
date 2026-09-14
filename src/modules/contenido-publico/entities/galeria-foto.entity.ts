@@ -2,7 +2,7 @@ import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity('GaleriaFoto')
 export class GaleriaFoto {
-  @PrimaryGeneratedColumn()
+  @PrimaryGeneratedColumn({ name: 'idGaleriaFoto' })
   id: number;
 
   @Column({ type: 'varchar', length: 150, nullable: true })
@@ -11,7 +11,7 @@ export class GaleriaFoto {
   @Column({ type: 'varchar', length: 500, nullable: true })
   descripcion: string | null;
 
-  @Column({ type: 'varchar', length: 500 })
+  @Column({ name: 'imagenUrl', type: 'varchar', length: 500 })
   url: string;
 
   @Column({ type: 'varchar', length: 255 })
@@ -20,6 +20,6 @@ export class GaleriaFoto {
   @Column({ type: 'int', default: 0 })
   ordenVisualizacion: number;
 
-  @Column({ default: true })
+  @Column({ name: 'activo', default: true })
   activa: boolean;
 }

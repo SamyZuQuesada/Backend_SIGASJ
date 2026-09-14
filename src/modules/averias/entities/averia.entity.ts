@@ -27,8 +27,8 @@ import { Usuario } from '../../usuarios/entities/usuario.entity';
  * - No existe entidad `Abonado` ni catálogos `TipoAveria`/`PrioridadAveria`.
  *   `idAbonado`, `tipoAveria` y `prioridad` quedan como columnas compatibles
  *   (enteros/texto nulos) hasta esas tareas.
- * - El Fontanero se representa con `Usuario` + rol FONTANERO. La entidad no
- *   valida el rol; eso corresponde al service de asignación.
+ * - El Fontanero se representa con `Usuario.idUsuario` y rol persistido FONTANERO.
+ *   Varios usuarios pueden compartir el mismo Rol. Una Avería tiene un solo Fontanero.
  */
 @Entity('Averia')
 export class Averia {

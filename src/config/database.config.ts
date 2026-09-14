@@ -78,7 +78,8 @@ export default registerAs('database', (): TypeOrmModuleOptions => {
     host,
     database,
     entities: [__dirname + '/../**/*.entity{.ts,.js}'],
-    synchronize: process.env.NODE_ENV !== 'production',
+    // El esquema se aplica con `npm run migration:run`, no con synchronize.
+    synchronize: false,
     migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
     migrationsRun: false,
     logging: process.env.NODE_ENV === 'development',
