@@ -87,6 +87,11 @@ async function bootstrap() {
   await app.listen(port);
 
   const logger = new Logger('Bootstrap');
+  if (configService.get<boolean>('auth.devLoginWithoutPassword') === true) {
+    logger.warn(
+      'Modo desarrollo: POST /auth/login no valida contraseña (AUTH_REQUIRE_PASSWORD=true para exigirla).',
+    );
+  }
   logger.log(
     `🚀 Servidor Backend SIGASJ corriendo en http://localhost:${port}/api/v1`,
   );

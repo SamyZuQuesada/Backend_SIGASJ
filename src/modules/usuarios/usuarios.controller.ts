@@ -15,7 +15,11 @@ export class UsuariosController {
 
   @Get()
   @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
-  @ApiOperation({ summary: 'Obtener lista de usuarios del sistema' })
+  @ApiOperation({
+    summary: 'Obtener lista de usuarios del sistema',
+    description:
+      'Devuelve `{ data: [{ id, nombre, correo, activo, rol }] }`. El rol es el nombre persistido en Rol (ADMINISTRADORA, SECRETARIA, FONTANERO, ABONADO). No incluye passwordHash ni secretos.',
+  })
   findAll() {
     return this.usuariosService.findAll();
   }

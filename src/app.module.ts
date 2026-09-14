@@ -7,6 +7,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import environmentConfig from './config/environment.config';
 import databaseConfig from './config/database.config';
 import jwtConfig from './config/jwt.config';
+import authConfig from './config/auth.config';
 import acueductosCrConfig from './config/acueductos-cr.config';
 
 import { AuthModule } from './modules/auth/auth.module';
@@ -28,7 +29,13 @@ import { AppService } from './app.service';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [environmentConfig, databaseConfig, jwtConfig, acueductosCrConfig],
+      load: [
+        environmentConfig,
+        databaseConfig,
+        jwtConfig,
+        authConfig,
+        acueductosCrConfig,
+      ],
     }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],

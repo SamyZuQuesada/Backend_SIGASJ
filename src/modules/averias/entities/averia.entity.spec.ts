@@ -9,10 +9,12 @@ import { Averia } from './averia.entity';
 
 describe('Averia Entity (Gestión de Averías)', () => {
   describe('Enum EstadoAveria', () => {
-    it('define el estado inicial RECIBIDA con etiqueta Recibida', () => {
+    it('define el estado inicial RECIBIDA y el catálogo administrativo', () => {
       expect(EstadoAveria.RECIBIDA).toBe('RECIBIDA');
       expect(ESTADO_AVERIA_LABELS[EstadoAveria.RECIBIDA]).toBe('Recibida');
       expect(isEstadoAveriaValido('RECIBIDA')).toBe(true);
+      expect(isEstadoAveriaValido('ASIGNADA')).toBe(true);
+      expect(isEstadoAveriaValido('REPORTADA')).toBe(false);
       expect(isEstadoAveriaValido('INVENTADO')).toBe(false);
     });
   });

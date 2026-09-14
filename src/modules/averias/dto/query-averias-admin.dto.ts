@@ -125,7 +125,7 @@ export class QueryAveriasAdminDto {
     enum: EstadoAveria,
     enumName: 'EstadoAveria',
     description:
-      'Filtro por estado persistido. Hoy solo existe RECIBIDA; un valor fuera del enum produce 400.',
+      'Filtro por estado persistido (EstadoAveria). Un valor fuera del enum produce 400.',
     example: EstadoAveria.RECIBIDA,
   })
   @Transform(toOptionalEstado)

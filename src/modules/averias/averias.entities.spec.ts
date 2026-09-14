@@ -1,6 +1,12 @@
 import { DataSource, QueryFailedError, Repository } from 'typeorm';
 import { EstadoAveria } from '../../common/enums/estado-averia.enum';
+import { Role } from '../../common/enums/role.enum';
+import { Rol } from '../usuarios/entities/rol.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
+import {
+  crearUsuarioPrueba,
+  seedRolesBase,
+} from '../usuarios/usuarios.test-helpers';
 import { Averia } from './entities/averia.entity';
 
 function averiaMinima(overrides: Partial<Averia> = {}): Averia {
@@ -20,16 +26,18 @@ describe('Persistencia Averia (sqljs / repository)', () => {
   let dataSource: DataSource;
   let averias: Repository<Averia>;
   let usuarios: Repository<Usuario>;
+  let rolesMap: Record<Role, Rol>;
 
   beforeAll(async () => {
     dataSource = new DataSource({
       type: 'sqljs',
-      entities: [Averia, Usuario],
+      entities: [Averia, Usuario, Rol],
       synchronize: true,
     });
     await dataSource.initialize();
     averias = dataSource.getRepository(Averia);
     usuarios = dataSource.getRepository(Usuario);
+    rolesMap = await seedRolesBase(dataSource.getRepository(Rol));
   });
 
   afterAll(async () => {
@@ -149,7 +157,11 @@ describe('Persistencia Averia (sqljs / repository)', () => {
     );
     expect(inicial.idFontaneroAsignado).toBeNull();
 
-    const fontanero = await usuarios.save(new Usuario());
+    const fontanero = await crearUsuarioPrueba(usuarios, rolesMap, {
+      nombre: 'Fontanero persistido',
+      correo: 'fontanero.entidad@asadasanjuan.cr',
+      role: Role.FONTANERO,
+    });
     inicial.idFontaneroAsignado = fontanero.idUsuario;
     inicial.fontaneroAsignado = fontanero;
     inicial.fechaAsignacion = new Date('2026-09-11T20:00:00Z');

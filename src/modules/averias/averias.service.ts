@@ -12,15 +12,26 @@ import {
   ESTADO_AVERIA_LABELS,
   EstadoAveria,
 } from '../../common/enums/estado-averia.enum';
+import { Role } from '../../common/enums/role.enum';
 import { withDbRetry } from '../../common/persistence/with-db-retry';
+import { Usuario } from '../usuarios/entities/usuario.entity';
+import {
+  assertEstadoAveriaCompatibleConFontanero,
+  assertTransicionEstadoAveria,
+} from './averias.estado-transiciones';
+import { usuarioEsFontaneroAsignable } from './averias.fontanero-asignable';
 import {
   ADMIN_AVERIAS_LIMIT_DEFAULT,
   ADMIN_AVERIAS_PAGE_DEFAULT,
   ADMIN_AVERIAS_PRIORIDAD_SIN_ASIGNAR,
   QueryAveriasAdminDto,
 } from './dto/query-averias-admin.dto';
+import { AssignAveriaFontaneroDto } from './dto/assign-averia-fontanero.dto';
 import { CreatePublicAveriaDto } from './dto/create-public-averia.dto';
 import { RegistroPublicoAveriaResponseDto } from './dto/registro-publico-averia-response.dto';
+import { UpdateAveriaClasificacionDto } from './dto/update-averia-clasificacion.dto';
+import { UpdateAveriaEstadoDto } from './dto/update-averia-estado.dto';
+import { UpdateAveriaPrioridadDto } from './dto/update-averia-prioridad.dto';
 import {
   buildCodigoSeguimiento,
   CODIGO_SEGUIMIENTO_MAX_RETRIES,
@@ -33,13 +44,23 @@ const REGISTRO_OK = 'Avería registrada correctamente.';
 const REGISTRO_ERROR = 'No se pudo registrar la avería. Intente nuevamente.';
 const LISTADO_ERROR = 'No se pudieron consultar las averías';
 const DETALLE_ERROR = 'No se pudo consultar la avería';
+const ACTUALIZACION_ERROR = 'No se pudo actualizar la avería';
+const FONTANEROS_ERROR = 'No se pudieron consultar los fontaneros';
 export const AVERIA_ADMIN_NOT_FOUND = 'No se encontró la avería solicitada.';
+export const FONTANERO_ASIGNABLE_NOT_FOUND =
+  'No se encontró el fontanero solicitado.';
+export const FONTANERO_ROL_INVALIDO =
+  'El usuario seleccionado no tiene rol FONTANERO.';
+export const FONTANERO_INACTIVO =
+  'El fontanero seleccionado se encuentra inactivo.';
+export const AVERIA_YA_ASIGNADA = 'La avería ya tiene un fontanero asignado.';
 const RANGO_FECHAS_INVALIDO = 'fechaDesde no puede ser posterior a fechaHasta';
 const FECHA_CALENDARIO_INVALIDA =
   'fechaDesde y fechaHasta deben ser una fecha calendario válida (YYYY-MM-DD)';
 
 export type AveriaAdminFontanero = {
   id: number;
+  nombre?: string;
 };
 
 /** Identificador básico. No existe entidad Abonado; solo se persiste idAbonado. */
@@ -49,7 +70,7 @@ export type AveriaAdminAbonado = {
 
 /**
  * Detalle administrativo. Campos planos, mismos nombres que el listado.
- * Abonado y Fontanero no tienen nombre en el modelo actual.
+ * Fontanero: `{ id, nombre }` cuando hay asignación; Abonado sigue siendo `{ id }`.
  */
 export type AveriaAdminDetail = {
   id: number;
@@ -95,6 +116,10 @@ export type AveriasAdminListado = {
   totalPages: number;
 };
 
+export type AveriasAdminFontanerosListado = {
+  data: AveriaAdminFontanero[];
+};
+
 const ISO_DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 export function isValidIsoDateOnly(value: string): boolean {
@@ -132,6 +157,17 @@ export function escapeLikePattern(value: string): string {
   return value.replace(/[\\%_[\]]/g, '\\$&');
 }
 
+function toAdminFontanero(averia: Averia): AveriaAdminFontanero | null {
+  if (averia.idFontaneroAsignado == null) {
+    return null;
+  }
+  const nombre = averia.fontaneroAsignado?.nombre?.trim();
+  return {
+    id: averia.idFontaneroAsignado,
+    ...(nombre ? { nombre } : {}),
+  };
+}
+
 function toAdminListItem(averia: Averia): AveriaAdminListItem {
   return {
     id: averia.id,
@@ -144,10 +180,7 @@ function toAdminListItem(averia: Averia): AveriaAdminListItem {
     estado: averia.estado,
     tipoAveria: averia.tipoAveria ?? null,
     prioridad: averia.prioridad ?? null,
-    fontanero:
-      averia.idFontaneroAsignado != null
-        ? { id: averia.idFontaneroAsignado }
-        : null,
+    fontanero: toAdminFontanero(averia),
   };
 }
 
@@ -167,10 +200,7 @@ export function toAdminDetail(averia: Averia): AveriaAdminDetail {
     estado: averia.estado,
     tipoAveria: averia.tipoAveria ?? null,
     prioridad: averia.prioridad ?? null,
-    fontanero:
-      averia.idFontaneroAsignado != null
-        ? { id: averia.idFontaneroAsignado }
-        : null,
+    fontanero: toAdminFontanero(averia),
     fechaAsignacion: averia.fechaAsignacion ?? null,
     fechaInicioAtencion: averia.fechaInicioAtencion ?? null,
     fechaResolucion: averia.fechaResolucion ?? null,
@@ -206,6 +236,7 @@ export function buildFindOneAdminQuery(
       'averia.fechaResolucion',
       'averia.observacionesAtencion',
       'fontanero.idUsuario',
+      'fontanero.nombre',
     ])
     .where('averia.id = :id', { id });
 }
@@ -217,12 +248,14 @@ export class AveriasService {
   constructor(
     @InjectRepository(Averia)
     private readonly averiaRepository: Repository<Averia>,
+    @InjectRepository(Usuario)
+    private readonly usuarioRepository: Repository<Usuario>,
   ) {}
 
   /**
    * Listado administrativo paginado. Filtros, orden y página se resuelven en SQL.
    * `descripcion` se devuelve completa: no hay regla aprobada de recorte.
-   * `Usuario` solo expone `idUsuario`; el Fontanero del listado es `{ id }` o null.
+   * `Usuario` solo expone identidad pública del Fontanero (`id` y `nombre`).
    */
   async findAllAdmin(
     query: QueryAveriasAdminDto,
@@ -250,6 +283,7 @@ export class AveriasService {
             'averia.prioridad',
             'averia.idFontaneroAsignado',
             'fontanero.idUsuario',
+            'fontanero.nombre',
           ]);
 
         const search = query.search?.trim();
@@ -329,6 +363,145 @@ export class AveriasService {
       this.logger.error('Error inesperado al listar averías administrativas');
       throw new InternalServerErrorException(LISTADO_ERROR);
     }
+  }
+
+  /**
+   * Fontaneros activos con rol persistido FONTANERO.
+   */
+  async listFontanerosAsignables(): Promise<AveriasAdminFontanerosListado> {
+    try {
+      return await withDbRetry(async () => {
+        const rows = await this.usuarioRepository.find({
+          relations: { rol: true },
+          where: {
+            activo: true,
+            rol: { nombre: Role.FONTANERO },
+          },
+          order: { idUsuario: 'ASC' },
+        });
+        return {
+          data: rows
+            .filter((usuario) => usuarioEsFontaneroAsignable(usuario))
+            .map((usuario) => ({
+              id: usuario.idUsuario,
+              nombre: usuario.nombre,
+            })),
+        };
+      });
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      this.logger.error('Error inesperado al listar fontaneros asignables');
+      throw new InternalServerErrorException(FONTANEROS_ERROR);
+    }
+  }
+
+  async updateEstado(
+    id: number,
+    dto: UpdateAveriaEstadoDto,
+  ): Promise<AveriaAdminDetail> {
+    return this.runAdminUpdate(
+      'Error inesperado al actualizar el estado de una avería',
+      async () => {
+        const averia = await this.getAveriaForAdminUpdate(id);
+        assertTransicionEstadoAveria(averia.estado, dto.estado);
+        if (averia.estado === dto.estado) {
+          return toAdminDetail(averia);
+        }
+        assertEstadoAveriaCompatibleConFontanero(
+          dto.estado,
+          averia.idFontaneroAsignado,
+        );
+        averia.estado = dto.estado;
+        return toAdminDetail(await this.averiaRepository.save(averia));
+      },
+    );
+  }
+
+  async updatePrioridad(
+    id: number,
+    dto: UpdateAveriaPrioridadDto,
+  ): Promise<AveriaAdminDetail> {
+    return this.runAdminUpdate(
+      'Error inesperado al actualizar la prioridad de una avería',
+      async () => {
+        const averia = await this.getAveriaForAdminUpdate(id);
+        if (averia.prioridad === dto.prioridad) {
+          return toAdminDetail(averia);
+        }
+        averia.prioridad = dto.prioridad;
+        return toAdminDetail(await this.averiaRepository.save(averia));
+      },
+    );
+  }
+
+  async updateClasificacion(
+    id: number,
+    dto: UpdateAveriaClasificacionDto,
+  ): Promise<AveriaAdminDetail> {
+    return this.runAdminUpdate(
+      'Error inesperado al actualizar la clasificación de una avería',
+      async () => {
+        const averia = await this.getAveriaForAdminUpdate(id);
+        if (averia.tipoAveria === dto.clasificacion) {
+          return toAdminDetail(averia);
+        }
+        averia.tipoAveria = dto.clasificacion;
+        return toAdminDetail(await this.averiaRepository.save(averia));
+      },
+    );
+  }
+
+  /**
+   * Asignación inicial al Fontanero (PBI 2.4). Reutiliza transiciones de 2.3.
+   * No reasigna. No notifica (2.8). No lista "mis averías" (2.5).
+   */
+  async assignFontanero(
+    id: number,
+    dto: AssignAveriaFontaneroDto,
+  ): Promise<AveriaAdminDetail> {
+    return this.runAdminUpdate(
+      'Error inesperado al asignar un fontanero a una avería',
+      async () => {
+        return this.averiaRepository.manager.transaction(async (manager) => {
+          const averia = await manager.findOne(Averia, { where: { id } });
+          if (!averia) {
+            throw new NotFoundException(AVERIA_ADMIN_NOT_FOUND);
+          }
+          if (averia.idFontaneroAsignado != null) {
+            throw new BadRequestException(AVERIA_YA_ASIGNADA);
+          }
+
+          const usuario = await manager.findOne(Usuario, {
+            where: { idUsuario: dto.fontaneroId },
+            relations: { rol: true },
+          });
+          if (!usuario) {
+            throw new NotFoundException(FONTANERO_ASIGNABLE_NOT_FOUND);
+          }
+          if (!usuario.activo) {
+            throw new BadRequestException(FONTANERO_INACTIVO);
+          }
+          if (usuario.rol?.nombre !== Role.FONTANERO) {
+            throw new BadRequestException(FONTANERO_ROL_INVALIDO);
+          }
+
+          assertTransicionEstadoAveria(averia.estado, EstadoAveria.ASIGNADA);
+
+          averia.idFontaneroAsignado = usuario.idUsuario;
+          averia.fontaneroAsignado = usuario;
+          averia.fechaAsignacion = new Date();
+          averia.estado = EstadoAveria.ASIGNADA;
+          assertEstadoAveriaCompatibleConFontanero(
+            averia.estado,
+            averia.idFontaneroAsignado,
+          );
+
+          return toAdminDetail(await manager.save(averia));
+        });
+      },
+    );
   }
 
   /**
@@ -441,6 +614,33 @@ export class AveriasService {
       fechaResolucion: null,
       observacionesAtencion: null,
     });
+  }
+
+  private async getAveriaForAdminUpdate(id: number): Promise<Averia> {
+    const averia = await this.averiaRepository.findOne({
+      where: { id },
+      relations: { fontaneroAsignado: true },
+    });
+    if (!averia) {
+      throw new NotFoundException(AVERIA_ADMIN_NOT_FOUND);
+    }
+    return averia;
+  }
+
+  private async runAdminUpdate(
+    logMessage: string,
+    work: () => Promise<AveriaAdminDetail>,
+  ): Promise<AveriaAdminDetail> {
+    try {
+      return await withDbRetry(work);
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(logMessage);
+      throw new InternalServerErrorException(ACTUALIZACION_ERROR);
+    }
   }
 
   private toPublicResponse(averia: Averia): RegistroPublicoAveriaResponseDto {

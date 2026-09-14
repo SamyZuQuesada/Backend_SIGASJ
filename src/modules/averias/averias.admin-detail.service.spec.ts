@@ -76,6 +76,17 @@ describe('AveriasService.findOneAdmin — mapeo y consulta', () => {
     expect(toAdminDetail(averia)).not.toHaveProperty('fontaneroAsignado');
   });
 
+  it('incluye fontanero.nombre cuando la relación está cargada', () => {
+    const averia = {
+      idFontaneroAsignado: 7,
+      fontaneroAsignado: { idUsuario: 7, nombre: 'José Ramírez' },
+    } as Averia;
+    expect(toAdminDetail(averia).fontanero).toEqual({
+      id: 7,
+      nombre: 'José Ramírez',
+    });
+  });
+
   it('lanza NotFoundException si no existe', async () => {
     const getOne = jest.fn().mockResolvedValue(null);
     const repository = {
@@ -87,7 +98,7 @@ describe('AveriasService.findOneAdmin — mapeo y consulta', () => {
       }),
     };
 
-    const service = new AveriasService(repository as never);
+    const service = new AveriasService(repository as never, {} as never);
     await expect(service.findOneAdmin(99)).rejects.toBeInstanceOf(
       NotFoundException,
     );
@@ -117,7 +128,11 @@ describe('AveriasService.findOneAdmin — mapeo y consulta', () => {
     );
     expect(qb.where).toHaveBeenCalledWith('averia.id = :id', { id: 25 });
     expect(select).toHaveBeenCalledWith(
-      expect.arrayContaining(['fontanero.idUsuario', 'averia.id']),
+      expect.arrayContaining([
+        'fontanero.idUsuario',
+        'fontanero.nombre',
+        'averia.id',
+      ]),
     );
     expect(select).not.toHaveBeenCalledWith(
       expect.arrayContaining(['password']),

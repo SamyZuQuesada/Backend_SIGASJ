@@ -17,11 +17,18 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   validate(payload: JwtPayload) {
-    if (!payload || !payload.sub) {
+    if (
+      !payload ||
+      payload.sub === undefined ||
+      payload.sub === null ||
+      payload.sub === ''
+    ) {
       throw new UnauthorizedException('Token inválido');
     }
+    const parsed = Number(payload.sub);
     return {
-      userId: payload.sub,
+      userId: String(payload.sub),
+      ...(Number.isInteger(parsed) ? { idUsuario: parsed } : {}),
       email: payload.email,
       role: payload.role,
       name: payload.name,

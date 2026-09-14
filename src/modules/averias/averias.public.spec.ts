@@ -9,6 +9,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { EstadoAveria } from '../../common/enums/estado-averia.enum';
 import { HttpExceptionFilter } from '../../common/filters/http-exception.filter';
 import { Usuario } from '../usuarios/entities/usuario.entity';
+import { Rol } from '../usuarios/entities/rol.entity';
 import { AveriasModule } from './averias.module';
 import { AveriasService } from './averias.service';
 import { Averia } from './entities/averia.entity';
@@ -47,7 +48,7 @@ describe('POST /api/v1/public/averias — registro público', () => {
           type: 'sqljs',
           autoSave: false,
           dropSchema: true,
-          entities: [Averia, Usuario],
+          entities: [Averia, Usuario, Rol],
           synchronize: true,
         }),
         AveriasModule,
@@ -168,6 +169,7 @@ describe('POST /api/v1/public/averias — registro público', () => {
       codigoSeguimiento: 'AV-HACK-0001',
       fechaReporte: '2000-01-01T00:00:00.000Z',
       tipoAveria: 'Fuga',
+      clasificacion: 'FUGA',
       fechaAsignacion: '2000-01-01',
       fechaResolucion: '2000-01-02',
       observacionesAtencion: 'interno',

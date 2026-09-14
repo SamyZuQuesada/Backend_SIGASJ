@@ -2,4 +2,12 @@ export enum Role {
   ADMINISTRADORA = 'ADMINISTRADORA',
   SECRETARIA = 'SECRETARIA',
   FONTANERO = 'FONTANERO',
+  ABONADO = 'ABONADO',
 }
+
+export const ROLES_SISTEMA: readonly Role[] = [
+  Role.ADMINISTRADORA,
+  Role.SECRETARIA,
+  Role.FONTANERO,
+  Role.ABONADO,
+];

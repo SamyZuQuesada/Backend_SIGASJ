@@ -64,18 +64,18 @@ describe('QueryAveriasAdminDto', () => {
     expect(blank.dto.search).toBeUndefined();
   });
 
-  it('acepta el estado real RECIBIDA y normaliza minúsculas', async () => {
+  it('acepta estados del catálogo y normaliza minúsculas', async () => {
     const exact = await validateQuery({ estado: EstadoAveria.RECIBIDA });
     expect(exact.errors).toHaveLength(0);
     expect(exact.dto.estado).toBe(EstadoAveria.RECIBIDA);
 
-    const lower = await validateQuery({ estado: 'recibida' });
+    const lower = await validateQuery({ estado: 'en_revision' });
     expect(lower.errors).toHaveLength(0);
-    expect(lower.dto.estado).toBe(EstadoAveria.RECIBIDA);
+    expect(lower.dto.estado).toBe(EstadoAveria.EN_REVISION);
   });
 
   it('rechaza estados que no existen en EstadoAveria', async () => {
-    for (const estado of ['ASIGNADA', 'EN_ATENCION', 'RESUELTA', 'inventado']) {
+    for (const estado of ['REPORTADA', 'PENDIENTE_ATENCION', 'inventado']) {
       const { errors } = await validateQuery({ estado });
       expect(errors.some((error) => error.property === 'estado')).toBe(true);
     }

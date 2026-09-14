@@ -13,7 +13,13 @@ import { HttpExceptionFilter } from '../../common/filters/http-exception.filter'
 import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
 import jwtConfig from '../../config/jwt.config';
 import { AuthModule } from '../auth/auth.module';
+import { Rol } from '../usuarios/entities/rol.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
+import {
+  crearUsuarioPrueba,
+  seedRolesBase,
+  seedStaffLoginUsers,
+} from '../usuarios/usuarios.test-helpers';
 import { AveriasModule } from './averias.module';
 import { Averia } from './entities/averia.entity';
 import type {
@@ -42,9 +48,12 @@ describe('GET /api/v1/admin/averias — listado administrativo', () => {
   let jwtService: JwtService;
   let averias: Repository<Averia>;
   let usuarios: Repository<Usuario>;
+  let rolesMap: Record<Role, Rol>;
   let adminToken: string;
   let secretariaToken: string;
   let fontaneroId: number;
+  let fontaneroNombre: string;
+  let usuarioSeq = 0;
 
   const signAs = (role: Role, sub = '1') => {
     const payload: JwtPayload = {
@@ -100,7 +109,7 @@ describe('GET /api/v1/admin/averias — listado administrativo', () => {
           type: 'sqljs',
           autoSave: false,
           dropSchema: true,
-          entities: [Averia, Usuario],
+          entities: [Averia, Usuario, Rol],
           synchronize: true,
         }),
         AuthModule,
@@ -125,6 +134,8 @@ describe('GET /api/v1/admin/averias — listado administrativo', () => {
     const dataSource = moduleFixture.get(DataSource);
     averias = dataSource.getRepository(Averia);
     usuarios = dataSource.getRepository(Usuario);
+    rolesMap = await seedRolesBase(dataSource.getRepository(Rol));
+    await seedStaffLoginUsers(usuarios, rolesMap);
 
     const adminLogin = await request(app.getHttpServer())
       .post('/api/v1/auth/login')
@@ -150,8 +161,14 @@ describe('GET /api/v1/admin/averias — listado administrativo', () => {
   beforeEach(async () => {
     await averias.clear();
     await usuarios.clear();
-    const fontanero = await usuarios.save(usuarios.create({}));
+    usuarioSeq += 1;
+    const fontanero = await crearUsuarioPrueba(usuarios, rolesMap, {
+      nombre: 'Fontanero listado',
+      correo: `fontanero.list.${usuarioSeq}.${Date.now()}@asadasanjuan.cr`,
+      role: Role.FONTANERO,
+    });
     fontaneroId = fontanero.idUsuario;
+    fontaneroNombre = fontanero.nombre;
 
     await persist({
       codigoSeguimiento: 'AV-2026-0001',
@@ -289,6 +306,9 @@ describe('GET /api/v1/admin/averias — listado administrativo', () => {
     expect(body.data.some((item) => item.fontanero?.id === fontaneroId)).toBe(
       true,
     );
+    expect(
+      body.data.some((item) => item.fontanero?.nombre === fontaneroNombre),
+    ).toBe(true);
 
     const stamps = body.data.map((item) => ({
       time: new Date(item.fechaReporte).getTime(),
@@ -305,7 +325,7 @@ describe('GET /api/v1/admin/averias — listado administrativo', () => {
     expect(body.data[0].codigoSeguimiento).toBe('AV-2026-0005');
   });
 
-  it('filtra por estado RECIBIDA (único valor real de EstadoAveria)', async () => {
+  it('filtra por estado RECIBIDA de los reportes sembrados', async () => {
     const body = (
       await getAverias({ estado: EstadoAveria.RECIBIDA }, adminToken).expect(
         200,
@@ -317,8 +337,14 @@ describe('GET /api/v1/admin/averias — listado administrativo', () => {
     ).toBe(true);
   });
 
-  it('no hay tests contra En atención o Resuelta: esos valores no existen en EstadoAveria', () => {
-    expect(Object.values(EstadoAveria)).toEqual([EstadoAveria.RECIBIDA]);
+  it('acepta filtro por estados administrativos aún sin filas en esos valores', async () => {
+    const body = (
+      await getAverias({ estado: EstadoAveria.EN_REVISION }, adminToken).expect(
+        200,
+      )
+    ).body as AveriasAdminListado;
+    expect(body.total).toBe(0);
+    expect(body.data).toEqual([]);
   });
 
   it('filtra por prioridad almacenada y no rompe los null del listado general', async () => {
@@ -559,7 +585,7 @@ describe('GET /api/v1/admin/averias — listado administrativo', () => {
       { limit: -1 },
       { limit: 1000000 },
       { estado: 'inventado' },
-      { estado: 'EN_ATENCION' },
+      { estado: 'REPORTADA' },
       { fontaneroId: 'abc' },
       { fontaneroId: 0 },
       { fechaDesde: '01/02/2026' },
