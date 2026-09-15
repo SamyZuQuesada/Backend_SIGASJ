@@ -7,6 +7,7 @@ import {
   Param,
   ParseIntPipe,
   Patch,
+  Post,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -26,6 +27,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { QueryAlertasReposicionDto } from './dto/query-alertas-reposicion.dto';
+import { CreateReposicionDesdeAlertaDto } from './dto/create-reposicion-desde-alerta.dto';
 import { UpdateEstadoAlertaReposicionDto } from './dto/update-estado-alerta-reposicion.dto';
 import { InventarioService } from './inventario.service';
 
@@ -121,5 +123,51 @@ export class AlertasReposicionController {
       dto.estado,
       user,
     );
+  }
+
+  @Post([
+    'admin/inventario/alertas-reposicion/:id/reposicion',
+    'inventario/alertas-reposicion/:id/reposicion',
+    'admin/alertas-reposicion/:id/reposicion',
+  ])
+  @HttpCode(HttpStatus.CREATED)
+  @Roles(Role.ADMINISTRADORA)
+  @ApiOperation({
+    summary: 'Generar reposición desde una alerta de stock mínimo (Administradora)',
+    description:
+      'Crea una reposición PENDIENTE vinculada a la alerta. No modifica las existencias del material. ' +
+      'Rechaza alertas resueltas o reposiciones activas duplicadas.',
+  })
+  @ApiParam({ name: 'id', description: 'ID de la alerta', type: Number })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'Reposición generada',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'La alerta no requiere reposición o los datos son inválidos',
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'No autenticado',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Acceso restringido al rol ADMINISTRADORA',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Alerta no encontrada',
+  })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description: 'Ya existe una reposición activa para la alerta',
+  })
+  generarReposicion(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CreateReposicionDesdeAlertaDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.inventarioService.generarReposicionDesdeAlertaAdmin(id, user, dto);
   }
 }

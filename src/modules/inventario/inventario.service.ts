@@ -12,6 +12,8 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, In, Repository } from 'typeorm';
 import { EstadoAlertaReposicion } from '../../common/enums/estado-alerta-reposicion.enum';
+import { EstadoReposicionMaterial } from '../../common/enums/estado-reposicion-material.enum';
+import { OrigenReposicionMaterial } from '../../common/enums/origen-reposicion-material.enum';
 import { EstadoSolicitudMaterial } from '../../common/enums/estado-solicitud-material.enum';
 import { Role } from '../../common/enums/role.enum';
 import { TipoMovimientoInventario } from '../../common/enums/tipo-movimiento-inventario.enum';
@@ -30,6 +32,7 @@ import {
 } from '../../common/media/public-media';
 import { QueryProveedoresDto } from './dto/query-proveedores.dto';
 import { QueryAlertasReposicionDto } from './dto/query-alertas-reposicion.dto';
+import { CreateReposicionDesdeAlertaDto } from './dto/create-reposicion-desde-alerta.dto';
 import { QuerySolicitudesMaterialDto } from './dto/query-solicitudes-material.dto';
 import { RegistrarEntradaDto } from './dto/registrar-entrada.dto';
 import { RegistrarSalidaDto } from './dto/registrar-salida.dto';
@@ -46,6 +49,8 @@ import { Proveedor } from './entities/proveedor.entity';
 import { SolicitudMaterial } from './entities/solicitud-material.entity';
 import { DetalleSolicitudMaterial } from './entities/detalle-solicitud-material.entity';
 import { AlertaReposicion } from './entities/alerta-reposicion.entity';
+import { ReposicionMaterial } from './entities/reposicion-material.entity';
+import { DetalleReposicionMaterial } from './entities/detalle-reposicion-material.entity';
 import {
   assertStockDisponible,
   ResultadoValidacionStock,
@@ -120,6 +125,12 @@ export class InventarioService {
     @Optional()
     @InjectRepository(AlertaReposicion)
     private readonly alertaReposicionRepository?: Repository<AlertaReposicion>,
+    @Optional()
+    @InjectRepository(ReposicionMaterial)
+    private readonly reposicionMaterialRepository?: Repository<ReposicionMaterial>,
+    @Optional()
+    @InjectRepository(DetalleReposicionMaterial)
+    private readonly detalleReposicionRepository?: Repository<DetalleReposicionMaterial>,
   ) {}
 
   /**
@@ -1482,6 +1493,152 @@ export class InventarioService {
   }
 
   /**
+   * Genera una reposición a partir de una alerta de stock mínimo (3.9.2).
+   * No modifica existencias. Evita duplicar una reposición activa de la misma alerta.
+   */
+  async generarReposicionDesdeAlertaAdmin(
+    idAlerta: number,
+    user: AuthenticatedUser,
+    dto?: CreateReposicionDesdeAlertaDto,
+  ): Promise<Record<string, unknown>> {
+    if (!idAlerta || !Number.isInteger(idAlerta) || idAlerta <= 0) {
+      throw new BadRequestException(
+        'El identificador de la alerta debe ser un número entero mayor a cero',
+      );
+    }
+
+    const rawUserId = user?.idUsuario ?? user?.userId;
+    const idUsuario = Number(rawUserId);
+    if (!idUsuario || Number.isNaN(idUsuario)) {
+      throw new BadRequestException(
+        'No se pudo identificar a la administradora responsable',
+      );
+    }
+
+    const estadosActivos = [
+      EstadoReposicionMaterial.PENDIENTE,
+      EstadoReposicionMaterial.EN_GESTION,
+      EstadoReposicionMaterial.COMPRA_REGISTRADA,
+      EstadoReposicionMaterial.PENDIENTE_RECEPCION,
+      EstadoReposicionMaterial.RECIBIDA,
+    ];
+
+    try {
+      return await withDbRetry(async () => {
+        return await this.materialRepository.manager.transaction(async (manager) => {
+          const alertaRepo = manager.getRepository(AlertaReposicion);
+          const reposicionRepo = manager.getRepository(ReposicionMaterial);
+          const detalleRepo = manager.getRepository(DetalleReposicionMaterial);
+
+          const alerta = await alertaRepo.findOne({
+            where: { id: idAlerta },
+            relations: { material: true },
+          });
+
+          if (!alerta) {
+            throw new NotFoundException(
+              `Alerta de reposición con ID ${idAlerta} no encontrada`,
+            );
+          }
+
+          if (alerta.estado === EstadoAlertaReposicion.RESUELTA) {
+            throw new BadRequestException(
+              'La alerta ya fue resuelta y no requiere una nueva reposición',
+            );
+          }
+
+          const material = alerta.material;
+          if (!material || !alerta.idMaterial) {
+            throw new BadRequestException(
+              'La alerta no está asociada a un material válido',
+            );
+          }
+
+          if (!material.activo) {
+            throw new BadRequestException(
+              `El material "${material.nombre}" se encuentra inactivo y no puede reponerse`,
+            );
+          }
+
+          const duplicada = await reposicionRepo.findOne({
+            where: {
+              idAlertaReposicion: alerta.id,
+              estado: In(estadosActivos),
+            },
+          });
+
+          if (duplicada) {
+            throw new ConflictException(
+              `Ya existe una reposición activa (${duplicada.codigo ?? duplicada.id}) para esta alerta`,
+            );
+          }
+
+          const cantidad =
+            dto?.cantidad ??
+            Math.max(alerta.stockMinimo - alerta.stockActual, 1);
+
+          const totalReposiciones = await reposicionRepo.count();
+          const codigo = `REP-${String(totalReposiciones + 1).padStart(4, '0')}`;
+
+          const stockAntes = material.stockActual;
+          const nueva = reposicionRepo.create({
+            codigo,
+            fechaGeneracion: new Date(),
+            origen: OrigenReposicionMaterial.ALERTA_STOCK_MINIMO,
+            estado: EstadoReposicionMaterial.PENDIENTE,
+            idAlertaReposicion: alerta.id,
+            idSolicitudMaterial: null,
+            idUsuarioResponsable: idUsuario,
+            observacion: dto?.observacion?.trim() || null,
+            detalles: [
+              detalleRepo.create({
+                idMaterial: material.id,
+                cantidad,
+              }),
+            ],
+          });
+
+          const guardada = await reposicionRepo.save(nueva);
+          const recargada = await reposicionRepo.findOne({
+            where: { id: guardada.id },
+            relations: {
+              detalles: { material: true },
+              alertaReposicion: true,
+              usuarioResponsable: true,
+            },
+          });
+
+          const materialDespues = await manager.getRepository(Material).findOne({
+            where: { id: material.id },
+          });
+          if (
+            materialDespues &&
+            materialDespues.stockActual !== stockAntes
+          ) {
+            this.logger.warn(
+              `La generación de reposición no debe alterar stock. Material ${material.id} cambió de ${stockAntes} a ${materialDespues.stockActual}`,
+            );
+          }
+
+          return this.mapReposicionMaterialAdmin(recargada ?? guardada);
+        });
+      });
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(
+        `Error al generar reposición desde la alerta ${idAlerta}:`,
+        error,
+      );
+      throw new InternalServerErrorException(
+        'No se pudo generar la reposición a partir de la alerta',
+      );
+    }
+  }
+
+  /**
    * Consulta y valida de manera centralizada la existencia física disponible de un material
    * antes de autorizar cualquier operación de salida (Regla 4.5.2).
    *
@@ -2268,6 +2425,45 @@ export class InventarioService {
               nombre: d.material.nombre,
               unidadMedida: d.material.unidadMedida,
               stockActual: d.material.stockActual,
+            }
+          : null,
+      })),
+    };
+  }
+
+  private mapReposicionMaterialAdmin(
+    reposicion: ReposicionMaterial,
+  ): Record<string, unknown> {
+    return {
+      id: reposicion.id,
+      codigo: reposicion.codigo,
+      fechaGeneracion: reposicion.fechaGeneracion,
+      origen: reposicion.origen,
+      estado: reposicion.estado,
+      idAlertaReposicion: reposicion.idAlertaReposicion,
+      idSolicitudMaterial: reposicion.idSolicitudMaterial,
+      idUsuarioResponsable: reposicion.idUsuarioResponsable,
+      observacion: reposicion.observacion,
+      updatedAt: reposicion.updatedAt,
+      usuarioResponsable: reposicion.idUsuarioResponsable
+        ? {
+            id: reposicion.idUsuarioResponsable,
+            nombre: this.nombreUsuarioResumen(reposicion.usuarioResponsable),
+          }
+        : null,
+      alertaReposicion: reposicion.idAlertaReposicion
+        ? { id: reposicion.idAlertaReposicion }
+        : null,
+      detalles: (reposicion.detalles || []).map((detalle) => ({
+        id: detalle.id,
+        idMaterial: detalle.idMaterial,
+        cantidad: detalle.cantidad,
+        material: detalle.material
+          ? {
+              id: detalle.material.id,
+              nombre: detalle.material.nombre,
+              unidadMedida: detalle.material.unidadMedida,
+              stockActual: detalle.material.stockActual,
             }
           : null,
       })),

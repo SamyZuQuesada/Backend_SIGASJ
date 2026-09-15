@@ -9,6 +9,8 @@ import { Proveedor } from './entities/proveedor.entity';
 import { SolicitudMaterial } from './entities/solicitud-material.entity';
 import { DetalleSolicitudMaterial } from './entities/detalle-solicitud-material.entity';
 import { AlertaReposicion } from './entities/alerta-reposicion.entity';
+import { ReposicionMaterial } from './entities/reposicion-material.entity';
+import { DetalleReposicionMaterial } from './entities/detalle-reposicion-material.entity';
 import { Averia } from '../averias/entities/averia.entity';
 import { InventarioController } from './inventario.controller';
 import { SolicitudesMaterialesController } from './solicitudes-materiales.controller';
@@ -26,6 +28,8 @@ import { InventarioService } from './inventario.service';
       SolicitudMaterial,
       DetalleSolicitudMaterial,
       AlertaReposicion,
+      ReposicionMaterial,
+      DetalleReposicionMaterial,
       Averia,
     ]),
   ],

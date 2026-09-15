@@ -12,6 +12,8 @@ import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
 import jwtConfig from '../../config/jwt.config';
 import { AuthModule } from '../auth/auth.module';
 import { Averia } from '../averias/entities/averia.entity';
+import { Rol } from '../usuarios/entities/rol.entity';
+import { Usuario } from '../usuarios/entities/usuario.entity';
 import { CategoriaMaterial } from './entities/categoria-material.entity';
 import { DetalleSolicitudMaterial } from './entities/detalle-solicitud-material.entity';
 import { DocumentoMovimientoInventario } from './entities/documento-movimiento-inventario.entity';
@@ -20,6 +22,8 @@ import { MovimientoInventario } from './entities/movimiento-inventario.entity';
 import { Proveedor } from './entities/proveedor.entity';
 import { SolicitudMaterial } from './entities/solicitud-material.entity';
 import { AlertaReposicion } from './entities/alerta-reposicion.entity';
+import { ReposicionMaterial } from './entities/reposicion-material.entity';
+import { DetalleReposicionMaterial } from './entities/detalle-reposicion-material.entity';
 import { InventarioModule } from './inventario.module';
 
 describe('Solicitudes de Materiales por Fontanero (Backlog 4.6) — QA y Pruebas Funcionales', () => {
@@ -296,6 +300,14 @@ describe('Solicitudes de Materiales por Fontanero (Backlog 4.6) — QA y Pruebas
       .overrideProvider(getRepositoryToken(Averia))
       .useValue(mockAveriaRepo)
       .overrideProvider(getRepositoryToken(AlertaReposicion))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(ReposicionMaterial))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(DetalleReposicionMaterial))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(Usuario))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(Rol))
       .useValue({})
       .compile();
 

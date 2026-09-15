@@ -26,6 +26,8 @@ import { Proveedor } from './entities/proveedor.entity';
 import { SolicitudMaterial } from './entities/solicitud-material.entity';
 import { DetalleSolicitudMaterial } from './entities/detalle-solicitud-material.entity';
 import { AlertaReposicion } from './entities/alerta-reposicion.entity';
+import { ReposicionMaterial } from './entities/reposicion-material.entity';
+import { DetalleReposicionMaterial } from './entities/detalle-reposicion-material.entity';
 import { Averia } from '../averias/entities/averia.entity';
 import { InventarioModule } from './inventario.module';
 import { InventarioService } from './inventario.service';
@@ -45,6 +47,8 @@ const integralQaTypeOrmModule = TypeOrmModule.forRoot({
     SolicitudMaterial,
     DetalleSolicitudMaterial,
     AlertaReposicion,
+    ReposicionMaterial,
+    DetalleReposicionMaterial,
     Averia,
   ],
   synchronize: true,

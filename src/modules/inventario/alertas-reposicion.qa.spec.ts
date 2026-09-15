@@ -7,6 +7,8 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { Repository } from 'typeorm';
 import { EstadoAlertaReposicion } from '../../common/enums/estado-alerta-reposicion.enum';
+import { EstadoReposicionMaterial } from '../../common/enums/estado-reposicion-material.enum';
+import { OrigenReposicionMaterial } from '../../common/enums/origen-reposicion-material.enum';
 import { Role } from '../../common/enums/role.enum';
 import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
 import jwtConfig from '../../config/jwt.config';
@@ -19,6 +21,8 @@ import {
   seedRolesBase,
 } from '../usuarios/usuarios.test-helpers';
 import { AlertaReposicion } from './entities/alerta-reposicion.entity';
+import { ReposicionMaterial } from './entities/reposicion-material.entity';
+import { DetalleReposicionMaterial } from './entities/detalle-reposicion-material.entity';
 import { CategoriaMaterial } from './entities/categoria-material.entity';
 import { DetalleSolicitudMaterial } from './entities/detalle-solicitud-material.entity';
 import { DocumentoMovimientoInventario } from './entities/documento-movimiento-inventario.entity';
@@ -43,6 +47,8 @@ const alertasQaTypeOrmModule = TypeOrmModule.forRoot({
     SolicitudMaterial,
     DetalleSolicitudMaterial,
     AlertaReposicion,
+    ReposicionMaterial,
+    DetalleReposicionMaterial,
     Averia,
   ],
   synchronize: true,
@@ -463,5 +469,198 @@ describe('3.8.6 Cambio de estado de alertas de reposición', () => {
     await adminPatch(alerta.id, { estado: 'ATENDIDA' }, token).expect(
       HttpStatus.BAD_REQUEST,
     );
+  });
+});
+
+describe('3.9.2 Generar reposición desde alerta de stock mínimo', () => {
+  jest.setTimeout(30_000);
+
+  let app: INestApplication<App>;
+  let jwtService: JwtService;
+  let materialRepository: Repository<Material>;
+  let alertaRepository: Repository<AlertaReposicion>;
+  let reposicionRepository: Repository<ReposicionMaterial>;
+  let detalleReposicionRepository: Repository<DetalleReposicionMaterial>;
+  let usuarioRepository: Repository<Usuario>;
+  let administradora: Usuario;
+
+  const signAs = (role: Role | string, sub?: string) => {
+    const payload: JwtPayload = {
+      sub: sub ?? String(administradora?.idUsuario ?? 1),
+      email: `${String(role).toLowerCase()}@asada.test`,
+      role: role as Role,
+      name: `Usuario ${String(role)}`,
+    };
+    return jwtService.sign(payload);
+  };
+
+  const adminPost = (
+    id: number,
+    body: Record<string, unknown> = {},
+    token?: string,
+  ) => {
+    const req = request(app.getHttpServer()).post(
+      `/api/v1/admin/inventario/alertas-reposicion/${id}/reposicion`,
+    );
+    if (token) {
+      req.set('Authorization', `Bearer ${token}`);
+    }
+    return req.send(body);
+  };
+
+  beforeAll(async () => {
+    const moduleRef: TestingModule = await Test.createTestingModule({
+      imports: [
+        ConfigModule.forRoot({
+          isGlobal: true,
+          load: [jwtConfig],
+        }),
+        alertasQaTypeOrmModule,
+        TypeOrmModule.forFeature([Usuario, Rol]),
+        AuthModule,
+        InventarioModule,
+      ],
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    app.setGlobalPrefix('api/v1');
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+        transformOptions: { enableImplicitConversion: true },
+      }),
+    );
+    await app.init();
+
+    jwtService = moduleRef.get(JwtService);
+    materialRepository = moduleRef.get(getRepositoryToken(Material));
+    alertaRepository = moduleRef.get(getRepositoryToken(AlertaReposicion));
+    reposicionRepository = moduleRef.get(getRepositoryToken(ReposicionMaterial));
+    detalleReposicionRepository = moduleRef.get(
+      getRepositoryToken(DetalleReposicionMaterial),
+    );
+    usuarioRepository = moduleRef.get(getRepositoryToken(Usuario));
+    const rolRepository = moduleRef.get<Repository<Rol>>(getRepositoryToken(Rol));
+    const roles = await seedRolesBase(rolRepository);
+
+    administradora = await crearUsuarioPrueba(usuarioRepository, roles, {
+      nombre: 'Administradora Reposición Alerta',
+      correo: 'admin.reposicion.alerta@asada.test',
+      role: Role.ADMINISTRADORA,
+    });
+  });
+
+  afterAll(async () => {
+    if (app) {
+      await app.close();
+    }
+  });
+
+  beforeEach(async () => {
+    await detalleReposicionRepository.clear();
+    await reposicionRepository.clear();
+    await alertaRepository.clear();
+    await materialRepository.clear();
+  });
+
+  const crearAlertaPendiente = async () => {
+    const material = await materialRepository.save(
+      materialRepository.create({
+        nombre: 'Válvula 1/2"',
+        unidadMedida: 'Unidad',
+        stockActual: 2,
+        stockMinimo: 8,
+        activo: true,
+      }),
+    );
+    const alerta = await alertaRepository.save(
+      alertaRepository.create({
+        idMaterial: material.id,
+        stockActual: 2,
+        stockMinimo: 8,
+        estado: EstadoAlertaReposicion.PENDIENTE,
+        fechaGeneracion: new Date('2026-09-14T10:00:00Z'),
+        idUsuarioGestiona: null,
+      }),
+    );
+    return { material, alerta };
+  };
+
+  it('rechaza con 401 si no hay sesión y con 403 si el rol no es Administradora', async () => {
+    await adminPost(1).expect(HttpStatus.UNAUTHORIZED);
+    await adminPost(1, {}, signAs(Role.FONTANERO, '7')).expect(
+      HttpStatus.FORBIDDEN,
+    );
+  });
+
+  it('retorna 404 si la alerta no existe', async () => {
+    await adminPost(
+      999,
+      {},
+      signAs(Role.ADMINISTRADORA, String(administradora.idUsuario)),
+    ).expect(HttpStatus.NOT_FOUND);
+  });
+
+  it('genera reposición desde alerta válida sin modificar stock', async () => {
+    const { material, alerta } = await crearAlertaPendiente();
+    const token = signAs(
+      Role.ADMINISTRADORA,
+      String(administradora.idUsuario),
+    );
+
+    const res = await adminPost(alerta.id, {}, token).expect(HttpStatus.CREATED);
+
+    expect(res.body.codigo).toMatch(/^REP-\d{4}$/);
+    expect(res.body.origen).toBe(OrigenReposicionMaterial.ALERTA_STOCK_MINIMO);
+    expect(res.body.estado).toBe(EstadoReposicionMaterial.PENDIENTE);
+    expect(res.body.idAlertaReposicion).toBe(alerta.id);
+    expect(res.body.idUsuarioResponsable).toBe(administradora.idUsuario);
+    expect(res.body.detalles).toHaveLength(1);
+    expect(res.body.detalles[0]).toMatchObject({
+      idMaterial: material.id,
+      cantidad: 6,
+    });
+
+    const materialDespues = await materialRepository.findOneBy({
+      id: material.id,
+    });
+    expect(materialDespues?.stockActual).toBe(2);
+
+    const persistida = await reposicionRepository.findOne({
+      where: { id: res.body.id },
+      relations: { detalles: true },
+    });
+    expect(persistida?.idAlertaReposicion).toBe(alerta.id);
+    expect(persistida?.detalles[0].cantidad).toBe(6);
+  });
+
+  it('acepta cantidad explícita y rechaza alerta resuelta o duplicada', async () => {
+    const { alerta } = await crearAlertaPendiente();
+    const token = signAs(
+      Role.ADMINISTRADORA,
+      String(administradora.idUsuario),
+    );
+
+    const primera = await adminPost(
+      alerta.id,
+      { cantidad: 20, observacion: 'Compra programada' },
+      token,
+    ).expect(HttpStatus.CREATED);
+    expect(primera.body.detalles[0].cantidad).toBe(20);
+    expect(primera.body.observacion).toBe('Compra programada');
+
+    await adminPost(alerta.id, { cantidad: 5 }, token).expect(
+      HttpStatus.CONFLICT,
+    );
+
+    alerta.estado = EstadoAlertaReposicion.RESUELTA;
+    await alertaRepository.save(alerta);
+
+    const { alerta: otra } = await crearAlertaPendiente();
+    otra.estado = EstadoAlertaReposicion.RESUELTA;
+    await alertaRepository.save(otra);
+    await adminPost(otra.id, {}, token).expect(HttpStatus.BAD_REQUEST);
   });
 });

@@ -22,6 +22,10 @@ import type { AuthenticatedUser } from '../../common/interfaces/authenticated-us
 import { InventarioService } from './inventario.service';
 import { AlertaReposicion } from './entities/alerta-reposicion.entity';
 import { EstadoAlertaReposicion } from '../../common/enums/estado-alerta-reposicion.enum';
+import { EstadoReposicionMaterial } from '../../common/enums/estado-reposicion-material.enum';
+import { OrigenReposicionMaterial } from '../../common/enums/origen-reposicion-material.enum';
+import { ReposicionMaterial } from './entities/reposicion-material.entity';
+import { DetalleReposicionMaterial } from './entities/detalle-reposicion-material.entity';
 
 describe('InventarioService — Catálogo de Materiales y Categorías', () => {
   let service: InventarioService;
@@ -78,6 +82,11 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
   let alertaQbGetCountSpy: jest.Mock;
   let alertaQbGetManySpy: jest.Mock;
   let alertaCreateQueryBuilderSpy: jest.Mock;
+  let reposicionRepoCreateSpy: jest.Mock;
+  let reposicionRepoSaveSpy: jest.Mock;
+  let reposicionRepoFindOneSpy: jest.Mock;
+  let reposicionRepoCountSpy: jest.Mock;
+  let detalleReposicionCreateSpy: jest.Mock;
   let mockManager: any;
 
   beforeEach(async () => {
@@ -248,6 +257,31 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
       createQueryBuilder: alertaCreateQueryBuilderSpy,
     };
 
+    reposicionRepoCreateSpy = jest
+      .fn()
+      .mockImplementation((data: Partial<ReposicionMaterial>) => data);
+    reposicionRepoSaveSpy = jest
+      .fn()
+      .mockImplementation((data: Partial<ReposicionMaterial>) =>
+        Promise.resolve({ id: 1, ...data } as ReposicionMaterial),
+      );
+    reposicionRepoFindOneSpy = jest.fn().mockResolvedValue(null);
+    reposicionRepoCountSpy = jest.fn().mockResolvedValue(0);
+    detalleReposicionCreateSpy = jest
+      .fn()
+      .mockImplementation((data: Partial<DetalleReposicionMaterial>) => data);
+
+    const mockReposicionRepo = {
+      create: reposicionRepoCreateSpy,
+      save: reposicionRepoSaveSpy,
+      findOne: reposicionRepoFindOneSpy,
+      count: reposicionRepoCountSpy,
+    };
+
+    const mockDetalleReposicionRepo = {
+      create: detalleReposicionCreateSpy,
+    };
+
     const mockDocRepo = {
       create: jest.fn().mockImplementation((data: any) => data),
       save: jest
@@ -264,6 +298,8 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
         if (entity === Proveedor) return mockProvRepo;
         if (entity === DocumentoMovimientoInventario) return mockDocRepo;
         if (entity === AlertaReposicion) return mockAlertaRepo;
+        if (entity === ReposicionMaterial) return mockReposicionRepo;
+        if (entity === DetalleReposicionMaterial) return mockDetalleReposicionRepo;
         return mockRepo;
       }),
       transaction: jest
@@ -299,6 +335,14 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
         {
           provide: getRepositoryToken(AlertaReposicion),
           useValue: mockAlertaRepo,
+        },
+        {
+          provide: getRepositoryToken(ReposicionMaterial),
+          useValue: mockReposicionRepo,
+        },
+        {
+          provide: getRepositoryToken(DetalleReposicionMaterial),
+          useValue: mockDetalleReposicionRepo,
         },
       ],
     }).compile();
@@ -2566,6 +2610,149 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
           admin,
         ),
       ).rejects.toThrow('Alerta de reposición con ID 99 no encontrada');
+    });
+  });
+
+  describe('generarReposicionDesdeAlertaAdmin', () => {
+    const admin = {
+      userId: '2',
+      idUsuario: 2,
+      email: 'admin@asada.test',
+      role: Role.ADMINISTRADORA,
+      name: 'Ana Admin',
+    };
+
+    const alertaPendiente = () => ({
+      id: 9,
+      idMaterial: 4,
+      stockActual: 3,
+      stockMinimo: 10,
+      estado: EstadoAlertaReposicion.PENDIENTE,
+      fechaGeneracion: new Date('2026-09-12T10:00:00Z'),
+      material: {
+        id: 4,
+        nombre: 'Tubo PVC',
+        unidadMedida: 'Metro',
+        stockActual: 3,
+        activo: true,
+      },
+    });
+
+    it('genera reposición PENDIENTE con cantidad calculada y no toca el stock', async () => {
+      const alerta = alertaPendiente();
+      alertaRepoFindOneSpy.mockResolvedValueOnce(alerta);
+      reposicionRepoFindOneSpy
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          id: 1,
+          codigo: 'REP-0001',
+          fechaGeneracion: new Date('2026-09-14T12:00:00Z'),
+          origen: OrigenReposicionMaterial.ALERTA_STOCK_MINIMO,
+          estado: EstadoReposicionMaterial.PENDIENTE,
+          idAlertaReposicion: 9,
+          idSolicitudMaterial: null,
+          idUsuarioResponsable: 2,
+          observacion: null,
+          usuarioResponsable: { idUsuario: 2, nombre: 'Ana Admin' },
+          detalles: [
+            {
+              id: 1,
+              idMaterial: 4,
+              cantidad: 7,
+              material: {
+                id: 4,
+                nombre: 'Tubo PVC',
+                unidadMedida: 'Metro',
+                stockActual: 3,
+              },
+            },
+          ],
+        });
+      reposicionRepoCountSpy.mockResolvedValueOnce(0);
+      repoFindOneSpy.mockResolvedValueOnce({
+        id: 4,
+        stockActual: 3,
+      });
+
+      const result = await service.generarReposicionDesdeAlertaAdmin(9, admin);
+
+      expect(reposicionRepoSaveSpy).toHaveBeenCalled();
+      const saved = reposicionRepoSaveSpy.mock.calls[0][0];
+      expect(saved.codigo).toBe('REP-0001');
+      expect(saved.origen).toBe(OrigenReposicionMaterial.ALERTA_STOCK_MINIMO);
+      expect(saved.estado).toBe(EstadoReposicionMaterial.PENDIENTE);
+      expect(saved.idAlertaReposicion).toBe(9);
+      expect(saved.idUsuarioResponsable).toBe(2);
+      expect(saved.detalles[0].cantidad).toBe(7);
+      expect(result).toMatchObject({
+        codigo: 'REP-0001',
+        origen: OrigenReposicionMaterial.ALERTA_STOCK_MINIMO,
+        estado: EstadoReposicionMaterial.PENDIENTE,
+        idAlertaReposicion: 9,
+        idUsuarioResponsable: 2,
+      });
+      expect(result.detalles[0]).toMatchObject({
+        idMaterial: 4,
+        cantidad: 7,
+      });
+    });
+
+    it('usa la cantidad indicada en el cuerpo cuando es válida', async () => {
+      alertaRepoFindOneSpy.mockResolvedValueOnce(alertaPendiente());
+      reposicionRepoFindOneSpy.mockResolvedValueOnce(null).mockResolvedValueOnce({
+        id: 2,
+        codigo: 'REP-0002',
+        origen: OrigenReposicionMaterial.ALERTA_STOCK_MINIMO,
+        estado: EstadoReposicionMaterial.PENDIENTE,
+        idAlertaReposicion: 9,
+        idUsuarioResponsable: 2,
+        detalles: [{ id: 1, idMaterial: 4, cantidad: 30, material: null }],
+      });
+      reposicionRepoCountSpy.mockResolvedValueOnce(1);
+
+      await service.generarReposicionDesdeAlertaAdmin(9, admin, { cantidad: 30 });
+
+      const saved = reposicionRepoSaveSpy.mock.calls[0][0];
+      expect(saved.codigo).toBe('REP-0002');
+      expect(saved.detalles[0].cantidad).toBe(30);
+    });
+
+    it('rechaza una alerta inexistente', async () => {
+      alertaRepoFindOneSpy.mockResolvedValueOnce(null);
+
+      await expect(
+        service.generarReposicionDesdeAlertaAdmin(99, admin),
+      ).rejects.toThrow('Alerta de reposición con ID 99 no encontrada');
+      expect(reposicionRepoSaveSpy).not.toHaveBeenCalled();
+    });
+
+    it('rechaza una alerta ya resuelta', async () => {
+      alertaRepoFindOneSpy.mockResolvedValueOnce({
+        ...alertaPendiente(),
+        estado: EstadoAlertaReposicion.RESUELTA,
+      });
+
+      await expect(
+        service.generarReposicionDesdeAlertaAdmin(9, admin),
+      ).rejects.toThrow(
+        'La alerta ya fue resuelta y no requiere una nueva reposición',
+      );
+    });
+
+    it('rechaza una reposición activa duplicada', async () => {
+      alertaRepoFindOneSpy.mockResolvedValueOnce(alertaPendiente());
+      reposicionRepoFindOneSpy.mockResolvedValueOnce({
+        id: 5,
+        codigo: 'REP-0005',
+        estado: EstadoReposicionMaterial.PENDIENTE,
+      });
+
+      await expect(
+        service.generarReposicionDesdeAlertaAdmin(9, admin),
+      ).rejects.toThrow(
+        'Ya existe una reposición activa (REP-0005) para esta alerta',
+      );
+      expect(reposicionRepoSaveSpy).not.toHaveBeenCalled();
     });
   });
 });

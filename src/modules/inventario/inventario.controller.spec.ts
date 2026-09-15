@@ -28,7 +28,11 @@ import { Proveedor } from './entities/proveedor.entity';
 import { SolicitudMaterial } from './entities/solicitud-material.entity';
 import { DetalleSolicitudMaterial } from './entities/detalle-solicitud-material.entity';
 import { AlertaReposicion } from './entities/alerta-reposicion.entity';
+import { ReposicionMaterial } from './entities/reposicion-material.entity';
+import { DetalleReposicionMaterial } from './entities/detalle-reposicion-material.entity';
 import { Averia } from '../averias/entities/averia.entity';
+import { Usuario } from '../usuarios/entities/usuario.entity';
+import { Rol } from '../usuarios/entities/rol.entity';
 import { RegistrarEntradaDto } from './dto/registrar-entrada.dto';
 import { RegistrarSalidaDto } from './dto/registrar-salida.dto';
 import { InventarioController } from './inventario.controller';
@@ -525,6 +529,11 @@ describe('InventarioController — Endpoints de Materiales', () => {
         id: 1,
         estado: 'EN_GESTION',
       }),
+      generarReposicionDesdeAlertaAdmin: jest.fn().mockResolvedValue({
+        id: 1,
+        codigo: 'REP-0001',
+        estado: 'PENDIENTE',
+      }),
     };
 
     const moduleRef: TestingModule = await Test.createTestingModule({
@@ -554,6 +563,14 @@ describe('InventarioController — Endpoints de Materiales', () => {
       .overrideProvider(getRepositoryToken(Averia))
       .useValue({})
       .overrideProvider(getRepositoryToken(AlertaReposicion))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(ReposicionMaterial))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(DetalleReposicionMaterial))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(Usuario))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(Rol))
       .useValue({})
       .overrideProvider(InventarioService)
       .useValue(mockInventarioService)
@@ -1971,6 +1988,39 @@ describe('InventarioController — Endpoints de Materiales', () => {
         .set('Authorization', `Bearer ${token}`);
 
       expect(res.status).toBe(HttpStatus.NOT_FOUND);
+    });
+  });
+
+  describe('Integración HTTP: POST /api/v1/admin/inventario/alertas-reposicion/:id/reposicion', () => {
+    it('rechaza con 401 Unauthorized si no se envía token JWT', async () => {
+      const res = await request(app.getHttpServer()).post(
+        '/api/v1/admin/inventario/alertas-reposicion/1/reposicion',
+      );
+
+      expect(res.status).toBe(HttpStatus.UNAUTHORIZED);
+    });
+
+    it('rechaza con 403 Forbidden si el rol no es Administradora', async () => {
+      const token = signAs(Role.FONTANERO);
+
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/admin/inventario/alertas-reposicion/1/reposicion')
+        .set('Authorization', `Bearer ${token}`)
+        .send({});
+
+      expect(res.status).toBe(HttpStatus.FORBIDDEN);
+    });
+
+    it('permite a ADMINISTRADORA generar reposición con 201 Created', async () => {
+      const token = signAs(Role.ADMINISTRADORA);
+
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/admin/inventario/alertas-reposicion/1/reposicion')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ cantidad: 12 });
+
+      expect(res.status).toBe(HttpStatus.CREATED);
+      expect(res.body.codigo).toBe('REP-0001');
     });
   });
 });
