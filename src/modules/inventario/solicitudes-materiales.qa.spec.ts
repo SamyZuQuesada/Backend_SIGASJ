@@ -19,6 +19,7 @@ import { Material } from './entities/material.entity';
 import { MovimientoInventario } from './entities/movimiento-inventario.entity';
 import { Proveedor } from './entities/proveedor.entity';
 import { SolicitudMaterial } from './entities/solicitud-material.entity';
+import { AlertaReposicion } from './entities/alerta-reposicion.entity';
 import { InventarioModule } from './inventario.module';
 
 describe('Solicitudes de Materiales por Fontanero (Backlog 4.6) — QA y Pruebas Funcionales', () => {
@@ -294,6 +295,8 @@ describe('Solicitudes de Materiales por Fontanero (Backlog 4.6) — QA y Pruebas
       .useValue(mockDetalleRepo)
       .overrideProvider(getRepositoryToken(Averia))
       .useValue(mockAveriaRepo)
+      .overrideProvider(getRepositoryToken(AlertaReposicion))
+      .useValue({})
       .compile();
 
     app = moduleRef.createNestApplication();

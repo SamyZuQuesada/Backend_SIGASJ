@@ -5,3 +5,4 @@ export * from './movimiento-inventario.entity';
 export * from './documento-movimiento-inventario.entity';
 export * from './solicitud-material.entity';
 export * from './detalle-solicitud-material.entity';
+export * from './alerta-reposicion.entity';

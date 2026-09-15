@@ -10,7 +10,8 @@ import {
   Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
+import { EstadoAlertaReposicion } from '../../common/enums/estado-alerta-reposicion.enum';
 import { EstadoSolicitudMaterial } from '../../common/enums/estado-solicitud-material.enum';
 import { Role } from '../../common/enums/role.enum';
 import { TipoMovimientoInventario } from '../../common/enums/tipo-movimiento-inventario.enum';
@@ -28,6 +29,7 @@ import {
   type MovimientoDocumentFile,
 } from '../../common/media/public-media';
 import { QueryProveedoresDto } from './dto/query-proveedores.dto';
+import { QueryAlertasReposicionDto } from './dto/query-alertas-reposicion.dto';
 import { QuerySolicitudesMaterialDto } from './dto/query-solicitudes-material.dto';
 import { RegistrarEntradaDto } from './dto/registrar-entrada.dto';
 import { RegistrarSalidaDto } from './dto/registrar-salida.dto';
@@ -43,6 +45,7 @@ import { MovimientoInventario } from './entities/movimiento-inventario.entity';
 import { Proveedor } from './entities/proveedor.entity';
 import { SolicitudMaterial } from './entities/solicitud-material.entity';
 import { DetalleSolicitudMaterial } from './entities/detalle-solicitud-material.entity';
+import { AlertaReposicion } from './entities/alerta-reposicion.entity';
 import {
   assertStockDisponible,
   ResultadoValidacionStock,
@@ -114,6 +117,9 @@ export class InventarioService {
     @Optional()
     @InjectRepository(Averia)
     private readonly averiaRepository?: Repository<Averia>,
+    @Optional()
+    @InjectRepository(AlertaReposicion)
+    private readonly alertaReposicionRepository?: Repository<AlertaReposicion>,
   ) {}
 
   /**
@@ -1217,6 +1223,8 @@ export class InventarioService {
 
             const movimientoGuardado = await movimientoRepo.save(movimiento);
 
+            await this.evaluarYGenerarAlertaReposicion(material, manager);
+
             this.logger.log(
               `Salida registrada con éxito: Material "${material.nombre}" (ID: ${material.id}), -${dto.cantidad} unidades (Stock: ${stockAnterior} -> ${stockActual}), Movimiento ID: ${movimientoGuardado.id}, Usuario ID: ${idUsuario}`,
             );
@@ -1242,6 +1250,233 @@ export class InventarioService {
       );
       throw new InternalServerErrorException(
         'No se pudo registrar la salida de inventario',
+      );
+    }
+  }
+
+  /**
+   * Evalúa el stock del material después de una operación que reduce existencias
+   * y genera una alerta de reposición cuando stockActual <= stockMinimo.
+   *
+   * No duplica alertas en estado PENDIENTE o EN_GESTION. Una alerta RESUELTA
+   * permite generar una nueva si el stock vuelve a caer al umbral.
+   * Un fallo al persistir la alerta no revierte la operación de inventario.
+   */
+  async evaluarYGenerarAlertaReposicion(
+    material: Material,
+    manager?: EntityManager,
+  ): Promise<AlertaReposicion | null> {
+    try {
+      const stockActual = material.stockActual ?? 0;
+      const stockMinimo = material.stockMinimo ?? 0;
+
+      if (stockActual > stockMinimo) {
+        return null;
+      }
+
+      const alertaRepo =
+        manager?.getRepository(AlertaReposicion) ??
+        this.alertaReposicionRepository;
+
+      if (!alertaRepo) {
+        this.logger.warn(
+          `No se evaluó alerta de reposición para el material ID ${material.id}: repositorio no disponible`,
+        );
+        return null;
+      }
+
+      const alertaActiva = await alertaRepo.findOne({
+        where: {
+          idMaterial: material.id,
+          estado: In([
+            EstadoAlertaReposicion.PENDIENTE,
+            EstadoAlertaReposicion.EN_GESTION,
+          ]),
+        },
+      });
+
+      if (alertaActiva) {
+        this.logger.log(
+          `Alerta de reposición activa ya existe para el material "${material.nombre}" (ID: ${material.id}, alerta ${alertaActiva.id}, estado ${alertaActiva.estado}). No se duplica.`,
+        );
+        return alertaActiva;
+      }
+
+      const alerta = alertaRepo.create({
+        idMaterial: material.id,
+        stockActual,
+        stockMinimo,
+        estado: EstadoAlertaReposicion.PENDIENTE,
+        fechaGeneracion: new Date(),
+        idUsuarioGestiona: null,
+      });
+
+      const guardada = await alertaRepo.save(alerta);
+      this.logger.warn(
+        `Alerta de reposición generada: Material "${material.nombre}" (ID: ${material.id}), stock ${stockActual} <= mínimo ${stockMinimo}. Alerta ID: ${guardada.id}`,
+      );
+      return guardada;
+    } catch (error) {
+      this.logger.error(
+        `No se pudo generar la alerta de reposición para el material ID ${material.id}. La operación de inventario no se revierte.`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Listado administrativo de alertas de reposición (3.8.3).
+   * No modifica stock. Ordena desde las más recientes.
+   */
+  async listarAlertasReposicionAdmin(
+    query?: QueryAlertasReposicionDto,
+  ): Promise<{
+    data: Record<string, unknown>[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const alertaRepo =
+      this.alertaReposicionRepository ??
+      this.materialRepository.manager.getRepository(AlertaReposicion);
+
+    const take = query?.limit && query.limit > 0 ? Number(query.limit) : 10;
+    const pageNum = query?.page && query.page > 0 ? Number(query.page) : 1;
+
+    try {
+      return await withDbRetry(async () => {
+        const qb = alertaRepo
+          .createQueryBuilder('alerta')
+          .leftJoinAndSelect('alerta.material', 'material')
+          .leftJoinAndSelect('alerta.usuarioGestiona', 'usuarioGestiona');
+
+        if (query?.estado) {
+          qb.where('alerta.estado = :estado', { estado: query.estado });
+        }
+
+        qb.orderBy('alerta.fechaGeneracion', 'DESC').addOrderBy(
+          'alerta.id',
+          'DESC',
+        );
+
+        const total = await qb.getCount();
+        const skip = (pageNum - 1) * take;
+        qb.skip(skip).take(take);
+        const alertas = await qb.getMany();
+
+        const data = alertas.map((alerta) => this.mapAlertaReposicionAdmin(alerta));
+
+        return {
+          data,
+          total,
+          page: pageNum,
+          limit: take,
+          totalPages: Math.ceil(total / take) || 0,
+        };
+      });
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(
+        'Error al consultar las alertas de reposición:',
+        error,
+      );
+      throw new InternalServerErrorException(
+        'No se pudieron consultar las alertas de reposición',
+      );
+    }
+  }
+
+  /**
+   * Actualiza el estado de una alerta de reposición (3.8.6).
+   * Flujo: PENDIENTE → EN_GESTION → RESUELTA. No se permite saltar ni revertir.
+   * Registra a la administradora responsable y actualiza updatedAt.
+   */
+  async cambiarEstadoAlertaReposicionAdmin(
+    id: number,
+    estado: EstadoAlertaReposicion,
+    user: AuthenticatedUser,
+  ): Promise<Record<string, unknown>> {
+    if (!id || !Number.isInteger(id) || id <= 0) {
+      throw new BadRequestException(
+        'El identificador de la alerta debe ser un número entero mayor a cero',
+      );
+    }
+
+    const rawUserId = user?.idUsuario ?? user?.userId;
+    const idUsuario = Number(rawUserId);
+    if (!idUsuario || Number.isNaN(idUsuario)) {
+      throw new BadRequestException(
+        'No se pudo identificar a la administradora responsable',
+      );
+    }
+
+    const siguientePermitido: Record<
+      EstadoAlertaReposicion,
+      EstadoAlertaReposicion | null
+    > = {
+      [EstadoAlertaReposicion.PENDIENTE]: EstadoAlertaReposicion.EN_GESTION,
+      [EstadoAlertaReposicion.EN_GESTION]: EstadoAlertaReposicion.RESUELTA,
+      [EstadoAlertaReposicion.RESUELTA]: null,
+    };
+
+    const alertaRepo =
+      this.alertaReposicionRepository ??
+      this.materialRepository.manager.getRepository(AlertaReposicion);
+
+    try {
+      return await withDbRetry(async () => {
+        const alerta = await alertaRepo.findOne({
+          where: { id },
+          relations: { material: true, usuarioGestiona: true },
+        });
+
+        if (!alerta) {
+          throw new NotFoundException(
+            `Alerta de reposición con ID ${id} no encontrada`,
+          );
+        }
+
+        if (alerta.estado === estado) {
+          throw new BadRequestException(
+            `La alerta ya se encuentra en estado ${alerta.estado}`,
+          );
+        }
+
+        const esperado = siguientePermitido[alerta.estado];
+        if (esperado !== estado) {
+          throw new BadRequestException(
+            `No se puede cambiar una alerta de ${alerta.estado} a ${estado}. ` +
+              'Las transiciones permitidas son PENDIENTE → EN_GESTION → RESUELTA.',
+          );
+        }
+
+        alerta.estado = estado;
+        alerta.idUsuarioGestiona = idUsuario;
+        await alertaRepo.save(alerta);
+
+        const actualizada = await alertaRepo.findOne({
+          where: { id },
+          relations: { material: true, usuarioGestiona: true },
+        });
+
+        return this.mapAlertaReposicionAdmin(actualizada ?? alerta);
+      });
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(
+        `Error al actualizar el estado de la alerta de reposición ${id}:`,
+        error,
+      );
+      throw new InternalServerErrorException(
+        'No se pudo actualizar el estado de la alerta de reposición',
       );
     }
   }
@@ -2036,6 +2271,32 @@ export class InventarioService {
             }
           : null,
       })),
+    };
+  }
+
+  private mapAlertaReposicionAdmin(alerta: AlertaReposicion): Record<string, unknown> {
+    return {
+      id: alerta.id,
+      idMaterial: alerta.idMaterial,
+      stockActual: alerta.stockActual,
+      stockMinimo: alerta.stockMinimo,
+      estado: alerta.estado,
+      fechaGeneracion: alerta.fechaGeneracion,
+      updatedAt: alerta.updatedAt,
+      idUsuarioGestiona: alerta.idUsuarioGestiona,
+      material: alerta.material
+        ? {
+            id: alerta.material.id,
+            nombre: alerta.material.nombre,
+            unidadMedida: alerta.material.unidadMedida,
+          }
+        : null,
+      usuarioGestiona: alerta.idUsuarioGestiona
+        ? {
+            id: alerta.idUsuarioGestiona,
+            nombre: this.nombreUsuarioResumen(alerta.usuarioGestiona),
+          }
+        : null,
     };
   }
 

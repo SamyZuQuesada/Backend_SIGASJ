@@ -13,6 +13,7 @@ import jwtConfig from '../../config/jwt.config';
 import { AuthModule } from '../auth/auth.module';
 import { Averia } from '../averias/entities/averia.entity';
 import { SolicitudServicio } from '../solicitudes/entities/solicitud-servicio.entity';
+import { Rol } from '../usuarios/entities/rol.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { CategoriaMaterial } from './entities/categoria-material.entity';
 import { DocumentoMovimientoInventario } from './entities/documento-movimiento-inventario.entity';
@@ -21,7 +22,12 @@ import { MovimientoInventario } from './entities/movimiento-inventario.entity';
 import { Proveedor } from './entities/proveedor.entity';
 import { SolicitudMaterial } from './entities/solicitud-material.entity';
 import { DetalleSolicitudMaterial } from './entities/detalle-solicitud-material.entity';
+import { AlertaReposicion } from './entities/alerta-reposicion.entity';
 import { InventarioModule } from './inventario.module';
+import {
+  crearUsuarioPrueba,
+  seedRolesBase,
+} from '../usuarios/usuarios.test-helpers';
 
 const salidasQaTypeOrmModule = TypeOrmModule.forRoot({
   type: 'sqljs',
@@ -29,6 +35,7 @@ const salidasQaTypeOrmModule = TypeOrmModule.forRoot({
   dropSchema: true,
   entities: [
     Usuario,
+    Rol,
     Material,
     CategoriaMaterial,
     Proveedor,
@@ -38,6 +45,7 @@ const salidasQaTypeOrmModule = TypeOrmModule.forRoot({
     SolicitudServicio,
     SolicitudMaterial,
     DetalleSolicitudMaterial,
+    AlertaReposicion,
   ],
   synchronize: true,
 });
@@ -90,7 +98,7 @@ describe('Salidas de Inventario — QA Integral, Validación Funcional y Transac
           load: [jwtConfig],
         }),
         salidasQaTypeOrmModule,
-        TypeOrmModule.forFeature([Usuario, Averia, SolicitudServicio]),
+        TypeOrmModule.forFeature([Usuario, Rol, Averia, SolicitudServicio]),
         AuthModule,
         InventarioModule,
       ],
@@ -124,23 +132,36 @@ describe('Salidas de Inventario — QA Integral, Validación Funcional y Transac
     usuarioRepository = moduleRef.get<Repository<Usuario>>(
       getRepositoryToken(Usuario),
     );
+    const rolRepository = moduleRef.get<Repository<Rol>>(
+      getRepositoryToken(Rol),
+    );
+    const roles = await seedRolesBase(rolRepository);
 
-    // Sembrar usuarios en la base de datos
-    adminUser = await usuarioRepository.save(
-      usuarioRepository.create({ idUsuario: 1 }),
-    );
-    fontaneroUser = await usuarioRepository.save(
-      usuarioRepository.create({ idUsuario: 2 }),
-    );
-    otroFontaneroUser = await usuarioRepository.save(
-      usuarioRepository.create({ idUsuario: 3 }),
-    );
-    secretariaUser = await usuarioRepository.save(
-      usuarioRepository.create({ idUsuario: 4 }),
-    );
-    abonadoUser = await usuarioRepository.save(
-      usuarioRepository.create({ idUsuario: 5 }),
-    );
+    adminUser = await crearUsuarioPrueba(usuarioRepository, roles, {
+      nombre: 'Administradora QA',
+      correo: 'admin.salidas@asada.test',
+      role: Role.ADMINISTRADORA,
+    });
+    fontaneroUser = await crearUsuarioPrueba(usuarioRepository, roles, {
+      nombre: 'Fontanero QA',
+      correo: 'fontanero.salidas@asada.test',
+      role: Role.FONTANERO,
+    });
+    otroFontaneroUser = await crearUsuarioPrueba(usuarioRepository, roles, {
+      nombre: 'Otro Fontanero QA',
+      correo: 'fontanero2.salidas@asada.test',
+      role: Role.FONTANERO,
+    });
+    secretariaUser = await crearUsuarioPrueba(usuarioRepository, roles, {
+      nombre: 'Secretaria QA',
+      correo: 'secretaria.salidas@asada.test',
+      role: Role.SECRETARIA,
+    });
+    abonadoUser = await crearUsuarioPrueba(usuarioRepository, roles, {
+      nombre: 'Abonado QA',
+      correo: 'abonado.salidas@asada.test',
+      role: Role.ABONADO,
+    });
   });
 
   afterAll(async () => {

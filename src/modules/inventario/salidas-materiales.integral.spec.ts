@@ -11,6 +11,7 @@ import { getRepositoryToken, TypeOrmModule } from '@nestjs/typeorm';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import { Repository } from 'typeorm';
+import { EstadoAlertaReposicion } from '../../common/enums/estado-alerta-reposicion.enum';
 import { Role } from '../../common/enums/role.enum';
 import { TipoMovimientoInventario } from '../../common/enums/tipo-movimiento-inventario.enum';
 import type { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
@@ -18,6 +19,7 @@ import jwtConfig from '../../config/jwt.config';
 import { AuthModule } from '../auth/auth.module';
 import { Averia } from '../averias/entities/averia.entity';
 import { SolicitudServicio } from '../solicitudes/entities/solicitud-servicio.entity';
+import { Rol } from '../usuarios/entities/rol.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { CategoriaMaterial } from './entities/categoria-material.entity';
 import { DocumentoMovimientoInventario } from './entities/documento-movimiento-inventario.entity';
@@ -26,8 +28,13 @@ import { MovimientoInventario } from './entities/movimiento-inventario.entity';
 import { Proveedor } from './entities/proveedor.entity';
 import { SolicitudMaterial } from './entities/solicitud-material.entity';
 import { DetalleSolicitudMaterial } from './entities/detalle-solicitud-material.entity';
+import { AlertaReposicion } from './entities/alerta-reposicion.entity';
 import { InventarioModule } from './inventario.module';
 import { InventarioService } from './inventario.service';
+import {
+  crearUsuarioPrueba,
+  seedRolesBase,
+} from '../usuarios/usuarios.test-helpers';
 
 const integralSalidasTypeOrmModule = TypeOrmModule.forRoot({
   type: 'sqljs',
@@ -35,6 +42,7 @@ const integralSalidasTypeOrmModule = TypeOrmModule.forRoot({
   dropSchema: true,
   entities: [
     Usuario,
+    Rol,
     Material,
     CategoriaMaterial,
     Proveedor,
@@ -44,16 +52,19 @@ const integralSalidasTypeOrmModule = TypeOrmModule.forRoot({
     SolicitudServicio,
     SolicitudMaterial,
     DetalleSolicitudMaterial,
+    AlertaReposicion,
   ],
   synchronize: true,
 });
 
 describe('Backlog 4.5: Registro de Salidas de Materiales — Pruebas Funcionales e Integrales (Backend y BD)', () => {
+  jest.setTimeout(30_000);
   let app: INestApplication<App>;
   let jwtService: JwtService;
   let inventarioService: InventarioService;
   let materialRepository: Repository<Material>;
   let movimientoRepository: Repository<MovimientoInventario>;
+  let alertaReposicionRepository: Repository<AlertaReposicion>;
   let averiaRepository: Repository<Averia>;
   let usuarioRepository: Repository<Usuario>;
 
@@ -95,7 +106,7 @@ describe('Backlog 4.5: Registro de Salidas de Materiales — Pruebas Funcionales
           load: [jwtConfig],
         }),
         integralSalidasTypeOrmModule,
-        TypeOrmModule.forFeature([Usuario, Averia, SolicitudServicio]),
+        TypeOrmModule.forFeature([Usuario, Rol, Averia, SolicitudServicio]),
         AuthModule,
         InventarioModule,
       ],
@@ -121,32 +132,50 @@ describe('Backlog 4.5: Registro de Salidas de Materiales — Pruebas Funcionales
     movimientoRepository = moduleRef.get<Repository<MovimientoInventario>>(
       getRepositoryToken(MovimientoInventario),
     );
+    alertaReposicionRepository = moduleRef.get<Repository<AlertaReposicion>>(
+      getRepositoryToken(AlertaReposicion),
+    );
     averiaRepository = moduleRef.get<Repository<Averia>>(
       getRepositoryToken(Averia),
     );
     usuarioRepository = moduleRef.get<Repository<Usuario>>(
       getRepositoryToken(Usuario),
     );
+    const rolRepository = moduleRef.get<Repository<Rol>>(
+      getRepositoryToken(Rol),
+    );
+    const roles = await seedRolesBase(rolRepository);
 
-    fontaneroUser = await usuarioRepository.save(
-      usuarioRepository.create({ idUsuario: 10 }),
-    );
-    adminUser = await usuarioRepository.save(
-      usuarioRepository.create({ idUsuario: 11 }),
-    );
-    secretariaUser = await usuarioRepository.save(
-      usuarioRepository.create({ idUsuario: 12 }),
-    );
-    abonadoUser = await usuarioRepository.save(
-      usuarioRepository.create({ idUsuario: 13 }),
-    );
+    fontaneroUser = await crearUsuarioPrueba(usuarioRepository, roles, {
+      nombre: 'Fontanero Integral',
+      correo: 'fontanero.integral@asada.test',
+      role: Role.FONTANERO,
+    });
+    adminUser = await crearUsuarioPrueba(usuarioRepository, roles, {
+      nombre: 'Administradora Integral',
+      correo: 'admin.integral@asada.test',
+      role: Role.ADMINISTRADORA,
+    });
+    secretariaUser = await crearUsuarioPrueba(usuarioRepository, roles, {
+      nombre: 'Secretaria Integral',
+      correo: 'secretaria.integral@asada.test',
+      role: Role.SECRETARIA,
+    });
+    abonadoUser = await crearUsuarioPrueba(usuarioRepository, roles, {
+      nombre: 'Abonado Integral',
+      correo: 'abonado.integral@asada.test',
+      role: Role.ABONADO,
+    });
   });
 
   afterAll(async () => {
-    await app.close();
+    if (app) {
+      await app.close();
+    }
   });
 
   beforeEach(async () => {
+    await alertaReposicionRepository.clear();
     await movimientoRepository.clear();
     await materialRepository.clear();
     await averiaRepository.clear();
@@ -497,6 +526,111 @@ describe('Backlog 4.5: Registro de Salidas de Materiales — Pruebas Funcionales
 
       expect(res.status).toBe(400);
       expect(res.body.message).toContain('inactivo');
+    });
+  });
+
+  describe('Regla 3.8.2: Alerta de reposición por stock mínimo', () => {
+    it('no genera alerta cuando el stock queda por encima del mínimo', async () => {
+      const material = await createMaterial({
+        nombre: 'Codo PVC sin alerta',
+        stockActual: 20,
+        stockMinimo: 5,
+      });
+
+      const token = signAs(Role.FONTANERO, String(fontaneroUser.idUsuario));
+      await request(app.getHttpServer())
+        .post('/api/v1/inventario/salidas')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ idMaterial: material.id, cantidad: 5 })
+        .expect(201);
+
+      const alertas = await alertaReposicionRepository.find({
+        where: { idMaterial: material.id },
+      });
+      expect(alertas).toHaveLength(0);
+    });
+
+    it('genera alerta PENDIENTE relacionada al material con stock actual y mínimo', async () => {
+      const material = await createMaterial({
+        nombre: 'Tubo PVC alerta',
+        stockActual: 12,
+        stockMinimo: 10,
+      });
+
+      const token = signAs(Role.FONTANERO, String(fontaneroUser.idUsuario));
+      await request(app.getHttpServer())
+        .post('/api/v1/inventario/salidas')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ idMaterial: material.id, cantidad: 3 })
+        .expect(201);
+
+      const alertas = await alertaReposicionRepository.find({
+        where: { idMaterial: material.id },
+      });
+      expect(alertas).toHaveLength(1);
+      expect(alertas[0].idMaterial).toBe(material.id);
+      expect(alertas[0].stockActual).toBe(9);
+      expect(alertas[0].stockMinimo).toBe(10);
+      expect(alertas[0].estado).toBe(EstadoAlertaReposicion.PENDIENTE);
+      expect(alertas[0].fechaGeneracion).toBeInstanceOf(Date);
+    });
+
+    it('no duplica alerta activa ante una segunda salida del mismo material', async () => {
+      const material = await createMaterial({
+        nombre: 'Unión PVC alerta duplicada',
+        stockActual: 12,
+        stockMinimo: 10,
+      });
+
+      const token = signAs(Role.FONTANERO, String(fontaneroUser.idUsuario));
+      await request(app.getHttpServer())
+        .post('/api/v1/inventario/salidas')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ idMaterial: material.id, cantidad: 3 })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .post('/api/v1/inventario/salidas')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ idMaterial: material.id, cantidad: 1 })
+        .expect(201);
+
+      const alertas = await alertaReposicionRepository.find({
+        where: { idMaterial: material.id },
+      });
+      expect(alertas).toHaveLength(1);
+    });
+
+    it('permite una nueva alerta si la anterior está RESUELTA', async () => {
+      const material = await createMaterial({
+        nombre: 'Pegamento PVC alerta resuelta',
+        stockActual: 12,
+        stockMinimo: 10,
+      });
+
+      const token = signAs(Role.FONTANERO, String(fontaneroUser.idUsuario));
+      await request(app.getHttpServer())
+        .post('/api/v1/inventario/salidas')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ idMaterial: material.id, cantidad: 3 })
+        .expect(201);
+
+      const [primera] = await alertaReposicionRepository.find({
+        where: { idMaterial: material.id },
+      });
+      primera.estado = EstadoAlertaReposicion.RESUELTA;
+      await alertaReposicionRepository.save(primera);
+
+      await request(app.getHttpServer())
+        .post('/api/v1/inventario/salidas')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ idMaterial: material.id, cantidad: 1 })
+        .expect(201);
+
+      const alertas = await alertaReposicionRepository.find({
+        where: { idMaterial: material.id },
+      });
+      expect(alertas).toHaveLength(2);
     });
   });
 });

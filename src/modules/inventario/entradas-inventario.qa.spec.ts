@@ -11,6 +11,7 @@ import { TipoMovimientoInventario } from '../../common/enums/tipo-movimiento-inv
 import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
 import jwtConfig from '../../config/jwt.config';
 import { AuthModule } from '../auth/auth.module';
+import { Rol } from '../usuarios/entities/rol.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { CategoriaMaterial } from './entities/categoria-material.entity';
 import { DocumentoMovimientoInventario } from './entities/documento-movimiento-inventario.entity';
@@ -19,6 +20,7 @@ import { MovimientoInventario } from './entities/movimiento-inventario.entity';
 import { Proveedor } from './entities/proveedor.entity';
 import { SolicitudMaterial } from './entities/solicitud-material.entity';
 import { DetalleSolicitudMaterial } from './entities/detalle-solicitud-material.entity';
+import { AlertaReposicion } from './entities/alerta-reposicion.entity';
 import { Averia } from '../averias/entities/averia.entity';
 import { InventarioModule } from './inventario.module';
 
@@ -28,6 +30,7 @@ const entradasQaTypeOrmModule = TypeOrmModule.forRoot({
   dropSchema: true,
   entities: [
     Usuario,
+    Rol,
     Material,
     CategoriaMaterial,
     Proveedor,
@@ -35,6 +38,7 @@ const entradasQaTypeOrmModule = TypeOrmModule.forRoot({
     DocumentoMovimientoInventario,
     SolicitudMaterial,
     DetalleSolicitudMaterial,
+    AlertaReposicion,
     Averia,
   ],
   synchronize: true,

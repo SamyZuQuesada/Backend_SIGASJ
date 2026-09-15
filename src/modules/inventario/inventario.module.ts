@@ -8,9 +8,11 @@ import { MovimientoInventario } from './entities/movimiento-inventario.entity';
 import { Proveedor } from './entities/proveedor.entity';
 import { SolicitudMaterial } from './entities/solicitud-material.entity';
 import { DetalleSolicitudMaterial } from './entities/detalle-solicitud-material.entity';
+import { AlertaReposicion } from './entities/alerta-reposicion.entity';
 import { Averia } from '../averias/entities/averia.entity';
 import { InventarioController } from './inventario.controller';
 import { SolicitudesMaterialesController } from './solicitudes-materiales.controller';
+import { AlertasReposicionController } from './alertas-reposicion.controller';
 import { InventarioService } from './inventario.service';
 
 @Module({
@@ -23,10 +25,15 @@ import { InventarioService } from './inventario.service';
       DocumentoMovimientoInventario,
       SolicitudMaterial,
       DetalleSolicitudMaterial,
+      AlertaReposicion,
       Averia,
     ]),
   ],
-  controllers: [InventarioController, SolicitudesMaterialesController],
+  controllers: [
+    InventarioController,
+    SolicitudesMaterialesController,
+    AlertasReposicionController,
+  ],
   providers: [InventarioService, RolesGuard],
   exports: [TypeOrmModule, InventarioService],
 })

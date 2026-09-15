@@ -27,6 +27,7 @@ import { MovimientoInventario } from './entities/movimiento-inventario.entity';
 import { Proveedor } from './entities/proveedor.entity';
 import { SolicitudMaterial } from './entities/solicitud-material.entity';
 import { DetalleSolicitudMaterial } from './entities/detalle-solicitud-material.entity';
+import { AlertaReposicion } from './entities/alerta-reposicion.entity';
 import { Averia } from '../averias/entities/averia.entity';
 import { RegistrarEntradaDto } from './dto/registrar-entrada.dto';
 import { RegistrarSalidaDto } from './dto/registrar-salida.dto';
@@ -513,6 +514,17 @@ describe('InventarioController — Endpoints de Materiales', () => {
       registrarEntrada: registrarEntradaServiceSpy,
       registrarSalida: registrarSalidaServiceSpy,
       validarDisponibilidadStock: validarDisponibilidadStockSpy,
+      listarAlertasReposicionAdmin: jest.fn().mockResolvedValue({
+        data: [],
+        total: 0,
+        page: 1,
+        limit: 10,
+        totalPages: 0,
+      }),
+      cambiarEstadoAlertaReposicionAdmin: jest.fn().mockResolvedValue({
+        id: 1,
+        estado: 'EN_GESTION',
+      }),
     };
 
     const moduleRef: TestingModule = await Test.createTestingModule({
@@ -540,6 +552,8 @@ describe('InventarioController — Endpoints de Materiales', () => {
       .overrideProvider(getRepositoryToken(DetalleSolicitudMaterial))
       .useValue({})
       .overrideProvider(getRepositoryToken(Averia))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(AlertaReposicion))
       .useValue({})
       .overrideProvider(InventarioService)
       .useValue(mockInventarioService)

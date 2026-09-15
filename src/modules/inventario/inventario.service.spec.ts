@@ -20,6 +20,8 @@ import { RegistrarEntradaDto } from './dto/registrar-entrada.dto';
 import { RegistrarSalidaDto } from './dto/registrar-salida.dto';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { InventarioService } from './inventario.service';
+import { AlertaReposicion } from './entities/alerta-reposicion.entity';
+import { EstadoAlertaReposicion } from '../../common/enums/estado-alerta-reposicion.enum';
 
 describe('InventarioService — Catálogo de Materiales y Categorías', () => {
   let service: InventarioService;
@@ -65,6 +67,17 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
   let movRepoCreateSpy: jest.Mock;
   let movRepoSaveSpy: jest.Mock;
   let movRepoFindOneSpy: jest.Mock;
+  let alertaRepoCreateSpy: jest.Mock;
+  let alertaRepoSaveSpy: jest.Mock;
+  let alertaRepoFindOneSpy: jest.Mock;
+  let alertaQbWhereSpy: jest.Mock;
+  let alertaQbOrderBySpy: jest.Mock;
+  let alertaQbAddOrderBySpy: jest.Mock;
+  let alertaQbSkipSpy: jest.Mock;
+  let alertaQbTakeSpy: jest.Mock;
+  let alertaQbGetCountSpy: jest.Mock;
+  let alertaQbGetManySpy: jest.Mock;
+  let alertaCreateQueryBuilderSpy: jest.Mock;
   let mockManager: any;
 
   beforeEach(async () => {
@@ -198,6 +211,43 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
       findOne: movRepoFindOneSpy,
     };
 
+    alertaRepoCreateSpy = jest
+      .fn()
+      .mockImplementation((data: Partial<AlertaReposicion>) => data);
+    alertaRepoSaveSpy = jest
+      .fn()
+      .mockImplementation((data: Partial<AlertaReposicion>) =>
+        Promise.resolve({ id: 1, ...data } as AlertaReposicion),
+      );
+    alertaRepoFindOneSpy = jest.fn().mockResolvedValue(null);
+
+    alertaQbWhereSpy = jest.fn().mockReturnThis();
+    alertaQbOrderBySpy = jest.fn().mockReturnThis();
+    alertaQbAddOrderBySpy = jest.fn().mockReturnThis();
+    alertaQbSkipSpy = jest.fn().mockReturnThis();
+    alertaQbTakeSpy = jest.fn().mockReturnThis();
+    alertaQbGetCountSpy = jest.fn().mockResolvedValue(0);
+    alertaQbGetManySpy = jest.fn().mockResolvedValue([]);
+
+    const mockAlertaQb = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      where: alertaQbWhereSpy,
+      orderBy: alertaQbOrderBySpy,
+      addOrderBy: alertaQbAddOrderBySpy,
+      skip: alertaQbSkipSpy,
+      take: alertaQbTakeSpy,
+      getCount: alertaQbGetCountSpy,
+      getMany: alertaQbGetManySpy,
+    };
+    alertaCreateQueryBuilderSpy = jest.fn().mockReturnValue(mockAlertaQb);
+
+    const mockAlertaRepo = {
+      create: alertaRepoCreateSpy,
+      save: alertaRepoSaveSpy,
+      findOne: alertaRepoFindOneSpy,
+      createQueryBuilder: alertaCreateQueryBuilderSpy,
+    };
+
     const mockDocRepo = {
       create: jest.fn().mockImplementation((data: any) => data),
       save: jest
@@ -213,6 +263,7 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
         if (entity === MovimientoInventario) return mockMovRepo;
         if (entity === Proveedor) return mockProvRepo;
         if (entity === DocumentoMovimientoInventario) return mockDocRepo;
+        if (entity === AlertaReposicion) return mockAlertaRepo;
         return mockRepo;
       }),
       transaction: jest
@@ -244,6 +295,10 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
         {
           provide: getRepositoryToken(DocumentoMovimientoInventario),
           useValue: mockDocRepo,
+        },
+        {
+          provide: getRepositoryToken(AlertaReposicion),
+          useValue: mockAlertaRepo,
         },
       ],
     }).compile();
@@ -2112,6 +2167,120 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
         'No se pudo registrar la salida de inventario',
       );
     });
+
+    it('no genera alerta de reposición cuando el stock resultante queda por encima del mínimo', async () => {
+      const materialMock: Partial<Material> = {
+        id: 1,
+        nombre: 'Tubo PVC',
+        stockActual: 30,
+        stockMinimo: 10,
+        activo: true,
+      };
+      repoFindOneSpy.mockResolvedValueOnce(materialMock);
+
+      await service.registrarSalida(
+        { idMaterial: 1, cantidad: 5 },
+        fontaneroUser,
+      );
+
+      expect(alertaRepoSaveSpy).not.toHaveBeenCalled();
+    });
+
+    it('genera alerta PENDIENTE al quedar el stock igual o por debajo del mínimo (12 - 3 = 9, mínimo 10)', async () => {
+      const materialMock: Partial<Material> = {
+        id: 1,
+        nombre: 'Tubo PVC',
+        stockActual: 12,
+        stockMinimo: 10,
+        activo: true,
+      };
+      repoFindOneSpy.mockResolvedValueOnce(materialMock);
+
+      await service.registrarSalida(
+        { idMaterial: 1, cantidad: 3 },
+        fontaneroUser,
+      );
+
+      expect(alertaRepoFindOneSpy).toHaveBeenCalled();
+      expect(alertaRepoCreateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          idMaterial: 1,
+          stockActual: 9,
+          stockMinimo: 10,
+          estado: EstadoAlertaReposicion.PENDIENTE,
+          idUsuarioGestiona: null,
+        }),
+      );
+      expect(alertaRepoSaveSpy).toHaveBeenCalled();
+    });
+
+    it('no duplica una alerta si ya existe una PENDIENTE o EN_GESTION para el mismo material', async () => {
+      const materialMock: Partial<Material> = {
+        id: 1,
+        nombre: 'Tubo PVC',
+        stockActual: 8,
+        stockMinimo: 10,
+        activo: true,
+      };
+      repoFindOneSpy.mockResolvedValueOnce(materialMock);
+      alertaRepoFindOneSpy.mockResolvedValueOnce({
+        id: 44,
+        idMaterial: 1,
+        estado: EstadoAlertaReposicion.PENDIENTE,
+      });
+
+      await service.registrarSalida(
+        { idMaterial: 1, cantidad: 2 },
+        fontaneroUser,
+      );
+
+      expect(alertaRepoSaveSpy).not.toHaveBeenCalled();
+    });
+
+    it('permite una nueva alerta si la anterior ya está RESUELTA', async () => {
+      const materialMock: Partial<Material> = {
+        id: 1,
+        nombre: 'Tubo PVC',
+        stockActual: 9,
+        stockMinimo: 10,
+        activo: true,
+      };
+      repoFindOneSpy.mockResolvedValueOnce(materialMock);
+      alertaRepoFindOneSpy.mockResolvedValueOnce(null);
+
+      await service.registrarSalida(
+        { idMaterial: 1, cantidad: 1 },
+        fontaneroUser,
+      );
+
+      expect(alertaRepoCreateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          idMaterial: 1,
+          estado: EstadoAlertaReposicion.PENDIENTE,
+        }),
+      );
+      expect(alertaRepoSaveSpy).toHaveBeenCalled();
+    });
+
+    it('no revierte la salida si falla la persistencia de la alerta', async () => {
+      const materialMock: Partial<Material> = {
+        id: 1,
+        nombre: 'Tubo PVC',
+        stockActual: 5,
+        stockMinimo: 10,
+        activo: true,
+      };
+      repoFindOneSpy.mockResolvedValueOnce(materialMock);
+      alertaRepoSaveSpy.mockRejectedValueOnce(new Error('Fallo al guardar alerta'));
+
+      const result = await service.registrarSalida(
+        { idMaterial: 1, cantidad: 1 },
+        fontaneroUser,
+      );
+
+      expect(result.stockActual).toBe(4);
+      expect(movRepoSaveSpy).toHaveBeenCalled();
+    });
   });
 
   describe('validarDisponibilidadStock (Regla 4.5.2)', () => {
@@ -2230,6 +2399,173 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
       await expect(service.validarDisponibilidadStock(0, 5)).rejects.toThrow(
         'El identificador del material debe ser un número entero mayor a cero',
       );
+    });
+  });
+
+  describe('listarAlertasReposicionAdmin', () => {
+    it('retorna lista vacía paginada cuando no hay alertas', async () => {
+      const result = await service.listarAlertasReposicionAdmin();
+
+      expect(alertaCreateQueryBuilderSpy).toHaveBeenCalledWith('alerta');
+      expect(result).toEqual({
+        data: [],
+        total: 0,
+        page: 1,
+        limit: 10,
+        totalPages: 0,
+      });
+    });
+
+    it('mapea material, stock, estado, fecha y responsable sin datos innecesarios', async () => {
+      alertaQbGetCountSpy.mockResolvedValueOnce(1);
+      alertaQbGetManySpy.mockResolvedValueOnce([
+        {
+          id: 9,
+          idMaterial: 4,
+          stockActual: 3,
+          stockMinimo: 10,
+          estado: EstadoAlertaReposicion.EN_GESTION,
+          fechaGeneracion: new Date('2026-09-12T10:00:00Z'),
+          updatedAt: new Date('2026-09-13T10:00:00Z'),
+          idUsuarioGestiona: 2,
+          material: {
+            id: 4,
+            nombre: 'Tubo PVC',
+            unidadMedida: 'Metro',
+            descripcion: 'no debe exponerse extra',
+          },
+          usuarioGestiona: { idUsuario: 2, nombre: 'Ana Admin' },
+        },
+      ]);
+
+      const result = await service.listarAlertasReposicionAdmin({
+        estado: EstadoAlertaReposicion.EN_GESTION,
+        page: 1,
+        limit: 20,
+      });
+
+      expect(alertaQbWhereSpy).toHaveBeenCalledWith('alerta.estado = :estado', {
+        estado: EstadoAlertaReposicion.EN_GESTION,
+      });
+      expect(result.total).toBe(1);
+      expect(result.limit).toBe(20);
+      expect(result.data[0]).toMatchObject({
+        id: 9,
+        stockActual: 3,
+        stockMinimo: 10,
+        estado: EstadoAlertaReposicion.EN_GESTION,
+        material: {
+          id: 4,
+          nombre: 'Tubo PVC',
+          unidadMedida: 'Metro',
+        },
+        usuarioGestiona: { id: 2, nombre: 'Ana Admin' },
+      });
+      expect(result.data[0].material).not.toHaveProperty('descripcion');
+    });
+
+    it('lanza InternalServerErrorException si la consulta falla', async () => {
+      alertaQbGetCountSpy.mockRejectedValueOnce(new Error('Fallo SQL Server'));
+
+      await expect(service.listarAlertasReposicionAdmin()).rejects.toThrow(
+        'No se pudieron consultar las alertas de reposición',
+      );
+    });
+  });
+
+  describe('cambiarEstadoAlertaReposicionAdmin', () => {
+    const admin = {
+      userId: '2',
+      idUsuario: 2,
+      email: 'admin@asada.test',
+      role: Role.ADMINISTRADORA,
+      name: 'Ana Admin',
+    };
+
+    const alertaPendiente = () => ({
+      id: 9,
+      idMaterial: 4,
+      stockActual: 3,
+      stockMinimo: 10,
+      estado: EstadoAlertaReposicion.PENDIENTE,
+      fechaGeneracion: new Date('2026-09-12T10:00:00Z'),
+      updatedAt: new Date('2026-09-12T10:00:00Z'),
+      idUsuarioGestiona: null as number | null,
+      material: { id: 4, nombre: 'Tubo PVC', unidadMedida: 'Metro' },
+      usuarioGestiona: null,
+    });
+
+    it('pasa de PENDIENTE a EN_GESTION y registra a la administradora', async () => {
+      const pendiente = alertaPendiente();
+      alertaRepoFindOneSpy
+        .mockResolvedValueOnce(pendiente)
+        .mockResolvedValueOnce({
+          ...pendiente,
+          estado: EstadoAlertaReposicion.EN_GESTION,
+          idUsuarioGestiona: 2,
+          updatedAt: new Date('2026-09-13T10:00:00Z'),
+          usuarioGestiona: { idUsuario: 2, nombre: 'Ana Admin' },
+        });
+
+      const result = await service.cambiarEstadoAlertaReposicionAdmin(
+        9,
+        EstadoAlertaReposicion.EN_GESTION,
+        admin,
+      );
+
+      expect(alertaRepoSaveSpy).toHaveBeenCalled();
+      expect(result).toMatchObject({
+        id: 9,
+        estado: EstadoAlertaReposicion.EN_GESTION,
+        idUsuarioGestiona: 2,
+        usuarioGestiona: { id: 2, nombre: 'Ana Admin' },
+      });
+    });
+
+    it('pasa de EN_GESTION a RESUELTA', async () => {
+      const enGestion = {
+        ...alertaPendiente(),
+        estado: EstadoAlertaReposicion.EN_GESTION,
+        idUsuarioGestiona: 2,
+      };
+      alertaRepoFindOneSpy.mockResolvedValueOnce(enGestion).mockResolvedValueOnce({
+        ...enGestion,
+        estado: EstadoAlertaReposicion.RESUELTA,
+        usuarioGestiona: { idUsuario: 2, nombre: 'Ana Admin' },
+      });
+
+      const result = await service.cambiarEstadoAlertaReposicionAdmin(
+        9,
+        EstadoAlertaReposicion.RESUELTA,
+        admin,
+      );
+
+      expect(result.estado).toBe(EstadoAlertaReposicion.RESUELTA);
+    });
+
+    it('rechaza saltar de PENDIENTE a RESUELTA', async () => {
+      alertaRepoFindOneSpy.mockResolvedValueOnce(alertaPendiente());
+
+      await expect(
+        service.cambiarEstadoAlertaReposicionAdmin(
+          9,
+          EstadoAlertaReposicion.RESUELTA,
+          admin,
+        ),
+      ).rejects.toThrow('No se puede cambiar una alerta de PENDIENTE a RESUELTA');
+      expect(alertaRepoSaveSpy).not.toHaveBeenCalled();
+    });
+
+    it('rechaza una alerta inexistente', async () => {
+      alertaRepoFindOneSpy.mockResolvedValueOnce(null);
+
+      await expect(
+        service.cambiarEstadoAlertaReposicionAdmin(
+          99,
+          EstadoAlertaReposicion.EN_GESTION,
+          admin,
+        ),
+      ).rejects.toThrow('Alerta de reposición con ID 99 no encontrada');
     });
   });
 });
