@@ -16,6 +16,7 @@ import { Usuario } from '../../usuarios/entities/usuario.entity';
 import { Material } from './material.entity';
 import { Proveedor } from './proveedor.entity';
 import { DocumentoMovimientoInventario } from './documento-movimiento-inventario.entity';
+import { ReposicionMaterial } from './reposicion-material.entity';
 
 /**
  * Entidad que registra y conserva la trazabilidad histórica de todas las operaciones
@@ -133,6 +134,23 @@ export class MovimientoInventario {
    */
   @Column({ type: 'int', nullable: true })
   idProyecto?: number | null;
+
+  /**
+   * Referencia opcional a una reposición/compra cuya recepción generó esta ENTRADA.
+   */
+  @Index('IX_MovimientoInventario_idReposicion')
+  @Column({ type: 'int', nullable: true })
+  idReposicion?: number | null;
+
+  /**
+   * Reposición relacionada cuando la entrada proviene de una recepción de compra.
+   */
+  @ManyToOne(() => ReposicionMaterial, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'idReposicion' })
+  reposicion?: ReposicionMaterial | null;
 
   /**
    * Documentos de respaldo adjuntos a este movimiento (facturas, comprobantes, etc.)

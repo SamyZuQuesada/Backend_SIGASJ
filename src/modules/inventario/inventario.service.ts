@@ -38,6 +38,7 @@ import { QueryProveedoresDto } from './dto/query-proveedores.dto';
 import { QueryAlertasReposicionDto } from './dto/query-alertas-reposicion.dto';
 import { CreateReposicionDesdeAlertaDto } from './dto/create-reposicion-desde-alerta.dto';
 import { RegistrarCompraReposicionDto } from './dto/registrar-compra-reposicion.dto';
+import { RegistrarRecepcionDto } from './dto/registrar-recepcion.dto';
 import { QueryReposicionesDto } from './dto/query-reposiciones.dto';
 import { QuerySolicitudesMaterialDto } from './dto/query-solicitudes-material.dto';
 import { RegistrarEntradaDto } from './dto/registrar-entrada.dto';
@@ -2044,12 +2045,9 @@ export class InventarioService {
           );
         }
 
-        if (
-          estado === EstadoReposicionMaterial.RECIBIDA &&
-          (!reposicion.idProveedor || !reposicion.fechaCompra)
-        ) {
+        if (estado === EstadoReposicionMaterial.RECIBIDA) {
           throw new BadRequestException(
-            'No se puede marcar como recibida una reposición sin compra registrada',
+            'Para registrar la recepción física y actualizar existencias utilice POST /admin/inventario/recepciones',
           );
         }
 
@@ -2064,13 +2062,6 @@ export class InventarioService {
 
         reposicion.estado = estado;
         reposicion.idUsuarioResponsable = idUsuario;
-
-        if (
-          estado === EstadoReposicionMaterial.RECIBIDA &&
-          !reposicion.fechaRecepcion
-        ) {
-          reposicion.fechaRecepcion = new Date();
-        }
 
         await reposicionRepo.save(reposicion);
 
@@ -2098,6 +2089,223 @@ export class InventarioService {
       );
       throw new InternalServerErrorException(
         'No se pudo actualizar el estado de la reposición',
+      );
+    }
+  }
+
+  /**
+   * Registra la recepción física de una reposición pendiente (3.10).
+   * Genera movimientos ENTRADA, actualiza existencias y marca la reposición como RECIBIDA.
+   */
+  async registrarRecepcionReposicionAdmin(
+    dto: RegistrarRecepcionDto,
+    user: AuthenticatedUser,
+  ): Promise<Record<string, unknown>> {
+    const idReposicion = dto.idReposicion;
+    if (!idReposicion || !Number.isInteger(idReposicion) || idReposicion <= 0) {
+      throw new BadRequestException(
+        'El identificador de la reposición debe ser un número entero mayor a cero',
+      );
+    }
+
+    const rawUserId = user?.idUsuario ?? user?.userId;
+    const idUsuario = Number(rawUserId);
+    if (!idUsuario || Number.isNaN(idUsuario)) {
+      throw new BadRequestException(
+        'No se pudo identificar a la administradora responsable',
+      );
+    }
+
+    const reposicionRepo =
+      this.reposicionMaterialRepository ??
+      this.materialRepository.manager.getRepository(ReposicionMaterial);
+
+    try {
+      return await withDbRetry(async () => {
+        return await this.materialRepository.manager.transaction(
+          async (manager) => {
+            const reposicionRepoTx =
+              manager.getRepository(ReposicionMaterial);
+            const movimientoRepoTx =
+              manager.getRepository(MovimientoInventario);
+            const materialRepoTx = manager.getRepository(Material);
+
+            const reposicion = await reposicionRepoTx.findOne({
+              where: { id: idReposicion },
+              relations: { detalles: { material: true }, proveedor: true },
+            });
+
+            if (!reposicion) {
+              throw new NotFoundException(
+                `Reposición con ID ${idReposicion} no encontrada`,
+              );
+            }
+
+            if (reposicion.estado !== EstadoReposicionMaterial.PENDIENTE_RECEPCION) {
+              throw new BadRequestException(
+                `Solo se pueden recibir reposiciones en estado ${EstadoReposicionMaterial.PENDIENTE_RECEPCION}. Estado actual: ${reposicion.estado}`,
+              );
+            }
+
+            if (!reposicion.idProveedor || !reposicion.fechaCompra) {
+              throw new BadRequestException(
+                'No se puede recibir una reposición sin compra registrada',
+              );
+            }
+
+            const movimientosPrevios = await movimientoRepoTx.count({
+              where: { idReposicion: reposicion.id },
+            });
+            if (movimientosPrevios > 0) {
+              throw new ConflictException(
+                'Esta reposición ya tiene movimientos de entrada registrados',
+              );
+            }
+
+            const detallesCompra = reposicion.detalles ?? [];
+            if (detallesCompra.length === 0) {
+              throw new BadRequestException(
+                'La reposición no tiene materiales comprados para recibir',
+              );
+            }
+
+            const cantidadPorMaterial = new Map<number, number>();
+            for (const item of dto.detalles) {
+              const idMaterial = item.idMaterial ?? item.materialId;
+              if (!idMaterial) {
+                throw new BadRequestException(
+                  'Cada material recibido debe incluir idMaterial',
+                );
+              }
+              if (cantidadPorMaterial.has(idMaterial)) {
+                throw new BadRequestException(
+                  `El material ${idMaterial} está duplicado en la recepción`,
+                );
+              }
+              cantidadPorMaterial.set(idMaterial, item.cantidad);
+            }
+
+            if (cantidadPorMaterial.size !== detallesCompra.length) {
+              throw new BadRequestException(
+                'Debe indicar la cantidad recibida de todos los materiales comprados',
+              );
+            }
+
+            const fechaRecepcion = new Date();
+            const observacionRecepcion = dto.observacion?.trim() || null;
+            const movimientosCreados: MovimientoInventario[] = [];
+            const existenciasActualizadas: Array<{
+              idMaterial: number;
+              stockAnterior: number;
+              stockActual: number;
+            }> = [];
+
+            for (const detalle of detallesCompra) {
+              const cantidadRecibida = cantidadPorMaterial.get(detalle.idMaterial);
+              if (cantidadRecibida === undefined) {
+                throw new BadRequestException(
+                  `Falta indicar la cantidad recibida del material ${detalle.idMaterial}`,
+                );
+              }
+
+              if (cantidadRecibida !== detalle.cantidad) {
+                throw new BadRequestException(
+                  `La cantidad recibida (${cantidadRecibida}) debe coincidir con la cantidad comprada (${detalle.cantidad}) para el material ${detalle.idMaterial}`,
+                );
+              }
+
+              const material = await materialRepoTx.findOne({
+                where: { id: detalle.idMaterial },
+              });
+
+              if (!material) {
+                throw new NotFoundException(
+                  `Material con ID ${detalle.idMaterial} no encontrado`,
+                );
+              }
+
+              if (!material.activo) {
+                throw new BadRequestException(
+                  `No se pueden recibir materiales inactivos: "${material.nombre}"`,
+                );
+              }
+
+              const stockAnterior = material.stockActual;
+              const stockActual = stockAnterior + cantidadRecibida;
+              material.stockActual = stockActual;
+              await materialRepoTx.save(material);
+
+              const observacionMovimiento = observacionRecepcion
+                ? `Recepción reposición #${reposicion.id}: ${observacionRecepcion}`
+                : `Recepción reposición #${reposicion.id}`;
+
+              const movimiento = movimientoRepoTx.create({
+                tipo: TipoMovimientoInventario.ENTRADA,
+                cantidad: cantidadRecibida,
+                fechaMovimiento: fechaRecepcion,
+                observacion: observacionMovimiento,
+                idMaterial: material.id,
+                idUsuario,
+                idProveedor: reposicion.idProveedor,
+                idReposicion: reposicion.id,
+              });
+
+              const movimientoGuardado = await movimientoRepoTx.save(movimiento);
+              movimientosCreados.push(movimientoGuardado);
+              existenciasActualizadas.push({
+                idMaterial: material.id,
+                stockAnterior,
+                stockActual,
+              });
+            }
+
+            reposicion.estado = EstadoReposicionMaterial.RECIBIDA;
+            reposicion.idUsuarioResponsable = idUsuario;
+            reposicion.fechaRecepcion = fechaRecepcion;
+            if (observacionRecepcion) {
+              reposicion.observacion = observacionRecepcion;
+            }
+            await reposicionRepoTx.save(reposicion);
+
+            const actualizada = await reposicionRepoTx.findOne({
+              where: { id: idReposicion },
+              relations: {
+                detalles: { material: true },
+                proveedor: true,
+                usuarioResponsable: true,
+                alertaReposicion: true,
+                solicitudMaterial: true,
+              },
+            });
+
+            return {
+              ...this.mapReposicionMaterialAdmin(actualizada ?? reposicion),
+              movimientos: movimientosCreados.map((mov) => ({
+                id: mov.id,
+                tipo: mov.tipo,
+                cantidad: mov.cantidad,
+                idMaterial: mov.idMaterial,
+                idReposicion: mov.idReposicion,
+                fechaMovimiento: mov.fechaMovimiento,
+              })),
+              existenciasActualizadas,
+              mensaje:
+                'Recepción registrada. Se generaron entradas de inventario y se actualizaron las existencias.',
+            };
+          },
+        );
+      });
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(
+        `Error al registrar recepción de la reposición ${idReposicion}:`,
+        error,
+      );
+      throw new InternalServerErrorException(
+        'No se pudo registrar la recepción de materiales',
       );
     }
   }

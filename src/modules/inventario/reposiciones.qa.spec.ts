@@ -637,7 +637,7 @@ describe('3.9.6 Estados y transiciones de reposiciones', () => {
     ).expect(HttpStatus.BAD_REQUEST);
   });
 
-  it('permite marcar RECIBIDA y COMPLETADA cuando existe compra y recepción', async () => {
+  it('permite marcar COMPLETADA después de recepción vía POST recepciones', async () => {
     const proveedor = await proveedorRepository.save(
       proveedorRepository.create({
         nombre: 'Ferretería Central',
@@ -678,11 +678,14 @@ describe('3.9.6 Estados y transiciones de reposiciones', () => {
       String(administradora.idUsuario),
     );
 
-    const recibida = await adminPatchEstado(
-      reposicion.id,
-      { estado: EstadoReposicionMaterial.RECIBIDA },
-      token,
-    ).expect(HttpStatus.OK);
+    const recibida = await request(app.getHttpServer())
+      .post('/api/v1/admin/inventario/recepciones')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        idReposicion: reposicion.id,
+        detalles: [{ idMaterial: material.id, cantidad: 8 }],
+      })
+      .expect(HttpStatus.OK);
 
     expect(recibida.body.estado).toBe(EstadoReposicionMaterial.RECIBIDA);
     expect(recibida.body.fechaRecepcion).toBeDefined();

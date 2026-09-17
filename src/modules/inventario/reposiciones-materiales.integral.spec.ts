@@ -132,7 +132,7 @@ describe('Backlog 3.9: Reposición y compra de materiales — Pruebas integrales
     await proveedorRepository.clear();
   });
 
-  it('recorre alerta → reposición → gestión → compra → recepción → completada sin alterar stock hasta integrar entradas', async () => {
+  it('recorre alerta → reposición → gestión → compra → recepción → completada con actualización de stock', async () => {
     const material = await materialRepository.save(
       materialRepository.create({
         nombre: 'Tubo PVC Integral',
@@ -223,18 +223,30 @@ describe('Backlog 3.9: Reposición y compra de materiales — Pruebas integrales
       .expect(HttpStatus.CONFLICT);
 
     const recepcionRes = await request(app.getHttpServer())
-      .patch(`/api/v1/admin/inventario/reposiciones/${reposicionId}/estado`)
+      .post('/api/v1/admin/inventario/recepciones')
       .set('Authorization', `Bearer ${token}`)
-      .send({ estado: EstadoReposicionMaterial.RECIBIDA })
+      .send({
+        idReposicion: reposicionId,
+        detalles: [{ idMaterial: material.id, cantidad: 50 }],
+      })
       .expect(HttpStatus.OK);
 
     expect(recepcionRes.body.estado).toBe(EstadoReposicionMaterial.RECIBIDA);
     expect(recepcionRes.body.fechaRecepcion).toBeDefined();
+    expect(recepcionRes.body.movimientos).toHaveLength(1);
+
+    const stockTrasRecepcion = await materialRepository.findOneBy({
+      id: material.id,
+    });
+    expect(stockTrasRecepcion?.stockActual).toBe(58);
 
     await request(app.getHttpServer())
-      .patch(`/api/v1/admin/inventario/reposiciones/${reposicionId}/estado`)
+      .post('/api/v1/admin/inventario/recepciones')
       .set('Authorization', `Bearer ${token}`)
-      .send({ estado: EstadoReposicionMaterial.RECIBIDA })
+      .send({
+        idReposicion: reposicionId,
+        detalles: [{ idMaterial: material.id, cantidad: 50 }],
+      })
       .expect(HttpStatus.BAD_REQUEST);
 
     const completadaRes = await request(app.getHttpServer())
