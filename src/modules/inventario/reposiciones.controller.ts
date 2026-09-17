@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -28,6 +29,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { QueryReposicionesDto } from './dto/query-reposiciones.dto';
 import { RegistrarCompraReposicionDto } from './dto/registrar-compra-reposicion.dto';
+import { UpdateEstadoReposicionDto } from './dto/update-estado-reposicion.dto';
 import { InventarioService } from './inventario.service';
 
 @ApiTags('Reposiciones de Materiales')
@@ -117,5 +119,37 @@ export class ReposicionesController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.inventarioService.registrarCompraReposicionAdmin(id, dto, user);
+  }
+
+  @Patch([
+    'admin/inventario/reposiciones/:id/estado',
+    'inventario/reposiciones/:id/estado',
+    'admin/reposiciones/:id/estado',
+  ])
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.ADMINISTRADORA)
+  @ApiOperation({
+    summary: 'Actualizar el estado de una reposición (Administradora)',
+    description:
+      'Permite avanzar la reposición en el flujo administrativo. ' +
+      'Registra a la administradora responsable y la fecha de actualización. No modifica el stock.',
+  })
+  @ApiParam({ name: 'id', description: 'ID de la reposición', type: Number })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Reposición actualizada' })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Estado inválido o transición no permitida',
+  })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'No encontrada' })
+  cambiarEstado(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateEstadoReposicionDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.inventarioService.cambiarEstadoReposicionAdmin(
+      id,
+      dto.estado,
+      user,
+    );
   }
 }

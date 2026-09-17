@@ -13,6 +13,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, In, Repository } from 'typeorm';
 import { EstadoAlertaReposicion } from '../../common/enums/estado-alerta-reposicion.enum';
 import { EstadoReposicionMaterial } from '../../common/enums/estado-reposicion-material.enum';
+import {
+  esTransicionEstadoReposicionValida,
+  MENSAJE_TRANSICIONES_ESTADO_REPOSICION,
+} from '../../common/enums/estado-reposicion-material.transitions';
 import { OrigenReposicionMaterial } from '../../common/enums/origen-reposicion-material.enum';
 import { EstadoSolicitudMaterial } from '../../common/enums/estado-solicitud-material.enum';
 import { Role } from '../../common/enums/role.enum';
@@ -1928,7 +1932,7 @@ export class InventarioService {
           reposicion.idProveedor = proveedor.id;
           reposicion.fechaCompra = dto.fechaCompra;
           reposicion.idUsuarioResponsable = idUsuario;
-          reposicion.estado = EstadoReposicionMaterial.COMPRA_REGISTRADA;
+          reposicion.estado = EstadoReposicionMaterial.PENDIENTE_RECEPCION;
           reposicion.observacion = this.construirObservacionCompra(
             dto.referenciaCompra,
             dto.observacion,
@@ -1973,6 +1977,127 @@ export class InventarioService {
       );
       throw new InternalServerErrorException(
         'No se pudo registrar la compra de la reposición',
+      );
+    }
+  }
+
+  /**
+   * Actualiza el estado de una reposición de materiales (3.9.6).
+   * Valida transiciones, registra responsable y updatedAt. No modifica existencias.
+   */
+  async cambiarEstadoReposicionAdmin(
+    id: number,
+    estado: EstadoReposicionMaterial,
+    user: AuthenticatedUser,
+  ): Promise<Record<string, unknown>> {
+    if (!id || !Number.isInteger(id) || id <= 0) {
+      throw new BadRequestException(
+        'El identificador de la reposición debe ser un número entero mayor a cero',
+      );
+    }
+
+    const rawUserId = user?.idUsuario ?? user?.userId;
+    const idUsuario = Number(rawUserId);
+    if (!idUsuario || Number.isNaN(idUsuario)) {
+      throw new BadRequestException(
+        'No se pudo identificar a la administradora responsable',
+      );
+    }
+
+    const reposicionRepo =
+      this.reposicionMaterialRepository ??
+      this.materialRepository.manager.getRepository(ReposicionMaterial);
+
+    try {
+      return await withDbRetry(async () => {
+        const reposicion = await reposicionRepo.findOne({
+          where: { id },
+          relations: {
+            detalles: { material: true },
+            proveedor: true,
+            usuarioResponsable: true,
+          },
+        });
+
+        if (!reposicion) {
+          throw new NotFoundException(`Reposición con ID ${id} no encontrada`);
+        }
+
+        if (reposicion.estado === estado) {
+          throw new BadRequestException(
+            `La reposición ya se encuentra en estado ${reposicion.estado}`,
+          );
+        }
+
+        if (!esTransicionEstadoReposicionValida(reposicion.estado, estado)) {
+          throw new BadRequestException(
+            `No se puede cambiar una reposición de ${reposicion.estado} a ${estado}. ${MENSAJE_TRANSICIONES_ESTADO_REPOSICION}`,
+          );
+        }
+
+        if (
+          estado === EstadoReposicionMaterial.PENDIENTE_RECEPCION &&
+          (!reposicion.idProveedor || !reposicion.fechaCompra)
+        ) {
+          throw new BadRequestException(
+            'No se puede marcar pendiente de recepción sin una compra registrada',
+          );
+        }
+
+        if (
+          estado === EstadoReposicionMaterial.RECIBIDA &&
+          (!reposicion.idProveedor || !reposicion.fechaCompra)
+        ) {
+          throw new BadRequestException(
+            'No se puede marcar como recibida una reposición sin compra registrada',
+          );
+        }
+
+        if (
+          estado === EstadoReposicionMaterial.COMPLETADA &&
+          !reposicion.fechaRecepcion
+        ) {
+          throw new BadRequestException(
+            'No se puede completar una reposición que aún no fue recibida',
+          );
+        }
+
+        reposicion.estado = estado;
+        reposicion.idUsuarioResponsable = idUsuario;
+
+        if (
+          estado === EstadoReposicionMaterial.RECIBIDA &&
+          !reposicion.fechaRecepcion
+        ) {
+          reposicion.fechaRecepcion = new Date();
+        }
+
+        await reposicionRepo.save(reposicion);
+
+        const actualizada = await reposicionRepo.findOne({
+          where: { id },
+          relations: {
+            detalles: { material: true },
+            proveedor: true,
+            usuarioResponsable: true,
+            alertaReposicion: true,
+            solicitudMaterial: true,
+          },
+        });
+
+        return this.mapReposicionMaterialAdmin(actualizada ?? reposicion);
+      });
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(
+        `Error al actualizar el estado de la reposición ${id}:`,
+        error,
+      );
+      throw new InternalServerErrorException(
+        'No se pudo actualizar el estado de la reposición',
       );
     }
   }
@@ -2800,6 +2925,7 @@ export class InventarioService {
       idUsuarioResponsable: reposicion.idUsuarioResponsable,
       idProveedor: reposicion.idProveedor,
       fechaCompra: reposicion.fechaCompra,
+      fechaRecepcion: reposicion.fechaRecepcion,
       observacion: reposicion.observacion,
       updatedAt: reposicion.updatedAt,
       proveedor: reposicion.idProveedor

@@ -235,7 +235,7 @@ describe('3.9.3 Registrar compra de reposición de materiales', () => {
       token,
     ).expect(HttpStatus.OK);
 
-    expect(res.body.estado).toBe(EstadoReposicionMaterial.COMPRA_REGISTRADA);
+    expect(res.body.estado).toBe(EstadoReposicionMaterial.PENDIENTE_RECEPCION);
     expect(res.body.idProveedor).toBe(proveedor.id);
     expect(res.body.proveedor).toEqual({
       id: proveedor.id,
@@ -257,7 +257,7 @@ describe('3.9.3 Registrar compra de reposición de materiales', () => {
       where: { id: reposicion.id },
       relations: { detalles: true, proveedor: true },
     });
-    expect(persistida?.estado).toBe(EstadoReposicionMaterial.COMPRA_REGISTRADA);
+    expect(persistida?.estado).toBe(EstadoReposicionMaterial.PENDIENTE_RECEPCION);
     expect(persistida?.idProveedor).toBe(proveedor.id);
     expect(persistida?.detalles[0].cantidad).toBe(30);
   });
@@ -494,5 +494,205 @@ describe('3.9.4 Consulta administrativa de reposiciones', () => {
     expect(detalle.body.detalles).toHaveLength(1);
 
     await adminGet('/999', token).expect(HttpStatus.NOT_FOUND);
+  });
+});
+
+describe('3.9.6 Estados y transiciones de reposiciones', () => {
+  jest.setTimeout(30_000);
+
+  let app: INestApplication<App>;
+  let jwtService: JwtService;
+  let materialRepository: Repository<Material>;
+  let proveedorRepository: Repository<Proveedor>;
+  let reposicionRepository: Repository<ReposicionMaterial>;
+  let detalleReposicionRepository: Repository<DetalleReposicionMaterial>;
+  let usuarioRepository: Repository<Usuario>;
+  let administradora: Usuario;
+
+  const signAs = (role: Role | string, sub?: string) => {
+    const payload: JwtPayload = {
+      sub: sub ?? String(administradora?.idUsuario ?? 1),
+      email: `${String(role).toLowerCase()}@asada.test`,
+      role: role as Role,
+      name: `Usuario ${String(role)}`,
+    };
+    return jwtService.sign(payload);
+  };
+
+  const adminPatchEstado = (
+    id: number,
+    body: Record<string, unknown>,
+    token?: string,
+  ) => {
+    const req = request(app.getHttpServer()).patch(
+      `/api/v1/admin/inventario/reposiciones/${id}/estado`,
+    );
+    if (token) {
+      req.set('Authorization', `Bearer ${token}`);
+    }
+    return req.send(body);
+  };
+
+  beforeAll(async () => {
+    const moduleRef: TestingModule = await Test.createTestingModule({
+      imports: [
+        ConfigModule.forRoot({
+          isGlobal: true,
+          load: [jwtConfig],
+        }),
+        reposicionesQaTypeOrmModule,
+        TypeOrmModule.forFeature([Usuario, Rol]),
+        AuthModule,
+        InventarioModule,
+      ],
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    app.setGlobalPrefix('api/v1');
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+        transformOptions: { enableImplicitConversion: true },
+      }),
+    );
+    await app.init();
+
+    jwtService = moduleRef.get(JwtService);
+    materialRepository = moduleRef.get(getRepositoryToken(Material));
+    proveedorRepository = moduleRef.get(getRepositoryToken(Proveedor));
+    reposicionRepository = moduleRef.get(getRepositoryToken(ReposicionMaterial));
+    detalleReposicionRepository = moduleRef.get(
+      getRepositoryToken(DetalleReposicionMaterial),
+    );
+    usuarioRepository = moduleRef.get(getRepositoryToken(Usuario));
+    const rolRepository = moduleRef.get<Repository<Rol>>(getRepositoryToken(Rol));
+    const roles = await seedRolesBase(rolRepository);
+
+    administradora = await crearUsuarioPrueba(usuarioRepository, roles, {
+      nombre: 'Administradora Reposiciones Estado',
+      correo: 'admin.reposiciones.estado@asada.test',
+      role: Role.ADMINISTRADORA,
+    });
+  });
+
+  afterAll(async () => {
+    if (app) {
+      await app.close();
+    }
+  });
+
+  beforeEach(async () => {
+    await detalleReposicionRepository.clear();
+    await reposicionRepository.clear();
+    await materialRepository.clear();
+    await proveedorRepository.clear();
+  });
+
+  it('avanza PENDIENTE a EN_GESTION y rechaza saltos inválidos', async () => {
+    const material = await materialRepository.save(
+      materialRepository.create({
+        nombre: 'Codo PVC',
+        unidadMedida: 'Unidad',
+        stockActual: 2,
+        stockMinimo: 6,
+        activo: true,
+      }),
+    );
+
+    const reposicion = await reposicionRepository.save(
+      reposicionRepository.create({
+        codigo: 'REP-0030',
+        fechaGeneracion: new Date('2026-09-16T10:00:00Z'),
+        origen: OrigenReposicionMaterial.ADMINISTRATIVA,
+        estado: EstadoReposicionMaterial.PENDIENTE,
+        idUsuarioResponsable: administradora.idUsuario,
+        detalles: [
+          detalleReposicionRepository.create({
+            idMaterial: material.id,
+            cantidad: 5,
+          }),
+        ],
+      }),
+    );
+
+    const token = signAs(
+      Role.ADMINISTRADORA,
+      String(administradora.idUsuario),
+    );
+
+    const enGestion = await adminPatchEstado(
+      reposicion.id,
+      { estado: EstadoReposicionMaterial.EN_GESTION },
+      token,
+    ).expect(HttpStatus.OK);
+
+    expect(enGestion.body.estado).toBe(EstadoReposicionMaterial.EN_GESTION);
+
+    await adminPatchEstado(
+      reposicion.id,
+      { estado: EstadoReposicionMaterial.COMPLETADA },
+      token,
+    ).expect(HttpStatus.BAD_REQUEST);
+  });
+
+  it('permite marcar RECIBIDA y COMPLETADA cuando existe compra y recepción', async () => {
+    const proveedor = await proveedorRepository.save(
+      proveedorRepository.create({
+        nombre: 'Ferretería Central',
+        activo: true,
+      }),
+    );
+
+    const material = await materialRepository.save(
+      materialRepository.create({
+        nombre: 'Tubo PVC',
+        unidadMedida: 'Metro',
+        stockActual: 4,
+        stockMinimo: 10,
+        activo: true,
+      }),
+    );
+
+    const reposicion = await reposicionRepository.save(
+      reposicionRepository.create({
+        codigo: 'REP-0031',
+        fechaGeneracion: new Date('2026-09-16T10:00:00Z'),
+        origen: OrigenReposicionMaterial.ADMINISTRATIVA,
+        estado: EstadoReposicionMaterial.PENDIENTE_RECEPCION,
+        idUsuarioResponsable: administradora.idUsuario,
+        idProveedor: proveedor.id,
+        fechaCompra: new Date('2026-09-15T12:00:00Z'),
+        detalles: [
+          detalleReposicionRepository.create({
+            idMaterial: material.id,
+            cantidad: 8,
+          }),
+        ],
+      }),
+    );
+
+    const token = signAs(
+      Role.ADMINISTRADORA,
+      String(administradora.idUsuario),
+    );
+
+    const recibida = await adminPatchEstado(
+      reposicion.id,
+      { estado: EstadoReposicionMaterial.RECIBIDA },
+      token,
+    ).expect(HttpStatus.OK);
+
+    expect(recibida.body.estado).toBe(EstadoReposicionMaterial.RECIBIDA);
+    expect(recibida.body.fechaRecepcion).toBeDefined();
+
+    const completada = await adminPatchEstado(
+      reposicion.id,
+      { estado: EstadoReposicionMaterial.COMPLETADA },
+      token,
+    ).expect(HttpStatus.OK);
+
+    expect(completada.body.estado).toBe(EstadoReposicionMaterial.COMPLETADA);
   });
 });

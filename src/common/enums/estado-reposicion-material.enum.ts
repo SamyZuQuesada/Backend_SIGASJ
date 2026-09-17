@@ -1,6 +1,6 @@
 /**
  * Estados del proceso de reposición y compra de materiales.
- * Las transiciones se implementan en la tarea 3.9.6.
+ * Las reglas de transición están en estado-reposicion-material.transitions.ts.
  */
 export enum EstadoReposicionMaterial {
   PENDIENTE = 'PENDIENTE',

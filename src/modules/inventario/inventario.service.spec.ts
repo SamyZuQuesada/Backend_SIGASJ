@@ -2810,7 +2810,7 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
         .mockResolvedValueOnce(reposicion)
         .mockResolvedValueOnce({
           ...reposicion,
-          estado: EstadoReposicionMaterial.COMPRA_REGISTRADA,
+          estado: EstadoReposicionMaterial.PENDIENTE_RECEPCION,
           idProveedor: 2,
           fechaCompra: dtoCompra.fechaCompra,
           idUsuarioResponsable: 2,
@@ -2852,12 +2852,12 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
 
       expect(reposicionRepoSaveSpy).toHaveBeenCalled();
       const saved = reposicionRepoSaveSpy.mock.calls[0][0];
-      expect(saved.estado).toBe(EstadoReposicionMaterial.COMPRA_REGISTRADA);
+      expect(saved.estado).toBe(EstadoReposicionMaterial.PENDIENTE_RECEPCION);
       expect(saved.idProveedor).toBe(2);
       expect(saved.fechaCompra).toEqual(dtoCompra.fechaCompra);
       expect(result).toMatchObject({
         codigo: 'REP-0012',
-        estado: EstadoReposicionMaterial.COMPRA_REGISTRADA,
+        estado: EstadoReposicionMaterial.PENDIENTE_RECEPCION,
         idProveedor: 2,
         proveedor: { id: 2, nombre: 'Ferretería ABC' },
       });
@@ -2893,12 +2893,65 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
     it('rechaza compra duplicada', async () => {
       reposicionRepoFindOneSpy.mockResolvedValueOnce({
         ...reposicionPendiente(),
-        estado: EstadoReposicionMaterial.COMPRA_REGISTRADA,
+        estado: EstadoReposicionMaterial.PENDIENTE_RECEPCION,
       });
 
       await expect(
         service.registrarCompraReposicionAdmin(12, dtoCompra, admin),
       ).rejects.toThrow('ya tiene una compra registrada');
+    });
+  });
+
+  describe('cambiarEstadoReposicionAdmin', () => {
+    const admin = {
+      userId: '2',
+      idUsuario: 2,
+      email: 'admin@asada.test',
+      role: Role.ADMINISTRADORA,
+      name: 'Ana Admin',
+    };
+
+    it('avanza PENDIENTE a EN_GESTION', async () => {
+      const reposicion = {
+        id: 12,
+        codigo: 'REP-0012',
+        estado: EstadoReposicionMaterial.PENDIENTE,
+        idUsuarioResponsable: 1,
+        detalles: [],
+      };
+      reposicionRepoFindOneSpy
+        .mockResolvedValueOnce(reposicion)
+        .mockResolvedValueOnce({
+          ...reposicion,
+          estado: EstadoReposicionMaterial.EN_GESTION,
+          idUsuarioResponsable: 2,
+          usuarioResponsable: { idUsuario: 2, nombre: 'Ana Admin' },
+        });
+
+      const result = await service.cambiarEstadoReposicionAdmin(
+        12,
+        EstadoReposicionMaterial.EN_GESTION,
+        admin,
+      );
+
+      expect(reposicionRepoSaveSpy).toHaveBeenCalled();
+      expect(result.estado).toBe(EstadoReposicionMaterial.EN_GESTION);
+    });
+
+    it('rechaza transición inválida', async () => {
+      reposicionRepoFindOneSpy.mockResolvedValueOnce({
+        id: 12,
+        estado: EstadoReposicionMaterial.PENDIENTE,
+        detalles: [],
+      });
+
+      await expect(
+        service.cambiarEstadoReposicionAdmin(
+          12,
+          EstadoReposicionMaterial.COMPLETADA,
+          admin,
+        ),
+      ).rejects.toThrow('No se puede cambiar una reposición');
     });
   });
 });
