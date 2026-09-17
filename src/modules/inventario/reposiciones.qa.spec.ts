@@ -318,3 +318,181 @@ describe('3.9.3 Registrar compra de reposición de materiales', () => {
     ).expect(HttpStatus.BAD_REQUEST);
   });
 });
+
+describe('3.9.4 Consulta administrativa de reposiciones', () => {
+  jest.setTimeout(30_000);
+
+  let app: INestApplication<App>;
+  let jwtService: JwtService;
+  let materialRepository: Repository<Material>;
+  let proveedorRepository: Repository<Proveedor>;
+  let reposicionRepository: Repository<ReposicionMaterial>;
+  let detalleReposicionRepository: Repository<DetalleReposicionMaterial>;
+  let usuarioRepository: Repository<Usuario>;
+  let administradora: Usuario;
+
+  const signAs = (role: Role | string, sub?: string) => {
+    const payload: JwtPayload = {
+      sub: sub ?? String(administradora?.idUsuario ?? 1),
+      email: `${String(role).toLowerCase()}@asada.test`,
+      role: role as Role,
+      name: `Usuario ${String(role)}`,
+    };
+    return jwtService.sign(payload);
+  };
+
+  const adminGet = (path = '', token?: string) => {
+    const req = request(app.getHttpServer()).get(
+      `/api/v1/admin/inventario/reposiciones${path}`,
+    );
+    if (token) {
+      req.set('Authorization', `Bearer ${token}`);
+    }
+    return req;
+  };
+
+  beforeAll(async () => {
+    const moduleRef: TestingModule = await Test.createTestingModule({
+      imports: [
+        ConfigModule.forRoot({
+          isGlobal: true,
+          load: [jwtConfig],
+        }),
+        reposicionesQaTypeOrmModule,
+        TypeOrmModule.forFeature([Usuario, Rol]),
+        AuthModule,
+        InventarioModule,
+      ],
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    app.setGlobalPrefix('api/v1');
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+        transformOptions: { enableImplicitConversion: true },
+      }),
+    );
+    await app.init();
+
+    jwtService = moduleRef.get(JwtService);
+    materialRepository = moduleRef.get(getRepositoryToken(Material));
+    proveedorRepository = moduleRef.get(getRepositoryToken(Proveedor));
+    reposicionRepository = moduleRef.get(getRepositoryToken(ReposicionMaterial));
+    detalleReposicionRepository = moduleRef.get(
+      getRepositoryToken(DetalleReposicionMaterial),
+    );
+    usuarioRepository = moduleRef.get(getRepositoryToken(Usuario));
+    const rolRepository = moduleRef.get<Repository<Rol>>(getRepositoryToken(Rol));
+    const roles = await seedRolesBase(rolRepository);
+
+    administradora = await crearUsuarioPrueba(usuarioRepository, roles, {
+      nombre: 'Administradora Reposiciones Listado',
+      correo: 'admin.reposiciones.listado@asada.test',
+      role: Role.ADMINISTRADORA,
+    });
+  });
+
+  afterAll(async () => {
+    if (app) {
+      await app.close();
+    }
+  });
+
+  beforeEach(async () => {
+    await detalleReposicionRepository.clear();
+    await reposicionRepository.clear();
+    await materialRepository.clear();
+    await proveedorRepository.clear();
+  });
+
+  it('lista reposiciones paginadas con materiales, origen y estado', async () => {
+    const material = await materialRepository.save(
+      materialRepository.create({
+        nombre: 'Unión PVC',
+        unidadMedida: 'Unidad',
+        stockActual: 1,
+        stockMinimo: 5,
+        activo: true,
+      }),
+    );
+
+    await reposicionRepository.save(
+      reposicionRepository.create({
+        codigo: 'REP-0013',
+        fechaGeneracion: new Date('2026-09-15T10:00:00Z'),
+        origen: OrigenReposicionMaterial.ALERTA_STOCK_MINIMO,
+        estado: EstadoReposicionMaterial.PENDIENTE,
+        idUsuarioResponsable: administradora.idUsuario,
+        detalles: [
+          detalleReposicionRepository.create({
+            idMaterial: material.id,
+            cantidad: 4,
+          }),
+        ],
+      }),
+    );
+
+    const token = signAs(
+      Role.ADMINISTRADORA,
+      String(administradora.idUsuario),
+    );
+
+    const res = await adminGet('', token).expect(HttpStatus.OK);
+
+    expect(res.body.total).toBe(1);
+    expect(res.body.data[0]).toMatchObject({
+      codigo: 'REP-0013',
+      origen: OrigenReposicionMaterial.ALERTA_STOCK_MINIMO,
+      estado: EstadoReposicionMaterial.PENDIENTE,
+    });
+    expect(res.body.data[0].detalles[0]).toMatchObject({
+      idMaterial: material.id,
+      cantidad: 4,
+      material: { nombre: 'Unión PVC' },
+    });
+  });
+
+  it('retorna detalle de una reposición y 404 si no existe', async () => {
+    const material = await materialRepository.save(
+      materialRepository.create({
+        nombre: 'Codo PVC',
+        unidadMedida: 'Unidad',
+        stockActual: 2,
+        stockMinimo: 6,
+        activo: true,
+      }),
+    );
+
+    const reposicion = await reposicionRepository.save(
+      reposicionRepository.create({
+        codigo: 'REP-0020',
+        fechaGeneracion: new Date('2026-09-16T10:00:00Z'),
+        origen: OrigenReposicionMaterial.ADMINISTRATIVA,
+        estado: EstadoReposicionMaterial.EN_GESTION,
+        idUsuarioResponsable: administradora.idUsuario,
+        detalles: [
+          detalleReposicionRepository.create({
+            idMaterial: material.id,
+            cantidad: 8,
+          }),
+        ],
+      }),
+    );
+
+    const token = signAs(
+      Role.ADMINISTRADORA,
+      String(administradora.idUsuario),
+    );
+
+    const detalle = await adminGet(`/${reposicion.id}`, token).expect(
+      HttpStatus.OK,
+    );
+    expect(detalle.body.codigo).toBe('REP-0020');
+    expect(detalle.body.detalles).toHaveLength(1);
+
+    await adminGet('/999', token).expect(HttpStatus.NOT_FOUND);
+  });
+});

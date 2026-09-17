@@ -34,6 +34,7 @@ import { QueryProveedoresDto } from './dto/query-proveedores.dto';
 import { QueryAlertasReposicionDto } from './dto/query-alertas-reposicion.dto';
 import { CreateReposicionDesdeAlertaDto } from './dto/create-reposicion-desde-alerta.dto';
 import { RegistrarCompraReposicionDto } from './dto/registrar-compra-reposicion.dto';
+import { QueryReposicionesDto } from './dto/query-reposiciones.dto';
 import { QuerySolicitudesMaterialDto } from './dto/query-solicitudes-material.dto';
 import { RegistrarEntradaDto } from './dto/registrar-entrada.dto';
 import { RegistrarSalidaDto } from './dto/registrar-salida.dto';
@@ -1640,6 +1641,130 @@ export class InventarioService {
   }
 
   /**
+   * Listado administrativo de reposiciones de materiales (3.9.4).
+   */
+  async listarReposicionesAdmin(
+    query?: QueryReposicionesDto,
+  ): Promise<{
+    data: Record<string, unknown>[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const reposicionRepo =
+      this.reposicionMaterialRepository ??
+      this.materialRepository.manager.getRepository(ReposicionMaterial);
+
+    const take = query?.limit && query.limit > 0 ? Number(query.limit) : 10;
+    const pageNum = query?.page && query.page > 0 ? Number(query.page) : 1;
+
+    try {
+      return await withDbRetry(async () => {
+        const countQb = reposicionRepo.createQueryBuilder('reposicion');
+
+        if (query?.estado) {
+          countQb.andWhere('reposicion.estado = :estado', { estado: query.estado });
+        }
+
+        if (query?.origen) {
+          countQb.andWhere('reposicion.origen = :origen', { origen: query.origen });
+        }
+
+        const total = await countQb.getCount();
+
+        const qb = reposicionRepo
+          .createQueryBuilder('reposicion')
+          .leftJoinAndSelect('reposicion.detalles', 'detalle')
+          .leftJoinAndSelect('detalle.material', 'material')
+          .leftJoinAndSelect('reposicion.proveedor', 'proveedor')
+          .leftJoinAndSelect('reposicion.usuarioResponsable', 'usuarioResponsable');
+
+        if (query?.estado) {
+          qb.andWhere('reposicion.estado = :estado', { estado: query.estado });
+        }
+
+        if (query?.origen) {
+          qb.andWhere('reposicion.origen = :origen', { origen: query.origen });
+        }
+
+        qb.orderBy('reposicion.fechaGeneracion', 'DESC').addOrderBy(
+          'reposicion.id',
+          'DESC',
+        );
+
+        const skip = (pageNum - 1) * take;
+        qb.skip(skip).take(take);
+        const reposiciones = await qb.getMany();
+
+        return {
+          data: reposiciones.map((reposicion) =>
+            this.mapReposicionMaterialAdmin(reposicion),
+          ),
+          total,
+          page: pageNum,
+          limit: take,
+          totalPages: Math.ceil(total / take) || 0,
+        };
+      });
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error('Error al consultar las reposiciones de materiales:', error);
+      throw new InternalServerErrorException(
+        'No se pudieron consultar las reposiciones de materiales',
+      );
+    }
+  }
+
+  /**
+   * Detalle administrativo de una reposición (3.9.4).
+   */
+  async obtenerReposicionAdmin(id: number): Promise<Record<string, unknown>> {
+    if (!id || !Number.isInteger(id) || id <= 0) {
+      throw new BadRequestException(
+        'El identificador de la reposición debe ser un número entero mayor a cero',
+      );
+    }
+
+    const reposicionRepo =
+      this.reposicionMaterialRepository ??
+      this.materialRepository.manager.getRepository(ReposicionMaterial);
+
+    try {
+      const reposicion = await withDbRetry(() =>
+        reposicionRepo.findOne({
+          where: { id },
+          relations: {
+            detalles: { material: true },
+            proveedor: true,
+            usuarioResponsable: true,
+            alertaReposicion: true,
+            solicitudMaterial: true,
+          },
+        }),
+      );
+
+      if (!reposicion) {
+        throw new NotFoundException(`Reposición con ID ${id} no encontrada`);
+      }
+
+      return this.mapReposicionMaterialAdmin(reposicion);
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(`Error al consultar la reposición ${id}:`, error);
+      throw new InternalServerErrorException(
+        'No se pudo consultar la reposición de materiales',
+      );
+    }
+  }
+
+  /**
    * Registra la compra asociada a una reposición (3.9.3).
    * No modifica existencias. Actualiza proveedor, fecha, detalles y estado.
    */
@@ -2691,6 +2816,9 @@ export class InventarioService {
         : null,
       alertaReposicion: reposicion.idAlertaReposicion
         ? { id: reposicion.idAlertaReposicion }
+        : null,
+      solicitudMaterial: reposicion.idSolicitudMaterial
+        ? { id: reposicion.idSolicitudMaterial }
         : null,
       detalles: (reposicion.detalles || []).map((detalle) => ({
         id: detalle.id,
