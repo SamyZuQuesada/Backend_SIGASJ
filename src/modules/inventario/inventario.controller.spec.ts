@@ -534,6 +534,11 @@ describe('InventarioController — Endpoints de Materiales', () => {
         codigo: 'REP-0001',
         estado: 'PENDIENTE',
       }),
+      registrarCompraReposicionAdmin: jest.fn().mockResolvedValue({
+        id: 1,
+        codigo: 'REP-0001',
+        estado: 'COMPRA_REGISTRADA',
+      }),
     };
 
     const moduleRef: TestingModule = await Test.createTestingModule({
@@ -2021,6 +2026,43 @@ describe('InventarioController — Endpoints de Materiales', () => {
 
       expect(res.status).toBe(HttpStatus.CREATED);
       expect(res.body.codigo).toBe('REP-0001');
+    });
+  });
+
+  describe('Integración HTTP: POST /api/v1/admin/inventario/reposiciones/:id/compra', () => {
+    it('rechaza con 401 Unauthorized si no se envía token JWT', async () => {
+      const res = await request(app.getHttpServer()).post(
+        '/api/v1/admin/inventario/reposiciones/1/compra',
+      );
+
+      expect(res.status).toBe(HttpStatus.UNAUTHORIZED);
+    });
+
+    it('rechaza con 403 Forbidden si el rol no es Administradora', async () => {
+      const token = signAs(Role.FONTANERO);
+
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/admin/inventario/reposiciones/1/compra')
+        .set('Authorization', `Bearer ${token}`)
+        .send({});
+
+      expect(res.status).toBe(HttpStatus.FORBIDDEN);
+    });
+
+    it('permite a ADMINISTRADORA registrar compra con 200 OK', async () => {
+      const token = signAs(Role.ADMINISTRADORA);
+
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/admin/inventario/reposiciones/1/compra')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          idProveedor: 2,
+          fechaCompra: '2026-08-25T00:00:00.000Z',
+          detalles: [{ idMaterial: 4, cantidad: 30 }],
+        });
+
+      expect(res.status).toBe(HttpStatus.OK);
+      expect(res.body.estado).toBe('COMPRA_REGISTRADA');
     });
   });
 });

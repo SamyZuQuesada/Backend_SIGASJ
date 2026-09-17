@@ -87,6 +87,7 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
   let reposicionRepoFindOneSpy: jest.Mock;
   let reposicionRepoCountSpy: jest.Mock;
   let detalleReposicionCreateSpy: jest.Mock;
+  let detalleReposicionSaveSpy: jest.Mock;
   let mockManager: any;
 
   beforeEach(async () => {
@@ -270,6 +271,11 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
     detalleReposicionCreateSpy = jest
       .fn()
       .mockImplementation((data: Partial<DetalleReposicionMaterial>) => data);
+    detalleReposicionSaveSpy = jest
+      .fn()
+      .mockImplementation((data: Partial<DetalleReposicionMaterial>) =>
+        Promise.resolve({ id: 1, ...data } as DetalleReposicionMaterial),
+      );
 
     const mockReposicionRepo = {
       create: reposicionRepoCreateSpy,
@@ -280,6 +286,7 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
 
     const mockDetalleReposicionRepo = {
       create: detalleReposicionCreateSpy,
+      save: detalleReposicionSaveSpy,
     };
 
     const mockDocRepo = {
@@ -2753,6 +2760,145 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
         'Ya existe una reposición activa (REP-0005) para esta alerta',
       );
       expect(reposicionRepoSaveSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('registrarCompraReposicionAdmin', () => {
+    const admin = {
+      userId: '2',
+      idUsuario: 2,
+      email: 'admin@asada.test',
+      role: Role.ADMINISTRADORA,
+      name: 'Ana Admin',
+    };
+
+    const reposicionPendiente = () => ({
+      id: 12,
+      codigo: 'REP-0012',
+      estado: EstadoReposicionMaterial.PENDIENTE,
+      idProveedor: null,
+      fechaCompra: null,
+      observacion: null,
+      detalles: [
+        {
+          id: 1,
+          idMaterial: 4,
+          cantidad: 7,
+          observacion: null,
+          material: {
+            id: 4,
+            nombre: 'Tubo PVC',
+            unidadMedida: 'Metro',
+            stockActual: 3,
+            activo: true,
+          },
+        },
+      ],
+    });
+
+    const dtoCompra = {
+      idProveedor: 2,
+      fechaCompra: new Date('2026-08-25T00:00:00Z'),
+      referenciaCompra: 'FAC-2026-0045',
+      observacion: 'Compra autorizada',
+      detalles: [{ idMaterial: 4, cantidad: 30 }],
+    };
+
+    it('registra compra en reposición PENDIENTE sin modificar stock', async () => {
+      const reposicion = reposicionPendiente();
+      reposicionRepoFindOneSpy
+        .mockResolvedValueOnce(reposicion)
+        .mockResolvedValueOnce({
+          ...reposicion,
+          estado: EstadoReposicionMaterial.COMPRA_REGISTRADA,
+          idProveedor: 2,
+          fechaCompra: dtoCompra.fechaCompra,
+          idUsuarioResponsable: 2,
+          observacion: 'Referencia: FAC-2026-0045. Compra autorizada',
+          proveedor: { id: 2, nombre: 'Ferretería ABC' },
+          usuarioResponsable: { idUsuario: 2, nombre: 'Ana Admin' },
+          detalles: [
+            {
+              id: 1,
+              idMaterial: 4,
+              cantidad: 30,
+              observacion: null,
+              material: {
+                id: 4,
+                nombre: 'Tubo PVC',
+                unidadMedida: 'Metro',
+                stockActual: 3,
+              },
+            },
+          ],
+        });
+      provRepoFindOneSpy.mockResolvedValueOnce({
+        id: 2,
+        nombre: 'Ferretería ABC',
+        activo: true,
+      });
+      repoFindOneSpy.mockResolvedValue({
+        id: 4,
+        nombre: 'Tubo PVC',
+        stockActual: 3,
+        activo: true,
+      });
+
+      const result = await service.registrarCompraReposicionAdmin(
+        12,
+        dtoCompra,
+        admin,
+      );
+
+      expect(reposicionRepoSaveSpy).toHaveBeenCalled();
+      const saved = reposicionRepoSaveSpy.mock.calls[0][0];
+      expect(saved.estado).toBe(EstadoReposicionMaterial.COMPRA_REGISTRADA);
+      expect(saved.idProveedor).toBe(2);
+      expect(saved.fechaCompra).toEqual(dtoCompra.fechaCompra);
+      expect(result).toMatchObject({
+        codigo: 'REP-0012',
+        estado: EstadoReposicionMaterial.COMPRA_REGISTRADA,
+        idProveedor: 2,
+        proveedor: { id: 2, nombre: 'Ferretería ABC' },
+      });
+      expect(result.detalles[0]).toMatchObject({
+        idMaterial: 4,
+        cantidad: 30,
+      });
+    });
+
+    it('rechaza reposición inexistente', async () => {
+      reposicionRepoFindOneSpy.mockResolvedValueOnce(null);
+
+      await expect(
+        service.registrarCompraReposicionAdmin(99, dtoCompra, admin),
+      ).rejects.toThrow('Reposición con ID 99 no encontrada');
+    });
+
+    it('rechaza proveedor inactivo', async () => {
+      reposicionRepoFindOneSpy.mockResolvedValueOnce(reposicionPendiente());
+      provRepoFindOneSpy.mockResolvedValueOnce({
+        id: 2,
+        nombre: 'Proveedor Inactivo',
+        activo: false,
+      });
+
+      await expect(
+        service.registrarCompraReposicionAdmin(12, dtoCompra, admin),
+      ).rejects.toThrow(
+        'El proveedor "Proveedor Inactivo" se encuentra inactivo',
+      );
+    });
+
+    it('rechaza compra duplicada', async () => {
+      reposicionRepoFindOneSpy.mockResolvedValueOnce({
+        ...reposicionPendiente(),
+        estado: EstadoReposicionMaterial.COMPRA_REGISTRADA,
+      });
+
+      await expect(
+        service.registrarCompraReposicionAdmin(12, dtoCompra, admin),
+      ).rejects.toThrow('ya tiene una compra registrada');
     });
   });
 });

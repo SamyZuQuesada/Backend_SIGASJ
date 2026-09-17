@@ -33,6 +33,7 @@ import {
 import { QueryProveedoresDto } from './dto/query-proveedores.dto';
 import { QueryAlertasReposicionDto } from './dto/query-alertas-reposicion.dto';
 import { CreateReposicionDesdeAlertaDto } from './dto/create-reposicion-desde-alerta.dto';
+import { RegistrarCompraReposicionDto } from './dto/registrar-compra-reposicion.dto';
 import { QuerySolicitudesMaterialDto } from './dto/query-solicitudes-material.dto';
 import { RegistrarEntradaDto } from './dto/registrar-entrada.dto';
 import { RegistrarSalidaDto } from './dto/registrar-salida.dto';
@@ -1639,6 +1640,219 @@ export class InventarioService {
   }
 
   /**
+   * Registra la compra asociada a una reposición (3.9.3).
+   * No modifica existencias. Actualiza proveedor, fecha, detalles y estado.
+   */
+  async registrarCompraReposicionAdmin(
+    idReposicion: number,
+    dto: RegistrarCompraReposicionDto,
+    user: AuthenticatedUser,
+  ): Promise<Record<string, unknown>> {
+    if (!idReposicion || !Number.isInteger(idReposicion) || idReposicion <= 0) {
+      throw new BadRequestException(
+        'El identificador de la reposición debe ser un número entero mayor a cero',
+      );
+    }
+
+    const rawUserId = user?.idUsuario ?? user?.userId;
+    const idUsuario = Number(rawUserId);
+    if (!idUsuario || Number.isNaN(idUsuario)) {
+      throw new BadRequestException(
+        'No se pudo identificar a la administradora responsable',
+      );
+    }
+
+    const idProveedor = dto.idProveedor ?? dto.proveedorId;
+    if (!idProveedor || !Number.isInteger(idProveedor) || idProveedor <= 0) {
+      throw new BadRequestException(
+        'El identificador del proveedor es obligatorio y debe ser mayor a cero',
+      );
+    }
+
+    const estadosPermitidos = [
+      EstadoReposicionMaterial.PENDIENTE,
+      EstadoReposicionMaterial.EN_GESTION,
+    ];
+
+    try {
+      return await withDbRetry(async () => {
+        return await this.materialRepository.manager.transaction(async (manager) => {
+          const reposicionRepo = manager.getRepository(ReposicionMaterial);
+          const detalleRepo = manager.getRepository(DetalleReposicionMaterial);
+          const materialRepo = manager.getRepository(Material);
+          const proveedorRepo = manager.getRepository(Proveedor);
+
+          const reposicion = await reposicionRepo.findOne({
+            where: { id: idReposicion },
+            relations: { detalles: { material: true } },
+          });
+
+          if (!reposicion) {
+            throw new NotFoundException(
+              `Reposición con ID ${idReposicion} no encontrada`,
+            );
+          }
+
+          if (!estadosPermitidos.includes(reposicion.estado)) {
+            if (
+              reposicion.estado === EstadoReposicionMaterial.COMPRA_REGISTRADA ||
+              reposicion.estado === EstadoReposicionMaterial.PENDIENTE_RECEPCION
+            ) {
+              throw new ConflictException(
+                `La reposición ${reposicion.codigo ?? reposicion.id} ya tiene una compra registrada`,
+              );
+            }
+
+            throw new BadRequestException(
+              `No se puede registrar una compra cuando la reposición está en estado ${reposicion.estado}`,
+            );
+          }
+
+          if (!reposicion.detalles?.length) {
+            throw new BadRequestException(
+              'La reposición no tiene materiales asociados para registrar la compra',
+            );
+          }
+
+          const proveedor = await proveedorRepo.findOne({
+            where: { id: idProveedor },
+          });
+
+          if (!proveedor) {
+            throw new NotFoundException(
+              `Proveedor con ID ${idProveedor} no encontrado`,
+            );
+          }
+
+          if (!proveedor.activo) {
+            throw new BadRequestException(
+              `El proveedor "${proveedor.nombre}" se encuentra inactivo y no puede utilizarse`,
+            );
+          }
+
+          const idsReposicion = new Set(
+            reposicion.detalles.map((detalle) => detalle.idMaterial),
+          );
+          const idsCompra = new Set<number>();
+
+          for (const item of dto.detalles) {
+            const idMaterial = item.idMaterial ?? item.materialId;
+            if (!idMaterial || !Number.isInteger(idMaterial) || idMaterial <= 0) {
+              throw new BadRequestException(
+                'Cada detalle de compra debe indicar un material válido',
+              );
+            }
+
+            if (idsCompra.has(idMaterial)) {
+              throw new BadRequestException(
+                `El material ${idMaterial} está repetido en los detalles de la compra`,
+              );
+            }
+            idsCompra.add(idMaterial);
+
+            if (!idsReposicion.has(idMaterial)) {
+              throw new BadRequestException(
+                `El material ${idMaterial} no pertenece a la reposición ${reposicion.codigo ?? reposicion.id}`,
+              );
+            }
+
+            const material = await materialRepo.findOne({
+              where: { id: idMaterial },
+            });
+
+            if (!material) {
+              throw new NotFoundException(
+                `Material con ID ${idMaterial} no encontrado`,
+              );
+            }
+
+            if (!material.activo) {
+              throw new BadRequestException(
+                `El material "${material.nombre}" se encuentra inactivo y no puede comprarse`,
+              );
+            }
+          }
+
+          if (idsCompra.size !== idsReposicion.size) {
+            throw new BadRequestException(
+              'Debe registrar la compra de todos los materiales incluidos en la reposición',
+            );
+          }
+
+          const stocksAntes = new Map<number, number>();
+          for (const detalle of reposicion.detalles) {
+            stocksAntes.set(detalle.idMaterial, detalle.material?.stockActual ?? 0);
+          }
+
+          for (const item of dto.detalles) {
+            const idMaterial = item.idMaterial ?? item.materialId;
+            const detalle = reposicion.detalles.find(
+              (d) => d.idMaterial === idMaterial,
+            );
+            if (!detalle) {
+              continue;
+            }
+
+            detalle.cantidad = item.cantidad;
+            if (item.observacion !== undefined) {
+              detalle.observacion = item.observacion?.trim() || null;
+            }
+            await detalleRepo.save(detalle);
+          }
+
+          reposicion.idProveedor = proveedor.id;
+          reposicion.fechaCompra = dto.fechaCompra;
+          reposicion.idUsuarioResponsable = idUsuario;
+          reposicion.estado = EstadoReposicionMaterial.COMPRA_REGISTRADA;
+          reposicion.observacion = this.construirObservacionCompra(
+            dto.referenciaCompra,
+            dto.observacion,
+          );
+
+          await reposicionRepo.save(reposicion);
+
+          const recargada = await reposicionRepo.findOne({
+            where: { id: reposicion.id },
+            relations: {
+              detalles: { material: true },
+              proveedor: true,
+              usuarioResponsable: true,
+            },
+          });
+
+          for (const [idMaterial, stockAntes] of stocksAntes) {
+            const materialDespues = await materialRepo.findOne({
+              where: { id: idMaterial },
+            });
+            if (
+              materialDespues &&
+              materialDespues.stockActual !== stockAntes
+            ) {
+              this.logger.warn(
+                `Registrar compra no debe alterar stock. Material ${idMaterial} cambió de ${stockAntes} a ${materialDespues.stockActual}`,
+              );
+            }
+          }
+
+          return this.mapReposicionMaterialAdmin(recargada ?? reposicion);
+        });
+      });
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(
+        `Error al registrar compra de la reposición ${idReposicion}:`,
+        error,
+      );
+      throw new InternalServerErrorException(
+        'No se pudo registrar la compra de la reposición',
+      );
+    }
+  }
+
+  /**
    * Consulta y valida de manera centralizada la existencia física disponible de un material
    * antes de autorizar cualquier operación de salida (Regla 4.5.2).
    *
@@ -2431,6 +2645,22 @@ export class InventarioService {
     };
   }
 
+  private construirObservacionCompra(
+    referencia?: string,
+    observacion?: string,
+  ): string | null {
+    const partes: string[] = [];
+    const ref = referencia?.trim();
+    const obs = observacion?.trim();
+    if (ref) {
+      partes.push(`Referencia: ${ref}`);
+    }
+    if (obs) {
+      partes.push(obs);
+    }
+    return partes.length ? partes.join('. ') : null;
+  }
+
   private mapReposicionMaterialAdmin(
     reposicion: ReposicionMaterial,
   ): Record<string, unknown> {
@@ -2443,8 +2673,16 @@ export class InventarioService {
       idAlertaReposicion: reposicion.idAlertaReposicion,
       idSolicitudMaterial: reposicion.idSolicitudMaterial,
       idUsuarioResponsable: reposicion.idUsuarioResponsable,
+      idProveedor: reposicion.idProveedor,
+      fechaCompra: reposicion.fechaCompra,
       observacion: reposicion.observacion,
       updatedAt: reposicion.updatedAt,
+      proveedor: reposicion.idProveedor
+        ? {
+            id: reposicion.idProveedor,
+            nombre: reposicion.proveedor?.nombre ?? null,
+          }
+        : null,
       usuarioResponsable: reposicion.idUsuarioResponsable
         ? {
             id: reposicion.idUsuarioResponsable,
@@ -2458,6 +2696,7 @@ export class InventarioService {
         id: detalle.id,
         idMaterial: detalle.idMaterial,
         cantidad: detalle.cantidad,
+        observacion: detalle.observacion,
         material: detalle.material
           ? {
               id: detalle.material.id,
