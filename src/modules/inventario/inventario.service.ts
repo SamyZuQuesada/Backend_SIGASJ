@@ -40,6 +40,7 @@ import { CreateReposicionDesdeAlertaDto } from './dto/create-reposicion-desde-al
 import { RegistrarCompraReposicionDto } from './dto/registrar-compra-reposicion.dto';
 import { RegistrarRecepcionDto } from './dto/registrar-recepcion.dto';
 import { QueryReposicionesDto } from './dto/query-reposiciones.dto';
+import { QueryMovimientosDto } from './dto/query-movimientos.dto';
 import { QuerySolicitudesMaterialDto } from './dto/query-solicitudes-material.dto';
 import { RegistrarEntradaDto } from './dto/registrar-entrada.dto';
 import { RegistrarSalidaDto } from './dto/registrar-salida.dto';
@@ -2352,6 +2353,107 @@ export class InventarioService {
   }
 
   /**
+   * Historial paginado de movimientos de inventario (3.11.1).
+   */
+  async listarMovimientosInventario(
+    query?: QueryMovimientosDto,
+  ): Promise<{
+    data: Record<string, unknown>[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    this.validarRangoFechasMovimientos(query);
+
+    const take = query?.limit && query.limit > 0 ? Number(query.limit) : 10;
+    const pageNum = query?.page && query.page > 0 ? Number(query.page) : 1;
+
+    try {
+      return await withDbRetry(async () => {
+        const countQb = this.crearQueryMovimientos(query);
+        const total = await countQb.getCount();
+
+        const qb = this.crearQueryMovimientos(query, true);
+        const skip = (pageNum - 1) * take;
+        qb.skip(skip).take(take);
+        const movimientos = await qb.getMany();
+
+        return {
+          data: movimientos.map((movimiento) =>
+            this.mapMovimientoInventarioAdmin(movimiento),
+          ),
+          total,
+          page: pageNum,
+          limit: take,
+          totalPages: Math.ceil(total / take) || 0,
+        };
+      });
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error('Error al consultar el historial de movimientos:', error);
+      throw new InternalServerErrorException(
+        'No se pudo consultar el historial de movimientos de inventario',
+      );
+    }
+  }
+
+  /**
+   * Detalle de un movimiento de inventario (3.11.3).
+   */
+  async obtenerMovimientoInventario(id: number): Promise<Record<string, unknown>> {
+    if (!id || !Number.isInteger(id) || id <= 0) {
+      throw new BadRequestException(
+        'El identificador del movimiento debe ser un número entero mayor a cero',
+      );
+    }
+
+    try {
+      const movimiento = await withDbRetry(() =>
+        this.movimientoRepository
+          .createQueryBuilder('movimiento')
+          .leftJoinAndSelect('movimiento.material', 'material')
+          .leftJoinAndSelect('movimiento.usuario', 'usuario')
+          .leftJoinAndSelect('movimiento.proveedor', 'proveedor')
+          .leftJoinAndSelect('movimiento.reposicion', 'reposicion')
+          .leftJoinAndSelect('movimiento.documentos', 'documentos')
+          .leftJoinAndMapOne(
+            'movimiento.averia',
+            Averia,
+            'averia',
+            'averia.id = movimiento.idAveria',
+          )
+          .leftJoinAndMapOne(
+            'movimiento.solicitudMaterial',
+            SolicitudMaterial,
+            'solicitud',
+            'solicitud.id = movimiento.idSolicitud',
+          )
+          .where('movimiento.id = :id', { id })
+          .getOne(),
+      );
+
+      if (!movimiento) {
+        throw new NotFoundException(`Movimiento con ID ${id} no encontrado`);
+      }
+
+      return this.mapMovimientoInventarioAdmin(movimiento, { incluirDocumentos: true });
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(`Error al consultar el movimiento ${id}:`, error);
+      throw new InternalServerErrorException(
+        'No se pudo consultar el detalle del movimiento de inventario',
+      );
+    }
+  }
+
+  /**
    * Consulta los movimientos de salida vinculados a una avería específica.
    */
   async findMovimientosByAveria(
@@ -3117,6 +3219,247 @@ export class InventarioService {
       partes.push(obs);
     }
     return partes.length ? partes.join('. ') : null;
+  }
+
+  private crearQueryMovimientos(
+    query?: QueryMovimientosDto,
+    withRelations = false,
+  ) {
+    const qb = this.movimientoRepository.createQueryBuilder('movimiento');
+
+    if (withRelations) {
+      qb.leftJoinAndSelect('movimiento.material', 'material')
+        .leftJoinAndSelect('movimiento.usuario', 'usuario')
+        .leftJoinAndSelect('movimiento.proveedor', 'proveedor')
+        .leftJoinAndSelect('movimiento.reposicion', 'reposicion')
+        .leftJoinAndMapOne(
+          'movimiento.averia',
+          Averia,
+          'averia',
+          'averia.id = movimiento.idAveria',
+        )
+        .leftJoinAndMapOne(
+          'movimiento.solicitudMaterial',
+          SolicitudMaterial,
+          'solicitud',
+          'solicitud.id = movimiento.idSolicitud',
+        )
+        .orderBy('movimiento.fechaMovimiento', 'DESC')
+        .addOrderBy('movimiento.id', 'DESC');
+    }
+
+    this.aplicarFiltrosMovimientos(qb, query);
+    return qb;
+  }
+
+  private aplicarFiltrosMovimientos(
+    qb: ReturnType<Repository<MovimientoInventario>['createQueryBuilder']>,
+    query?: QueryMovimientosDto,
+  ): void {
+    if (query?.tipo) {
+      qb.andWhere('movimiento.tipo = :tipo', { tipo: query.tipo });
+    }
+
+    if (query?.idMaterial) {
+      qb.andWhere('movimiento.idMaterial = :idMaterial', {
+        idMaterial: query.idMaterial,
+      });
+    }
+
+    if (query?.idUsuario) {
+      qb.andWhere('movimiento.idUsuario = :idUsuario', {
+        idUsuario: query.idUsuario,
+      });
+    }
+
+    if (query?.idAveria) {
+      qb.andWhere('movimiento.idAveria = :idAveria', {
+        idAveria: query.idAveria,
+      });
+    }
+
+    if (query?.idSolicitud) {
+      qb.andWhere('movimiento.idSolicitud = :idSolicitud', {
+        idSolicitud: query.idSolicitud,
+      });
+    }
+
+    if (query?.idReposicion) {
+      qb.andWhere('movimiento.idReposicion = :idReposicion', {
+        idReposicion: query.idReposicion,
+      });
+    }
+
+    if (query?.fechaDesde) {
+      qb.andWhere('movimiento.fechaMovimiento >= :fechaDesde', {
+        fechaDesde: this.inicioDiaMovimiento(query.fechaDesde),
+      });
+    }
+
+    if (query?.fechaHasta) {
+      qb.andWhere('movimiento.fechaMovimiento <= :fechaHasta', {
+        fechaHasta: this.finDiaMovimiento(query.fechaHasta),
+      });
+    }
+  }
+
+  private validarRangoFechasMovimientos(query?: QueryMovimientosDto): void {
+    if (query?.fechaDesde && !this.esFechaCalendarioValida(query.fechaDesde)) {
+      throw new BadRequestException(
+        'fechaDesde debe ser una fecha calendario válida (YYYY-MM-DD)',
+      );
+    }
+
+    if (query?.fechaHasta && !this.esFechaCalendarioValida(query.fechaHasta)) {
+      throw new BadRequestException(
+        'fechaHasta debe ser una fecha calendario válida (YYYY-MM-DD)',
+      );
+    }
+
+    if (
+      query?.fechaDesde &&
+      query?.fechaHasta &&
+      query.fechaDesde > query.fechaHasta
+    ) {
+      throw new BadRequestException(
+        'fechaDesde no puede ser posterior a fechaHasta',
+      );
+    }
+  }
+
+  private esFechaCalendarioValida(value: string): boolean {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    if (!match) {
+      return false;
+    }
+
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const date = new Date(Date.UTC(year, month - 1, day));
+
+    return (
+      date.getUTCFullYear() === year &&
+      date.getUTCMonth() === month - 1 &&
+      date.getUTCDate() === day
+    );
+  }
+
+  private inicioDiaMovimiento(value: string): Date {
+    const [year, month, day] = value.split('-').map(Number);
+    return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+  }
+
+  private finDiaMovimiento(value: string): Date {
+    const [year, month, day] = value.split('-').map(Number);
+    return new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
+  }
+
+  private mapMovimientoInventarioAdmin(
+    movimiento: MovimientoInventario & {
+      averia?: Averia | null;
+      solicitudMaterial?: SolicitudMaterial | null;
+    },
+    options?: { incluirDocumentos?: boolean },
+  ): Record<string, unknown> {
+    const averia = movimiento.averia ?? null;
+    const solicitud = movimiento.solicitudMaterial ?? null;
+    const referencia = this.referenciaMovimientoResumen(movimiento, averia, solicitud);
+
+    return {
+      id: movimiento.id,
+      tipo: movimiento.tipo,
+      cantidad: movimiento.cantidad,
+      fechaMovimiento: movimiento.fechaMovimiento,
+      createdAt: movimiento.createdAt,
+      observacion: movimiento.observacion,
+      idMaterial: movimiento.idMaterial,
+      idUsuario: movimiento.idUsuario,
+      idProveedor: movimiento.idProveedor ?? null,
+      idAveria: movimiento.idAveria ?? null,
+      idSolicitud: movimiento.idSolicitud ?? null,
+      idReposicion: movimiento.idReposicion ?? null,
+      idProyecto: movimiento.idProyecto ?? null,
+      referencia,
+      material: movimiento.material
+        ? {
+            id: movimiento.material.id,
+            nombre: movimiento.material.nombre,
+            unidadMedida: movimiento.material.unidadMedida,
+          }
+        : null,
+      usuario: movimiento.idUsuario
+        ? {
+            id: movimiento.idUsuario,
+            nombre: this.nombreUsuarioResumen(movimiento.usuario),
+          }
+        : null,
+      proveedor: movimiento.idProveedor
+        ? {
+            id: movimiento.idProveedor,
+            nombre: movimiento.proveedor?.nombre ?? null,
+          }
+        : null,
+      averia: movimiento.idAveria
+        ? {
+            id: movimiento.idAveria,
+            codigo: averia?.codigoSeguimiento ?? null,
+          }
+        : null,
+      solicitudMaterial: movimiento.idSolicitud
+        ? {
+            id: movimiento.idSolicitud,
+            codigo: solicitud?.codigo ?? null,
+          }
+        : null,
+      reposicion: movimiento.idReposicion
+        ? {
+            id: movimiento.idReposicion,
+            codigo: movimiento.reposicion?.codigo ?? null,
+          }
+        : null,
+      documentos:
+        options?.incluirDocumentos && movimiento.documentos
+          ? movimiento.documentos.map((documento) => ({
+              id: documento.id,
+              nombreOriginal: documento.nombreOriginal,
+              tipoArchivo: documento.tipoArchivo,
+              createdAt: documento.createdAt,
+            }))
+          : undefined,
+    };
+  }
+
+  private referenciaMovimientoResumen(
+    movimiento: MovimientoInventario,
+    averia?: Averia | null,
+    solicitud?: SolicitudMaterial | null,
+  ): string | null {
+    if (averia?.codigoSeguimiento) {
+      return averia.codigoSeguimiento;
+    }
+
+    if (movimiento.reposicion?.codigo) {
+      return movimiento.reposicion.codigo;
+    }
+
+    if (solicitud?.codigo) {
+      return solicitud.codigo;
+    }
+
+    if (movimiento.idAveria) {
+      return `AV-${movimiento.idAveria}`;
+    }
+
+    if (movimiento.idReposicion) {
+      return `REP-${String(movimiento.idReposicion).padStart(4, '0')}`;
+    }
+
+    if (movimiento.idSolicitud) {
+      return `SOL-${String(movimiento.idSolicitud).padStart(4, '0')}`;
+    }
+
+    return null;
   }
 
   private mapReposicionMaterialAdmin(
