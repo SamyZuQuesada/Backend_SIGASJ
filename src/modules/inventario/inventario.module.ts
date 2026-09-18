@@ -18,6 +18,7 @@ import { AlertasReposicionController } from './alertas-reposicion.controller';
 import { ReposicionesController } from './reposiciones.controller';
 import { RecepcionesController } from './recepciones.controller';
 import { MovimientosController } from './movimientos.controller';
+import { ReportesController } from './reportes.controller';
 import { InventarioService } from './inventario.service';
 
 @Module({
@@ -43,6 +44,7 @@ import { InventarioService } from './inventario.service';
     ReposicionesController,
     RecepcionesController,
     MovimientosController,
+    ReportesController,
   ],
   providers: [InventarioService, RolesGuard],
   exports: [TypeOrmModule, InventarioService],

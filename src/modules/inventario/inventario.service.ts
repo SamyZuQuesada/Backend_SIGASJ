@@ -41,6 +41,7 @@ import { RegistrarCompraReposicionDto } from './dto/registrar-compra-reposicion.
 import { RegistrarRecepcionDto } from './dto/registrar-recepcion.dto';
 import { QueryReposicionesDto } from './dto/query-reposiciones.dto';
 import { QueryMovimientosDto } from './dto/query-movimientos.dto';
+import { QueryReporteInventarioDto } from './dto/query-reporte-inventario.dto';
 import { QuerySolicitudesMaterialDto } from './dto/query-solicitudes-material.dto';
 import { RegistrarEntradaDto } from './dto/registrar-entrada.dto';
 import { RegistrarSalidaDto } from './dto/registrar-salida.dto';
@@ -2353,6 +2354,128 @@ export class InventarioService {
   }
 
   /**
+   * Reporte consolidado de inventario (3.12.1).
+   */
+  async obtenerReporteInventarioAdmin(
+    query?: QueryReporteInventarioDto,
+  ): Promise<Record<string, unknown>> {
+    this.validarRangoFechasMovimientos(query);
+
+    try {
+      return await withDbRetry(async () => {
+        const materialesQb = this.crearQueryMaterialesReporte(query);
+        const totalMateriales = await materialesQb.getCount();
+
+        const materialesActivos = await this.crearQueryMaterialesReporte(query)
+          .andWhere('material.activo = :activo', { activo: true })
+          .getCount();
+
+        const materialesStockBajo = await this.crearQueryMaterialesReporte(query)
+          .andWhere('material.stockActual <= material.stockMinimo')
+          .getCount();
+
+        const entradasRegistradas = await this.contarMovimientosReporte(
+          query,
+          TipoMovimientoInventario.ENTRADA,
+        );
+        const salidasRegistradas = await this.contarMovimientosReporte(
+          query,
+          TipoMovimientoInventario.SALIDA,
+        );
+
+        const porCategoriaQb = this.materialRepository
+          .createQueryBuilder('material')
+          .leftJoin('material.categoria', 'categoria')
+          .select('categoria.id', 'idCategoria')
+          .addSelect('categoria.nombre', 'categoriaNombre')
+          .addSelect('COUNT(material.id)', 'totalMateriales')
+          .addSelect(
+            'SUM(CASE WHEN material.stockActual <= material.stockMinimo THEN 1 ELSE 0 END)',
+            'materialesStockBajo',
+          );
+
+        if (query?.idMaterial) {
+          porCategoriaQb.andWhere('material.id = :idMaterial', {
+            idMaterial: query.idMaterial,
+          });
+        }
+
+        if (query?.idCategoria) {
+          porCategoriaQb.andWhere('material.idCategoria = :idCategoria', {
+            idCategoria: query.idCategoria,
+          });
+        }
+
+        const porCategoriaRows = await porCategoriaQb
+          .groupBy('categoria.id')
+          .addGroupBy('categoria.nombre')
+          .orderBy('categoria.nombre', 'ASC')
+          .getRawMany<{
+            idCategoria: number | string | null;
+            categoriaNombre: string | null;
+            totalMateriales: string;
+            materialesStockBajo: string;
+          }>();
+
+        const materiales = await this.crearQueryMaterialesReporte(query)
+          .leftJoinAndSelect('material.categoria', 'categoria')
+          .orderBy('material.nombre', 'ASC')
+          .take(100)
+          .getMany();
+
+        const movimientos = await this.crearQueryMovimientosReporte(query, true)
+          .take(100)
+          .getMany();
+
+        return {
+          indicadores: {
+            totalMateriales,
+            materialesActivos,
+            materialesStockBajo,
+            entradasRegistradas,
+            salidasRegistradas,
+          },
+          porCategoria: porCategoriaRows.map((row) => ({
+            idCategoria:
+              row.idCategoria === null || row.idCategoria === undefined
+                ? null
+                : Number(row.idCategoria),
+            nombre: row.categoriaNombre ?? 'Sin categoría',
+            totalMateriales: Number(row.totalMateriales),
+            materialesStockBajo: Number(row.materialesStockBajo ?? 0),
+          })),
+          materiales: materiales.map((material) => ({
+            id: material.id,
+            nombre: material.nombre,
+            unidadMedida: material.unidadMedida,
+            stockActual: material.stockActual,
+            stockMinimo: material.stockMinimo,
+            activo: material.activo,
+            categoria: material.idCategoria
+              ? {
+                  id: material.idCategoria,
+                  nombre: material.categoria?.nombre ?? null,
+                }
+              : null,
+          })),
+          movimientos: movimientos.map((movimiento) =>
+            this.mapMovimientoInventarioAdmin(movimiento),
+          ),
+        };
+      });
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error('Error al consultar el reporte de inventario:', error);
+      throw new InternalServerErrorException(
+        'No se pudo consultar el reporte de inventario',
+      );
+    }
+  }
+
+  /**
    * Historial paginado de movimientos de inventario (3.11.1).
    */
   async listarMovimientosInventario(
@@ -3219,6 +3342,60 @@ export class InventarioService {
       partes.push(obs);
     }
     return partes.length ? partes.join('. ') : null;
+  }
+
+  private crearQueryMaterialesReporte(query?: QueryReporteInventarioDto) {
+    const qb = this.materialRepository.createQueryBuilder('material');
+
+    if (query?.idMaterial) {
+      qb.andWhere('material.id = :idMaterial', { idMaterial: query.idMaterial });
+    }
+
+    if (query?.idCategoria) {
+      qb.andWhere('material.idCategoria = :idCategoria', {
+        idCategoria: query.idCategoria,
+      });
+    }
+
+    return qb;
+  }
+
+  private crearQueryMovimientosReporte(
+    query?: QueryReporteInventarioDto,
+    withRelations = false,
+  ) {
+    const movimientoQuery: QueryMovimientosDto = {
+      fechaDesde: query?.fechaDesde,
+      fechaHasta: query?.fechaHasta,
+      idMaterial: query?.idMaterial,
+      tipo: query?.tipo,
+    };
+
+    const qb = this.crearQueryMovimientos(movimientoQuery, withRelations);
+
+    if (query?.idCategoria) {
+      if (!withRelations) {
+        qb.leftJoin('movimiento.material', 'material');
+      }
+      qb.andWhere('material.idCategoria = :idCategoriaReporte', {
+        idCategoriaReporte: query.idCategoria,
+      });
+    }
+
+    return qb;
+  }
+
+  private async contarMovimientosReporte(
+    query: QueryReporteInventarioDto | undefined,
+    tipo: TipoMovimientoInventario,
+  ): Promise<number> {
+    if (query?.tipo && query.tipo !== tipo) {
+      return 0;
+    }
+
+    const qb = this.crearQueryMovimientosReporte(query);
+    qb.andWhere('movimiento.tipo = :tipoReporte', { tipoReporte: tipo });
+    return qb.getCount();
   }
 
   private crearQueryMovimientos(
