@@ -12,6 +12,7 @@ import { HttpExceptionFilter } from '../../common/filters/http-exception.filter'
 import jwtConfig from '../../config/jwt.config';
 import { AuthModule } from '../auth/auth.module';
 import { hashPassword } from '../auth/password.util';
+import { HorarioLaboralFontanero } from './entities/horario-laboral-fontanero.entity';
 import { Rol } from './entities/rol.entity';
 import { Usuario } from './entities/usuario.entity';
 import { UsuariosModule } from './usuarios.module';
@@ -38,7 +39,7 @@ describe('Usuarios y roles persistidos', () => {
           type: 'sqljs',
           autoSave: false,
           dropSchema: true,
-          entities: [Usuario, Rol],
+          entities: [Usuario, Rol, HorarioLaboralFontanero],
           synchronize: true,
         }),
         AuthModule,

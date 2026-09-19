@@ -13,6 +13,7 @@ import { HttpExceptionFilter } from '../../common/filters/http-exception.filter'
 import jwtConfig from '../../config/jwt.config';
 import { AuthModule } from '../auth/auth.module';
 import { Role } from '../../common/enums/role.enum';
+import { HorarioLaboralFontanero } from '../usuarios/entities/horario-laboral-fontanero.entity';
 import { Rol } from '../usuarios/entities/rol.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import {
@@ -28,6 +29,7 @@ import {
 } from './averias.estado-transiciones';
 import { type AveriaAdminDetail } from './averias.service';
 import { Averia } from './entities/averia.entity';
+import { ObservacionAveria } from './entities/observacion-averia.entity';
 
 describe('PBI 2.3 — PATCH estado, prioridad y clasificación', () => {
   jest.setTimeout(30_000);
@@ -64,7 +66,7 @@ describe('PBI 2.3 — PATCH estado, prioridad y clasificación', () => {
           type: 'sqljs',
           autoSave: false,
           dropSchema: true,
-          entities: [Averia, Usuario, Rol],
+          entities: [Averia, ObservacionAveria, Usuario, Rol, HorarioLaboralFontanero],
           synchronize: true,
         }),
         AuthModule,

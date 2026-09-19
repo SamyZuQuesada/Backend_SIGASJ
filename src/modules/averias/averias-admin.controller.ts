@@ -138,7 +138,7 @@ export class AveriasAdminController {
   @ApiOperation({
     summary: 'Cambiar el estado administrativo de una avería',
     description:
-      'Valida transiciones en Backend (PBI 2.3). ASIGNADA y EN_ATENCION exigen fontanero ya asignado. Roles: ADMINISTRADORA y SECRETARIA.',
+      'Valida transiciones en Backend (PBI 2.3). ASIGNADA y EN_ATENCION exigen fontanero ya asignado. Pasar a EN_ATENCION exige horario laboral del Fontanero asignado y registra fechaInicioAtencion en el servidor. Roles: ADMINISTRADORA y SECRETARIA.',
   })
   @ApiParam({
     name: 'id',
@@ -245,7 +245,7 @@ export class AveriasAdminController {
   @ApiOperation({
     summary: 'Asignar una avería a un Fontanero',
     description:
-      'Asignación inicial atómica. Valida Usuario activo con rol FONTANERO, guarda fontanero y fechaAsignacion y pasa a ASIGNADA (grafo 2.3). No reasigna. Un FONTANERO autenticado no puede usar este endpoint.',
+      'Asignación inicial atómica. Valida Usuario activo con rol FONTANERO, guarda fontanero y fechaAsignacion y pasa a ASIGNADA (grafo 2.3). Luego valida el horario laboral del Backend: si no está en jornada, queda PENDIENTE sin soltar al Fontanero. No reasigna ni envía SMS. Un FONTANERO autenticado no puede usar este endpoint.',
   })
   @ApiParam({
     name: 'id',
@@ -256,7 +256,7 @@ export class AveriasAdminController {
   @ApiResponse({
     status: HttpStatus.OK,
     description:
-      'Detalle con fontanero `{ id }`, fechaAsignacion y estado ASIGNADA.',
+      'Detalle con fontanero, fechaAsignacion, estado ASIGNADA o PENDIENTE según horario, y el evento de notificación preparado si aplica.',
   })
   @ApiResponse({
     status: HttpStatus.BAD_REQUEST,

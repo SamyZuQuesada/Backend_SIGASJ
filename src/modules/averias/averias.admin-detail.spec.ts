@@ -14,6 +14,7 @@ import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
 import jwtConfig from '../../config/jwt.config';
 import { AuthModule } from '../auth/auth.module';
 import { Rol } from '../usuarios/entities/rol.entity';
+import { HorarioLaboralFontanero } from '../usuarios/entities/horario-laboral-fontanero.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import {
   crearUsuarioPrueba,
@@ -26,6 +27,7 @@ import {
   type AveriaAdminDetail,
 } from './averias.service';
 import { Averia } from './entities/averia.entity';
+import { ObservacionAveria } from './entities/observacion-averia.entity';
 
 const LONG_DESCRIPTION = [
   'Fuga continua en la tubería de distribución frente a la escuela.',
@@ -128,7 +130,7 @@ describe('GET /api/v1/admin/averias/:id — detalle administrativo', () => {
           type: 'sqljs',
           autoSave: false,
           dropSchema: true,
-          entities: [Averia, Usuario, Rol],
+          entities: [Averia, ObservacionAveria, Usuario, Rol, HorarioLaboralFontanero],
           synchronize: true,
         }),
         AuthModule,
@@ -216,6 +218,7 @@ describe('GET /api/v1/admin/averias/:id — detalle administrativo', () => {
     expect(body.fechaInicioAtencion).toBeNull();
     expect(body.fechaResolucion).toBeNull();
     expect(body.observacionesAtencion).toBeNull();
+    expect(body.observaciones).toEqual([]);
     expect(JSON.stringify(body)).not.toMatch(SENSITIVE);
   });
 
@@ -265,6 +268,7 @@ describe('GET /api/v1/admin/averias/:id — detalle administrativo', () => {
       fontanero: { id: fontaneroId, nombre: fontaneroNombre },
       observacionesAtencion: 'Se reemplazó el tramo afectado.',
     });
+    expect(body.observaciones).toEqual([]);
     expect(
       new Date(body.fechaAsignacion as unknown as string).toISOString(),
     ).toBe('2026-09-13T08:15:00.000Z');

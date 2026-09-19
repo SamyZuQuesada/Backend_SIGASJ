@@ -5,11 +5,13 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { EstadoAveria } from '../../../common/enums/estado-averia.enum';
 import { Usuario } from '../../usuarios/entities/usuario.entity';
+import { ObservacionAveria } from './observacion-averia.entity';
 
 /**
  * Registro principal de una avería reportada a la ASADA.
@@ -112,8 +114,15 @@ export class Averia {
   @Column({ type: 'datetime', nullable: true })
   fechaResolucion: Date | null;
 
+  /**
+   * Campo de texto simple legado. No se sobrescribe al registrar
+   * observaciones independientes en `ObservacionAveria`.
+   */
   @Column({ type: 'text', nullable: true })
   observacionesAtencion: string | null;
+
+  @OneToMany(() => ObservacionAveria, (observacion) => observacion.averia)
+  observaciones: ObservacionAveria[];
 
   @CreateDateColumn()
   createdAt: Date;
