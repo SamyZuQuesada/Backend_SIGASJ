@@ -11,7 +11,7 @@ import {
 } from './averias.estado-transiciones';
 
 describe('transiciones de estado de avería (PBI 2.3 / 2.4)', () => {
-  it('permite EN_REVISION → ASIGNADA y PENDIENTE → ASIGNADA', () => {
+  it('permite EN_REVISION → ASIGNADA, PENDIENTE → ASIGNADA y ASIGNADA → PENDIENTE', () => {
     expect(
       esTransicionEstadoAveriaValida(
         EstadoAveria.EN_REVISION,
@@ -22,6 +22,12 @@ describe('transiciones de estado de avería (PBI 2.3 / 2.4)', () => {
       esTransicionEstadoAveriaValida(
         EstadoAveria.PENDIENTE,
         EstadoAveria.ASIGNADA,
+      ),
+    ).toBe(true);
+    expect(
+      esTransicionEstadoAveriaValida(
+        EstadoAveria.ASIGNADA,
+        EstadoAveria.PENDIENTE,
       ),
     ).toBe(true);
   });

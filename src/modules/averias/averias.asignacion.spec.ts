@@ -11,10 +11,13 @@ import { EstadoAveria } from '../../common/enums/estado-averia.enum';
 import { Role } from '../../common/enums/role.enum';
 import { HttpExceptionFilter } from '../../common/filters/http-exception.filter';
 import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
+import { partesLaboralesEnAsada } from '../../common/time/reloj-asada';
 import jwtConfig from '../../config/jwt.config';
 import { AuthModule } from '../auth/auth.module';
+import { HorarioLaboralFontanero } from '../usuarios/entities/horario-laboral-fontanero.entity';
 import { Rol } from '../usuarios/entities/rol.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
+import { ResultadoHorarioLaboral } from '../usuarios/validacion-horario-laboral-fontanero';
 import {
   crearUsuarioPrueba,
   seedRolesBase,
@@ -27,16 +30,21 @@ import {
   mensajeTransicionEstadoAveriaInvalida,
 } from './averias.estado-transiciones';
 import {
+  EVENTO_SMS_FONTANERO_FUERA_DE_HORARIO,
+} from './averias.asignacion-horario';
+import {
   AVERIA_ADMIN_NOT_FOUND,
   AVERIA_YA_ASIGNADA,
   FONTANERO_ASIGNABLE_NOT_FOUND,
   FONTANERO_INACTIVO,
   FONTANERO_ROL_INVALIDO,
   type AveriaAdminDetail,
+  type AveriaAsignacionResult,
   type AveriasAdminFontanerosListado,
   type AveriasAdminListado,
 } from './averias.service';
 import { Averia } from './entities/averia.entity';
+import { ObservacionAveria } from './entities/observacion-averia.entity';
 
 describe('PBI 2.4 — asignación de avería al Fontanero', () => {
   jest.setTimeout(30_000);
@@ -44,6 +52,7 @@ describe('PBI 2.4 — asignación de avería al Fontanero', () => {
   let jwtService: JwtService;
   let averias: Repository<Averia>;
   let usuarios: Repository<Usuario>;
+  let horarios: Repository<HorarioLaboralFontanero>;
   let rolesMap: Record<Role, Rol>;
   let adminToken: string;
   let secretariaToken: string;
@@ -132,7 +141,13 @@ describe('PBI 2.4 — asignación de avería al Fontanero', () => {
           type: 'sqljs',
           autoSave: false,
           dropSchema: true,
-          entities: [Averia, Usuario, Rol],
+          entities: [
+            Averia,
+            ObservacionAveria,
+            Usuario,
+            Rol,
+            HorarioLaboralFontanero,
+          ],
           synchronize: true,
         }),
         AuthModule,
@@ -157,6 +172,7 @@ describe('PBI 2.4 — asignación de avería al Fontanero', () => {
     const dataSource = moduleFixture.get(DataSource);
     averias = dataSource.getRepository(Averia);
     usuarios = dataSource.getRepository(Usuario);
+    horarios = dataSource.getRepository(HorarioLaboralFontanero);
     rolesMap = await seedRolesBase(dataSource.getRepository(Rol));
     await seedStaffLoginUsers(usuarios, rolesMap);
 
@@ -183,8 +199,38 @@ describe('PBI 2.4 — asignación de avería al Fontanero', () => {
 
   beforeEach(async () => {
     await averias.clear();
+    await horarios.clear();
     await usuarios.clear();
   });
+
+  const definirHorarioJornadaCompleta = async (idFontanero: number) => {
+    const partes = partesLaboralesEnAsada(new Date());
+    await horarios.save(
+      horarios.create({
+        idFontanero,
+        diaSemana: partes.diaSemana,
+        horaInicio: '00:00:00',
+        horaFin: '23:59:59',
+        activo: true,
+      }),
+    );
+  };
+
+  const definirHorarioFueraDeAhora = async (idFontanero: number) => {
+    const partes = partesLaboralesEnAsada(new Date());
+    const ventana =
+      partes.segundosDesdeMedianoche >= 3600
+        ? { horaInicio: '00:00:00', horaFin: '00:01:00' }
+        : { horaInicio: '23:00:00', horaFin: '23:30:00' };
+    await horarios.save(
+      horarios.create({
+        idFontanero,
+        diaSemana: partes.diaSemana,
+        ...ventana,
+        activo: true,
+      }),
+    );
+  };
 
   it('lista fontaneros asignables como { id, nombre } sin secretos', async () => {
     const fontanero = await persistUsuario({ nombre: 'Carlos Pérez' });
@@ -203,6 +249,7 @@ describe('PBI 2.4 — asignación de avería al Fontanero', () => {
 
   it('asigna un Usuario existente, guarda fecha y pasa EN_REVISION → ASIGNADA', async () => {
     const fontanero = await persistUsuario();
+    await definirHorarioJornadaCompleta(fontanero.idUsuario);
     const saved = await persistAveria({ codigoSeguimiento: 'AV-ASG-OK' });
     const before = Date.now();
 
@@ -249,6 +296,7 @@ describe('PBI 2.4 — asignación de avería al Fontanero', () => {
 
   it('también asigna desde PENDIENTE porque 2.3 lo permite', async () => {
     const fontanero = await persistUsuario();
+    await definirHorarioJornadaCompleta(fontanero.idUsuario);
     const saved = await persistAveria({
       codigoSeguimiento: 'AV-ASG-PEN',
       estado: EstadoAveria.PENDIENTE,
@@ -466,6 +514,7 @@ describe('PBI 2.4 — asignación de avería al Fontanero', () => {
 
   it('una avería ASIGNADA por /asignacion siempre tiene fontanero y fecha', async () => {
     const fontanero = await persistUsuario();
+    await definirHorarioJornadaCompleta(fontanero.idUsuario);
     const saved = await persistAveria({ codigoSeguimiento: 'AV-ASG-INV' });
     await patchAsignacion(
       saved.id,
@@ -587,5 +636,104 @@ describe('PBI 2.4 — asignación de avería al Fontanero', () => {
       adminToken,
     ).expect(400);
     expect(rIna.body).toMatchObject({ message: FONTANERO_INACTIVO });
+  });
+
+  it('dentro de horario permanece ASIGNADA y no arma SMS', async () => {
+    const fontanero = await persistUsuario();
+    await definirHorarioJornadaCompleta(fontanero.idUsuario);
+    const saved = await persistAveria({ codigoSeguimiento: 'AV-ASG-IN' });
+    const updatedAtAntes = saved.updatedAt;
+
+    const response = await patchAsignacion(
+      saved.id,
+      { fontaneroId: fontanero.idUsuario },
+      adminToken,
+    ).expect(200);
+    const body = response.body as AveriaAsignacionResult;
+
+    expect(body.estado).toBe(EstadoAveria.ASIGNADA);
+    expect(body.horarioLaboral.dentroDeHorario).toBe(true);
+    expect(body.horarioLaboral.resultado).toBe(
+      ResultadoHorarioLaboral.DENTRO_DE_HORARIO,
+    );
+    expect(body.notificacionPendiente).toBeNull();
+    expect(body.fontanero).toEqual({
+      id: fontanero.idUsuario,
+      nombre: fontanero.nombre,
+    });
+
+    const persistida = await averias.findOneBy({ id: saved.id });
+    expect(persistida?.estado).toBe(EstadoAveria.ASIGNADA);
+    expect(persistida?.idFontaneroAsignado).toBe(fontanero.idUsuario);
+    expect(persistida?.updatedAt.getTime()).toBeGreaterThanOrEqual(
+      updatedAtAntes.getTime(),
+    );
+    expect(persistida?.estado).not.toBe('FUERA_DE_HORARIO');
+  });
+
+  it('fuera de horario pasa a PENDIENTE y conserva al Fontanero', async () => {
+    const fontanero = await persistUsuario();
+    await definirHorarioFueraDeAhora(fontanero.idUsuario);
+    const saved = await persistAveria({ codigoSeguimiento: 'AV-ASG-OUT' });
+    const updatedAtAntes = saved.updatedAt;
+
+    const response = await patchAsignacion(
+      saved.id,
+      { fontaneroId: fontanero.idUsuario },
+      adminToken,
+    ).expect(200);
+    const body = response.body as AveriaAsignacionResult;
+
+    expect(body.estado).toBe(EstadoAveria.PENDIENTE);
+    expect(body.horarioLaboral.dentroDeHorario).toBe(false);
+    expect(body.horarioLaboral.resultado).toBe(
+      ResultadoHorarioLaboral.FUERA_DE_HORARIO,
+    );
+    expect(body.notificacionPendiente).toMatchObject({
+      tipo: EVENTO_SMS_FONTANERO_FUERA_DE_HORARIO,
+      destinatario: 'reportante',
+      idAveria: saved.id,
+      idFontanero: fontanero.idUsuario,
+      telefonoReportante: saved.telefonoReportante,
+    });
+    expect(body.fontanero).toEqual({
+      id: fontanero.idUsuario,
+      nombre: fontanero.nombre,
+    });
+
+    const persistida = await averias.findOneBy({ id: saved.id });
+    expect(persistida?.estado).toBe(EstadoAveria.PENDIENTE);
+    expect(persistida?.idFontaneroAsignado).toBe(fontanero.idUsuario);
+    expect(persistida?.fechaAsignacion).toBeInstanceOf(Date);
+    expect(persistida?.updatedAt.getTime()).toBeGreaterThanOrEqual(
+      updatedAtAntes.getTime(),
+    );
+    expect(persistida?.estado).not.toBe('FUERA_DE_HORARIO');
+  });
+
+  it('sin horario configurado queda PENDIENTE y no asume que puede atender', async () => {
+    const fontanero = await persistUsuario();
+    const saved = await persistAveria({ codigoSeguimiento: 'AV-ASG-NOH' });
+
+    const response = await patchAsignacion(
+      saved.id,
+      { fontaneroId: fontanero.idUsuario },
+      adminToken,
+    ).expect(200);
+    const body = response.body as AveriaAsignacionResult;
+
+    expect(body.estado).toBe(EstadoAveria.PENDIENTE);
+    expect(body.horarioLaboral.dentroDeHorario).toBe(false);
+    expect(body.horarioLaboral.resultado).toBe(
+      ResultadoHorarioLaboral.SIN_HORARIO_CONFIGURADO,
+    );
+    expect(body.notificacionPendiente?.tipo).toBe(
+      EVENTO_SMS_FONTANERO_FUERA_DE_HORARIO,
+    );
+    expect(body.fontanero?.id).toBe(fontanero.idUsuario);
+
+    const persistida = await averias.findOneBy({ id: saved.id });
+    expect(persistida?.estado).toBe(EstadoAveria.PENDIENTE);
+    expect(persistida?.idFontaneroAsignado).toBe(fontanero.idUsuario);
   });
 });

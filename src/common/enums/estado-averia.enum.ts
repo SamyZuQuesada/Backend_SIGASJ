@@ -20,7 +20,7 @@ export const ESTADO_AVERIA_LABELS: Record<EstadoAveria, string> = {
   [EstadoAveria.EN_REVISION]: 'En revisión',
   [EstadoAveria.ASIGNADA]: 'Asignada',
   [EstadoAveria.EN_ATENCION]: 'En atención',
-  [EstadoAveria.PENDIENTE]: 'Pendiente',
+  [EstadoAveria.PENDIENTE]: 'Pendiente de atención',
   [EstadoAveria.RESUELTA]: 'Resuelta',
   [EstadoAveria.CANCELADA]: 'Cancelada',
 };

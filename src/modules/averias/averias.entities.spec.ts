@@ -8,6 +8,7 @@ import {
   seedRolesBase,
 } from '../usuarios/usuarios.test-helpers';
 import { Averia } from './entities/averia.entity';
+import { ObservacionAveria } from './entities/observacion-averia.entity';
 
 function averiaMinima(overrides: Partial<Averia> = {}): Averia {
   const averia = new Averia();
@@ -25,17 +26,19 @@ describe('Persistencia Averia (sqljs / repository)', () => {
   jest.setTimeout(30_000);
   let dataSource: DataSource;
   let averias: Repository<Averia>;
+  let observaciones: Repository<ObservacionAveria>;
   let usuarios: Repository<Usuario>;
   let rolesMap: Record<Role, Rol>;
 
   beforeAll(async () => {
     dataSource = new DataSource({
       type: 'sqljs',
-      entities: [Averia, Usuario, Rol],
+      entities: [Averia, ObservacionAveria, Usuario, Rol],
       synchronize: true,
     });
     await dataSource.initialize();
     averias = dataSource.getRepository(Averia);
+    observaciones = dataSource.getRepository(ObservacionAveria);
     usuarios = dataSource.getRepository(Usuario);
     rolesMap = await seedRolesBase(dataSource.getRepository(Rol));
   });
@@ -47,6 +50,7 @@ describe('Persistencia Averia (sqljs / repository)', () => {
   });
 
   beforeEach(async () => {
+    await observaciones.clear();
     await averias.clear();
     await usuarios.clear();
   });
@@ -214,5 +218,61 @@ describe('Persistencia Averia (sqljs / repository)', () => {
     expect(relation?.isCascadeInsert).toBe(false);
     expect(relation?.isCascadeUpdate).toBe(false);
     expect(relation?.onDelete).toBe('SET NULL');
+  });
+
+  it('persiste observaciones independientes sin sobrescribir Averia.observacionesAtencion', async () => {
+    const fontanero = await crearUsuarioPrueba(usuarios, rolesMap, {
+      nombre: 'Fontanero observaciones',
+      correo: 'fontanero.obs@asadasanjuan.cr',
+      role: Role.FONTANERO,
+    });
+    const averia = await averias.save(
+      averiaMinima({
+        codigoSeguimiento: 'AVR-SQLJS-OBS',
+        observacionesAtencion: 'Texto legado',
+        idFontaneroAsignado: fontanero.idUsuario,
+      }),
+    );
+
+    const primera = await observaciones.save(
+      observaciones.create({
+        observacion: 'Primera nota de campo',
+        idAveria: averia.id,
+        idUsuarioAutor: fontanero.idUsuario,
+      }),
+    );
+    const segunda = await observaciones.save(
+      observaciones.create({
+        observacion: 'Segunda nota de campo',
+        idAveria: averia.id,
+        idUsuarioAutor: fontanero.idUsuario,
+      }),
+    );
+
+    expect(primera.id).not.toBe(segunda.id);
+    expect(primera.fechaCreacion).toBeInstanceOf(Date);
+    expect(segunda.fechaCreacion).toBeInstanceOf(Date);
+
+    const rows = await observaciones.find({
+      where: { idAveria: averia.id },
+      order: { id: 'ASC' },
+    });
+    expect(rows).toHaveLength(2);
+    expect(rows[0]?.observacion).toBe('Primera nota de campo');
+    expect(rows[1]?.observacion).toBe('Segunda nota de campo');
+
+    const loaded = await averias.findOneBy({ id: averia.id });
+    expect(loaded?.observacionesAtencion).toBe('Texto legado');
+  });
+
+  it('no usa cascade al persistir ObservacionAveria', () => {
+    const metadata = dataSource.getMetadata(ObservacionAveria);
+    const averiaRel = metadata.findRelationWithPropertyPath('averia');
+    const autorRel = metadata.findRelationWithPropertyPath('autor');
+    expect(averiaRel?.isCascadeInsert).toBe(false);
+    expect(averiaRel?.isCascadeUpdate).toBe(false);
+    expect(averiaRel?.onDelete).toBe('NO ACTION');
+    expect(autorRel?.isCascadeInsert).toBe(false);
+    expect(autorRel?.onDelete).toBe('NO ACTION');
   });
 });

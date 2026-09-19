@@ -13,6 +13,7 @@ import { HttpExceptionFilter } from '../../common/filters/http-exception.filter'
 import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
 import jwtConfig from '../../config/jwt.config';
 import { AuthModule } from '../auth/auth.module';
+import { HorarioLaboralFontanero } from '../usuarios/entities/horario-laboral-fontanero.entity';
 import { Rol } from '../usuarios/entities/rol.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import {
@@ -22,6 +23,7 @@ import {
 } from '../usuarios/usuarios.test-helpers';
 import { AveriasModule } from './averias.module';
 import { Averia } from './entities/averia.entity';
+import { ObservacionAveria } from './entities/observacion-averia.entity';
 import type {
   AveriaAdminListItem,
   AveriasAdminListado,
@@ -109,7 +111,7 @@ describe('GET /api/v1/admin/averias — listado administrativo', () => {
           type: 'sqljs',
           autoSave: false,
           dropSchema: true,
-          entities: [Averia, Usuario, Rol],
+          entities: [Averia, ObservacionAveria, Usuario, Rol, HorarioLaboralFontanero],
           synchronize: true,
         }),
         AuthModule,

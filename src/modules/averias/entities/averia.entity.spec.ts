@@ -12,6 +12,9 @@ describe('Averia Entity (Gestión de Averías)', () => {
     it('define el estado inicial RECIBIDA y el catálogo administrativo', () => {
       expect(EstadoAveria.RECIBIDA).toBe('RECIBIDA');
       expect(ESTADO_AVERIA_LABELS[EstadoAveria.RECIBIDA]).toBe('Recibida');
+      expect(ESTADO_AVERIA_LABELS[EstadoAveria.PENDIENTE]).toBe(
+        'Pendiente de atención',
+      );
       expect(isEstadoAveriaValido('RECIBIDA')).toBe(true);
       expect(isEstadoAveriaValido('ASIGNADA')).toBe(true);
       expect(isEstadoAveriaValido('REPORTADA')).toBe(false);

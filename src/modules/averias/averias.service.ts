@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   HttpException,
   Injectable,
   InternalServerErrorException,
@@ -13,12 +14,26 @@ import {
   EstadoAveria,
 } from '../../common/enums/estado-averia.enum';
 import { Role } from '../../common/enums/role.enum';
+import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
+import { ahoraDelSistema } from '../../common/time/reloj-asada';
 import { withDbRetry } from '../../common/persistence/with-db-retry';
 import { Usuario } from '../usuarios/entities/usuario.entity';
+import { ValidacionHorarioLaboralFontaneroService } from '../usuarios/validacion-horario-laboral-fontanero.service';
+import type { EvaluacionHorarioLaboral } from '../usuarios/validacion-horario-laboral-fontanero';
+import {
+  estadoTrasValidarHorarioAsignacion,
+  prepararEventoNotificacionHorarioAsignacion,
+  type EventoNotificacionHorarioAsignacion,
+} from './averias.asignacion-horario';
 import {
   assertEstadoAveriaCompatibleConFontanero,
   assertTransicionEstadoAveria,
 } from './averias.estado-transiciones';
+import {
+  MENSAJE_INICIO_ATENCION_FUERA_DE_HORARIO,
+  assertHorarioPermiteIniciarAtencion,
+  registrarInicioAtencionExitoso,
+} from './averias.inicio-atencion';
 import { usuarioEsFontaneroAsignable } from './averias.fontanero-asignable';
 import {
   ADMIN_AVERIAS_LIMIT_DEFAULT,
@@ -28,6 +43,17 @@ import {
 } from './dto/query-averias-admin.dto';
 import { AssignAveriaFontaneroDto } from './dto/assign-averia-fontanero.dto';
 import { CreatePublicAveriaDto } from './dto/create-public-averia.dto';
+import {
+  CreateObservacionAveriaDto,
+  OBSERVACION_AVERIA_REGISTRADA,
+} from './dto/create-observacion-averia.dto';
+import {
+  AVERIA_FONTANERO_RESOLVER_FORBIDDEN,
+  AVERIA_NO_EN_ATENCION,
+  AVERIA_RESOLVER_ERROR,
+  AVERIA_RESUELTA_OK,
+  ResolverAveriaDto,
+} from './dto/resolver-averia.dto';
 import { RegistroPublicoAveriaResponseDto } from './dto/registro-publico-averia-response.dto';
 import { UpdateAveriaClasificacionDto } from './dto/update-averia-clasificacion.dto';
 import { UpdateAveriaEstadoDto } from './dto/update-averia-estado.dto';
@@ -39,14 +65,24 @@ import {
   parseConsecutiveFromCodigo,
 } from './averias.codigo-seguimiento';
 import { Averia } from './entities/averia.entity';
+import { ObservacionAveria } from './entities/observacion-averia.entity';
 
 const REGISTRO_OK = 'Avería registrada correctamente.';
 const REGISTRO_ERROR = 'No se pudo registrar la avería. Intente nuevamente.';
 const LISTADO_ERROR = 'No se pudieron consultar las averías';
 const DETALLE_ERROR = 'No se pudo consultar la avería';
 const ACTUALIZACION_ERROR = 'No se pudo actualizar la avería';
+const INICIO_ATENCION_ERROR =
+  'No se pudo iniciar la atención. Intente nuevamente.';
 const FONTANEROS_ERROR = 'No se pudieron consultar los fontaneros';
+const OBSERVACION_ERROR =
+  'No se pudo registrar la observación. Intente nuevamente.';
 export const AVERIA_ADMIN_NOT_FOUND = 'No se encontró la avería solicitada.';
+export const AVERIA_FONTANERO_FORBIDDEN =
+  'No tiene autorización para consultar esta avería.';
+export const TIPO_AVERIA_SIN_CLASIFICAR = 'Sin clasificar';
+export const PRIORIDAD_AVERIA_SIN_ASIGNAR = 'Sin asignar';
+export const OBSERVACIONES_ATENCION_VACIAS = 'Sin observaciones';
 export const FONTANERO_ASIGNABLE_NOT_FOUND =
   'No se encontró el fontanero solicitado.';
 export const FONTANERO_ROL_INVALIDO =
@@ -92,6 +128,7 @@ export type AveriaAdminDetail = {
   fechaInicioAtencion: Date | null;
   fechaResolucion: Date | null;
   observacionesAtencion: string | null;
+  observaciones: AveriaObservacionItem[];
 };
 
 export type AveriaAdminListItem = {
@@ -118,6 +155,87 @@ export type AveriasAdminListado = {
 
 export type AveriasAdminFontanerosListado = {
   data: AveriaAdminFontanero[];
+};
+
+export type HorarioLaboralAsignacion = {
+  resultado: EvaluacionHorarioLaboral['resultado'];
+  dentroDeHorario: boolean;
+  motivo: string;
+};
+
+/**
+ * Respuesta de PATCH /asignacion. Incluye la validación de horario (2.6.3)
+ * y el evento preparado para el SMS posterior (2.8), sin enviarlo.
+ */
+export type AveriaAsignacionResult = AveriaAdminDetail & {
+  horarioLaboral: HorarioLaboralAsignacion;
+  notificacionPendiente: EventoNotificacionHorarioAsignacion | null;
+};
+
+export type AveriaObservacionItem = {
+  id: number;
+  observacion: string;
+  fechaCreacion: Date;
+  autor: {
+    id: number;
+    nombre: string;
+  };
+};
+
+export type CreateObservacionAveriaResponse = {
+  message: string;
+  data: AveriaObservacionItem;
+};
+
+export const ESTADOS_LISTADO_FONTANERO: readonly EstadoAveria[] = [
+  EstadoAveria.ASIGNADA,
+  EstadoAveria.PENDIENTE,
+  EstadoAveria.EN_ATENCION,
+];
+
+export type AveriaFontaneroListItem = {
+  id: number;
+  codigoSeguimiento: string;
+  fechaAsignacion: Date | null;
+  estado: EstadoAveria;
+  sectorComunidad: string;
+  ubicacion: string;
+  descripcion: string;
+  tipoAveria: string;
+  prioridad: string;
+  fechaInicioAtencion: Date | null;
+};
+
+export type AveriasFontaneroListado = {
+  data: AveriaFontaneroListItem[];
+};
+
+/**
+ * Detalle para el Fontanero autenticado. Solo datos necesarios para atender.
+ * No incluye identificación, correo, Abonado ni secretos de Usuario.
+ */
+export type AveriaFontaneroDetail = {
+  id: number;
+  codigoSeguimiento: string;
+  fechaReporte: Date;
+  fechaAsignacion: Date | null;
+  estado: EstadoAveria;
+  sectorComunidad: string;
+  ubicacion: string;
+  descripcion: string;
+  nombreReportante: string;
+  telefonoReportante: string;
+  tipoAveria: string;
+  prioridad: string;
+  fechaInicioAtencion: Date | null;
+  fechaResolucion: Date | null;
+  observacionesAtencion: string;
+  observaciones: AveriaObservacionItem[];
+};
+
+export type ResolverAveriaResponse = {
+  message: string;
+  data: AveriaFontaneroDetail;
 };
 
 const ISO_DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -184,7 +302,10 @@ function toAdminListItem(averia: Averia): AveriaAdminListItem {
   };
 }
 
-export function toAdminDetail(averia: Averia): AveriaAdminDetail {
+export function toAdminDetail(
+  averia: Averia,
+  observaciones: AveriaObservacionItem[] = [],
+): AveriaAdminDetail {
   return {
     id: averia.id,
     codigoSeguimiento: averia.codigoSeguimiento,
@@ -205,7 +326,85 @@ export function toAdminDetail(averia: Averia): AveriaAdminDetail {
     fechaInicioAtencion: averia.fechaInicioAtencion ?? null,
     fechaResolucion: averia.fechaResolucion ?? null,
     observacionesAtencion: averia.observacionesAtencion ?? null,
+    observaciones,
   };
+}
+
+export function resolveAuthenticatedUsuarioId(user: AuthenticatedUser): number {
+  const raw = user.idUsuario ?? user.userId;
+  const id = Number(raw);
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new ForbiddenException(AVERIA_FONTANERO_FORBIDDEN);
+  }
+  return id;
+}
+
+export function toFontaneroListItem(averia: Averia): AveriaFontaneroListItem {
+  return {
+    id: averia.id,
+    codigoSeguimiento: averia.codigoSeguimiento,
+    fechaAsignacion: averia.fechaAsignacion ?? null,
+    estado: averia.estado,
+    sectorComunidad: averia.sectorComunidad,
+    ubicacion: averia.ubicacion,
+    descripcion: averia.descripcion,
+    tipoAveria: averia.tipoAveria?.trim() || TIPO_AVERIA_SIN_CLASIFICAR,
+    prioridad: averia.prioridad?.trim() || PRIORIDAD_AVERIA_SIN_ASIGNAR,
+    fechaInicioAtencion: averia.fechaInicioAtencion ?? null,
+  };
+}
+
+export function toFontaneroDetail(
+  averia: Averia,
+  observaciones: AveriaObservacionItem[] = [],
+): AveriaFontaneroDetail {
+  const observacionesAtencion = averia.observacionesAtencion?.trim();
+  return {
+    id: averia.id,
+    codigoSeguimiento: averia.codigoSeguimiento,
+    fechaReporte: averia.fechaReporte,
+    fechaAsignacion: averia.fechaAsignacion ?? null,
+    estado: averia.estado,
+    sectorComunidad: averia.sectorComunidad,
+    ubicacion: averia.ubicacion,
+    descripcion: averia.descripcion,
+    nombreReportante: averia.nombreReportante,
+    telefonoReportante: averia.telefonoReportante,
+    tipoAveria: averia.tipoAveria?.trim() || TIPO_AVERIA_SIN_CLASIFICAR,
+    prioridad: averia.prioridad?.trim() || PRIORIDAD_AVERIA_SIN_ASIGNAR,
+    fechaInicioAtencion: averia.fechaInicioAtencion ?? null,
+    fechaResolucion: averia.fechaResolucion ?? null,
+    observacionesAtencion:
+      observacionesAtencion || OBSERVACIONES_ATENCION_VACIAS,
+    observaciones,
+  };
+}
+
+export function buildFindOneFontaneroQuery(
+  repository: Repository<Averia>,
+  id: number,
+): SelectQueryBuilder<Averia> {
+  return repository
+    .createQueryBuilder('averia')
+    .select([
+      'averia.id',
+      'averia.codigoSeguimiento',
+      'averia.fechaReporte',
+      'averia.fechaAsignacion',
+      'averia.estado',
+      'averia.sectorComunidad',
+      'averia.ubicacion',
+      'averia.descripcion',
+      'averia.nombreReportante',
+      'averia.telefonoReportante',
+      'averia.tipoAveria',
+      'averia.prioridad',
+      'averia.fechaInicioAtencion',
+      'averia.fechaResolucion',
+      'averia.observacionesAtencion',
+      'averia.idFontaneroAsignado',
+    ])
+    .where('averia.id = :id', { id });
 }
 
 export function buildFindOneAdminQuery(
@@ -250,7 +449,43 @@ export class AveriasService {
     private readonly averiaRepository: Repository<Averia>,
     @InjectRepository(Usuario)
     private readonly usuarioRepository: Repository<Usuario>,
+    @InjectRepository(ObservacionAveria)
+    private readonly observacionRepositoryInjected?: Repository<ObservacionAveria>,
+    private readonly validacionHorarioLaboral?: ValidacionHorarioLaboralFontaneroService,
   ) {}
+
+  /**
+   * Validación de horario para asignación e inicio de atención.
+   * Usa el reloj del Backend; no acepta fecha/hora del Frontend.
+   */
+  evaluarHorarioLaboralFontanero(
+    idFontanero: number,
+  ): Promise<EvaluacionHorarioLaboral> {
+    if (!this.validacionHorarioLaboral) {
+      throw new InternalServerErrorException(
+        'La validación de horario laboral no está disponible.',
+      );
+    }
+    return this.validacionHorarioLaboral.evaluarAhora(idFontanero);
+  }
+
+  private async assertHorarioParaInicioAtencion(
+    averia: Averia,
+  ): Promise<void> {
+    const idFontanero = averia.idFontaneroAsignado;
+    if (idFontanero == null) {
+      return;
+    }
+    const evaluacion = await this.evaluarHorarioLaboralFontanero(idFontanero);
+    assertHorarioPermiteIniciarAtencion(evaluacion);
+  }
+
+  private getObservacionRepository(): Repository<ObservacionAveria> {
+    return (
+      this.observacionRepositoryInjected ??
+      this.averiaRepository.manager.getRepository(ObservacionAveria)
+    );
+  }
 
   /**
    * Listado administrativo paginado. Filtros, orden y página se resuelven en SQL.
@@ -413,7 +648,12 @@ export class AveriasService {
           dto.estado,
           averia.idFontaneroAsignado,
         );
-        averia.estado = dto.estado;
+        if (dto.estado === EstadoAveria.EN_ATENCION) {
+          await this.assertHorarioParaInicioAtencion(averia);
+          registrarInicioAtencionExitoso(averia, ahoraDelSistema());
+        } else {
+          averia.estado = dto.estado;
+        }
         return toAdminDetail(await this.averiaRepository.save(averia));
       },
     );
@@ -454,13 +694,15 @@ export class AveriasService {
   }
 
   /**
-   * Asignación inicial al Fontanero (PBI 2.4). Reutiliza transiciones de 2.3.
-   * No reasigna. No notifica (2.8). No lista "mis averías" (2.5).
+   * Asignación inicial al Fontanero (PBI 2.4 + 2.6.3).
+   * Reutiliza transiciones de 2.3. Tras ASIGNADA valida el horario del
+   * Backend: dentro de jornada permanece ASIGNADA; si no, pasa a PENDIENTE
+   * sin soltar al Fontanero. No reasigna. No envía SMS (2.8).
    */
   async assignFontanero(
     id: number,
     dto: AssignAveriaFontaneroDto,
-  ): Promise<AveriaAdminDetail> {
+  ): Promise<AveriaAsignacionResult> {
     return this.runAdminUpdate(
       'Error inesperado al asignar un fontanero a una avería',
       async () => {
@@ -498,10 +740,355 @@ export class AveriasService {
             averia.idFontaneroAsignado,
           );
 
-          return toAdminDetail(await manager.save(averia));
+          const evaluacion = await this.evaluarHorarioLaboralFontanero(
+            usuario.idUsuario,
+          );
+          const estadoTrasHorario =
+            estadoTrasValidarHorarioAsignacion(evaluacion);
+          if (estadoTrasHorario !== EstadoAveria.ASIGNADA) {
+            assertTransicionEstadoAveria(
+              EstadoAveria.ASIGNADA,
+              estadoTrasHorario,
+            );
+            averia.estado = estadoTrasHorario;
+          }
+
+          const persistida = await manager.save(averia);
+          const notificacionPendiente =
+            prepararEventoNotificacionHorarioAsignacion({
+              idAveria: persistida.id,
+              codigoSeguimiento: persistida.codigoSeguimiento,
+              telefonoReportante: persistida.telefonoReportante,
+              idFontanero: usuario.idUsuario,
+              evaluacion,
+            });
+          if (notificacionPendiente) {
+            this.logger.log(
+              `Evento de notificación preparado (${notificacionPendiente.tipo}) para avería ${persistida.id}`,
+            );
+          }
+
+          return {
+            ...toAdminDetail(persistida),
+            horarioLaboral: {
+              resultado: evaluacion.resultado,
+              dentroDeHorario: evaluacion.puedeIniciarAtencion,
+              motivo: evaluacion.motivo,
+            },
+            notificacionPendiente,
+          };
         });
       },
     );
+  }
+
+  /**
+   * Listado operativo del Fontanero autenticado.
+   * Solo averías asignadas a él en Asignada, Pendiente de atención o En atención.
+   */
+  async findAllFontanero(
+    user: AuthenticatedUser,
+  ): Promise<AveriasFontaneroListado> {
+    try {
+      return await withDbRetry(async () => {
+        const fontaneroId = resolveAuthenticatedUsuarioId(user);
+        const rows = await this.averiaRepository
+          .createQueryBuilder('averia')
+          .select([
+            'averia.id',
+            'averia.codigoSeguimiento',
+            'averia.fechaAsignacion',
+            'averia.estado',
+            'averia.sectorComunidad',
+            'averia.ubicacion',
+            'averia.descripcion',
+            'averia.tipoAveria',
+            'averia.prioridad',
+            'averia.fechaInicioAtencion',
+            'averia.idFontaneroAsignado',
+          ])
+          .where('averia.idFontaneroAsignado = :fontaneroId', { fontaneroId })
+          .andWhere('averia.estado IN (:...estados)', {
+            estados: [...ESTADOS_LISTADO_FONTANERO],
+          })
+          .orderBy('averia.fechaAsignacion', 'DESC')
+          .addOrderBy('averia.id', 'DESC')
+          .getMany();
+
+        return { data: rows.map(toFontaneroListItem) };
+      });
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      this.logger.error(
+        'Error inesperado al consultar el listado de averías del Fontanero',
+      );
+      throw new InternalServerErrorException(LISTADO_ERROR);
+    }
+  }
+
+  /**
+   * Detalle de una avería asignada al Fontanero autenticado.
+   * La identidad sale del JWT. No basta con conocer el ID.
+   */
+  async findOneFontanero(
+    id: number,
+    user: AuthenticatedUser,
+  ): Promise<AveriaFontaneroDetail> {
+    try {
+      return await withDbRetry(async () => {
+        const fontaneroId = resolveAuthenticatedUsuarioId(user);
+        const averia = await buildFindOneFontaneroQuery(
+          this.averiaRepository,
+          id,
+        ).getOne();
+
+        if (!averia) {
+          throw new NotFoundException(AVERIA_ADMIN_NOT_FOUND);
+        }
+
+        if (
+          averia.idFontaneroAsignado == null ||
+          Number(averia.idFontaneroAsignado) !== fontaneroId
+        ) {
+          throw new ForbiddenException(AVERIA_FONTANERO_FORBIDDEN);
+        }
+
+        const observaciones = await this.listObservacionesDeAveria(averia.id);
+        return toFontaneroDetail(averia, observaciones);
+      });
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(
+        'Error inesperado al consultar el detalle de una avería para el Fontanero',
+      );
+      throw new InternalServerErrorException(DETALLE_ERROR);
+    }
+  }
+
+  /**
+   * Inserta una observación independiente. Relee la asignación en la misma
+   * transacción para no honrar una consulta previa si hubo reasignación.
+   */
+  async createObservacionAveria(
+    id: number,
+    dto: CreateObservacionAveriaDto,
+    user: AuthenticatedUser,
+  ): Promise<CreateObservacionAveriaResponse> {
+    try {
+      return await withDbRetry(async () => {
+        const fontaneroId = resolveAuthenticatedUsuarioId(user);
+        return this.averiaRepository.manager.transaction(async (manager) => {
+          const qb = manager
+            .createQueryBuilder(Averia, 'averia')
+            .where('averia.id = :id', { id });
+          if (manager.connection.options.type === 'mssql') {
+            qb.setLock('pessimistic_write');
+          }
+
+          const averia = await qb.getOne();
+          if (!averia) {
+            throw new NotFoundException(AVERIA_ADMIN_NOT_FOUND);
+          }
+          if (
+            averia.idFontaneroAsignado == null ||
+            Number(averia.idFontaneroAsignado) !== fontaneroId
+          ) {
+            throw new ForbiddenException(AVERIA_FONTANERO_FORBIDDEN);
+          }
+
+          const autor = await manager.findOne(Usuario, {
+            where: { idUsuario: fontaneroId },
+            select: { idUsuario: true, nombre: true },
+          });
+          if (!autor) {
+            throw new ForbiddenException(AVERIA_FONTANERO_FORBIDDEN);
+          }
+
+          const row = manager.create(ObservacionAveria, {
+            observacion: dto.observacion,
+            idAveria: averia.id,
+            idUsuarioAutor: autor.idUsuario,
+          });
+          const saved = await manager.save(row);
+          const persisted =
+            saved.fechaCreacion != null
+              ? saved
+              : await manager.findOneByOrFail(ObservacionAveria, {
+                  id: saved.id,
+                });
+
+          return {
+            message: OBSERVACION_AVERIA_REGISTRADA,
+            data: {
+              id: persisted.id,
+              observacion: persisted.observacion,
+              fechaCreacion: persisted.fechaCreacion,
+              autor: {
+                id: autor.idUsuario,
+                nombre: autor.nombre,
+              },
+            },
+          };
+        });
+      });
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(
+        'Error inesperado al registrar una observación de avería',
+      );
+      throw new InternalServerErrorException(OBSERVACION_ERROR);
+    }
+  }
+
+  /**
+   * Inicio de atención del Fontanero asignado.
+   * Horario y fechaInicioAtencion se resuelven en el Backend.
+   */
+  async iniciarAtencion(
+    id: number,
+    user: AuthenticatedUser,
+  ): Promise<AveriaFontaneroDetail> {
+    try {
+      return await withDbRetry(async () => {
+        const fontaneroId = resolveAuthenticatedUsuarioId(user);
+        const saved = await this.averiaRepository.manager.transaction(
+          async (manager) => {
+            const qb = manager
+              .createQueryBuilder(Averia, 'averia')
+              .leftJoinAndSelect('averia.fontaneroAsignado', 'fontanero')
+              .where('averia.id = :id', { id });
+            if (manager.connection.options.type === 'mssql') {
+              qb.setLock('pessimistic_write');
+            }
+
+            const averia = await qb.getOne();
+            if (!averia) {
+              throw new NotFoundException(AVERIA_ADMIN_NOT_FOUND);
+            }
+            if (
+              averia.idFontaneroAsignado == null ||
+              Number(averia.idFontaneroAsignado) !== fontaneroId
+            ) {
+              throw new ForbiddenException(AVERIA_FONTANERO_FORBIDDEN);
+            }
+
+            assertTransicionEstadoAveria(
+              averia.estado,
+              EstadoAveria.EN_ATENCION,
+            );
+            if (averia.estado === EstadoAveria.EN_ATENCION) {
+              return averia;
+            }
+
+            assertEstadoAveriaCompatibleConFontanero(
+              EstadoAveria.EN_ATENCION,
+              averia.idFontaneroAsignado,
+            );
+            await this.assertHorarioParaInicioAtencion(averia);
+            registrarInicioAtencionExitoso(averia, ahoraDelSistema());
+            return manager.save(averia);
+          },
+        );
+
+        const observaciones = await this.listObservacionesDeAveria(saved.id);
+        return toFontaneroDetail(saved, observaciones);
+      });
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      this.logger.error(
+        'Error inesperado al iniciar la atención de una avería',
+      );
+      throw new InternalServerErrorException(INICIO_ATENCION_ERROR);
+    }
+  }
+
+  /**
+   * Cierre operativo: En atención → Resuelta, con observación final.
+   * Estado, fecha de resolución y autor no vienen del cliente.
+   */
+  async resolverAveria(
+    id: number,
+    dto: ResolverAveriaDto,
+    user: AuthenticatedUser,
+  ): Promise<ResolverAveriaResponse> {
+    try {
+      return await withDbRetry(async () => {
+        const fontaneroId = resolveAuthenticatedUsuarioId(user);
+        const saved = await this.averiaRepository.manager.transaction(
+          async (manager) => {
+            const qb = manager
+              .createQueryBuilder(Averia, 'averia')
+              .where('averia.id = :id', { id });
+            if (manager.connection.options.type === 'mssql') {
+              qb.setLock('pessimistic_write');
+            }
+
+            const averia = await qb.getOne();
+            if (!averia) {
+              throw new NotFoundException(AVERIA_ADMIN_NOT_FOUND);
+            }
+            if (
+              averia.idFontaneroAsignado == null ||
+              Number(averia.idFontaneroAsignado) !== fontaneroId
+            ) {
+              throw new ForbiddenException(AVERIA_FONTANERO_RESOLVER_FORBIDDEN);
+            }
+            if (averia.estado !== EstadoAveria.EN_ATENCION) {
+              throw new BadRequestException(AVERIA_NO_EN_ATENCION);
+            }
+
+            assertTransicionEstadoAveria(
+              averia.estado,
+              EstadoAveria.RESUELTA,
+            );
+
+            const autor = await manager.findOne(Usuario, {
+              where: { idUsuario: fontaneroId },
+              select: { idUsuario: true, nombre: true },
+            });
+            if (!autor) {
+              throw new ForbiddenException(AVERIA_FONTANERO_RESOLVER_FORBIDDEN);
+            }
+
+            const observacion = manager.create(ObservacionAveria, {
+              observacion: dto.observacionFinal,
+              idAveria: averia.id,
+              idUsuarioAutor: autor.idUsuario,
+            });
+            await manager.save(observacion);
+
+            averia.estado = EstadoAveria.RESUELTA;
+            averia.fechaResolucion = new Date();
+            return manager.save(averia);
+          },
+        );
+
+        const observaciones = await this.listObservacionesDeAveria(saved.id);
+        return {
+          message: AVERIA_RESUELTA_OK,
+          data: toFontaneroDetail(saved, observaciones),
+        };
+      });
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(
+        'Error inesperado al resolver una avería asignada al Fontanero',
+      );
+      throw new InternalServerErrorException(AVERIA_RESOLVER_ERROR);
+    }
   }
 
   /**
@@ -520,7 +1107,8 @@ export class AveriasService {
           throw new NotFoundException(AVERIA_ADMIN_NOT_FOUND);
         }
 
-        return toAdminDetail(averia);
+        const observaciones = await this.listObservacionesDeAveria(averia.id);
+        return toAdminDetail(averia, observaciones);
       });
     } catch (error) {
       if (error instanceof HttpException) {
@@ -616,6 +1204,36 @@ export class AveriasService {
     });
   }
 
+  private async listObservacionesDeAveria(
+    idAveria: number,
+  ): Promise<AveriaObservacionItem[]> {
+    const rows = await this.getObservacionRepository()
+      .createQueryBuilder('obs')
+      .innerJoin('obs.autor', 'autor')
+      .select([
+        'obs.id',
+        'obs.observacion',
+        'obs.fechaCreacion',
+        'obs.idUsuarioAutor',
+        'autor.idUsuario',
+        'autor.nombre',
+      ])
+      .where('obs.idAveria = :idAveria', { idAveria })
+      .orderBy('obs.fechaCreacion', 'ASC')
+      .addOrderBy('obs.id', 'ASC')
+      .getMany();
+
+    return rows.map((row) => ({
+      id: row.id,
+      observacion: row.observacion,
+      fechaCreacion: row.fechaCreacion,
+      autor: {
+        id: row.autor.idUsuario,
+        nombre: row.autor.nombre,
+      },
+    }));
+  }
+
   private async getAveriaForAdminUpdate(id: number): Promise<Averia> {
     const averia = await this.averiaRepository.findOne({
       where: { id },
@@ -627,10 +1245,10 @@ export class AveriasService {
     return averia;
   }
 
-  private async runAdminUpdate(
+  private async runAdminUpdate<T extends AveriaAdminDetail>(
     logMessage: string,
-    work: () => Promise<AveriaAdminDetail>,
-  ): Promise<AveriaAdminDetail> {
+    work: () => Promise<T>,
+  ): Promise<T> {
     try {
       return await withDbRetry(work);
     } catch (error) {
