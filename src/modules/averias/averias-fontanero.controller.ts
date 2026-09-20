@@ -27,6 +27,8 @@ import { AveriasService } from './averias.service';
 import { CreateObservacionAveriaDto } from './dto/create-observacion-averia.dto';
 import { IniciarAtencionAveriaDto } from './dto/iniciar-atencion-averia.dto';
 import { ResolverAveriaDto } from './dto/resolver-averia.dto';
+import { UpdateAveriaClasificacionFontaneroDto } from './dto/update-averia-clasificacion-fontanero.dto';
+import { UpdateAveriaPrioridadFontaneroDto } from './dto/update-averia-prioridad-fontanero.dto';
 
 @ApiTags('Averías (Fontanero)')
 @ApiBearerAuth()
@@ -183,6 +185,90 @@ export class AveriasFontaneroController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.averiasService.iniciarAtencion(id, user);
+  }
+
+  @Patch(':id/prioridad')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Calificar la prioridad de una avería asignada',
+    description:
+      'Solo el Fontanero asignado. Prioridad: Baja, Media o Alta. No aplica a averías resueltas o canceladas.',
+  })
+  @ApiParam({
+    name: 'id',
+    type: Number,
+    description: 'Identificador entero positivo de Averia',
+    example: 25,
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Prioridad persistida por el Fontanero.',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Prioridad inválida o la avería ya está cerrada.',
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'Sin autenticación o token inválido',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description:
+      'Rol distinto de FONTANERO o la avería no está asignada al usuario autenticado',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'No se encontró la avería solicitada.',
+  })
+  updatePrioridadFontanero(
+    @Param('id', AveriaAdminIdPipe) id: number,
+    @Body() dto: UpdateAveriaPrioridadFontaneroDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.averiasService.updatePrioridadFontanero(id, dto, user);
+  }
+
+  @Patch(':id/clasificacion')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Calificar el tipo de una avería asignada',
+    description:
+      'Solo el Fontanero asignado. Tipo: Tubo madre o Tubo medidor. Body: `clasificacion`.',
+  })
+  @ApiParam({
+    name: 'id',
+    type: Number,
+    description: 'Identificador entero positivo de Averia',
+    example: 25,
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Tipo persistido por el Fontanero.',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Tipo inválido o la avería ya está cerrada.',
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'Sin autenticación o token inválido',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description:
+      'Rol distinto de FONTANERO o la avería no está asignada al usuario autenticado',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'No se encontró la avería solicitada.',
+  })
+  updateClasificacionFontanero(
+    @Param('id', AveriaAdminIdPipe) id: number,
+    @Body() dto: UpdateAveriaClasificacionFontaneroDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.averiasService.updateClasificacionFontanero(id, dto, user);
   }
 
   @Patch(':id/resolver')

@@ -56,8 +56,10 @@ import {
 } from './dto/resolver-averia.dto';
 import { RegistroPublicoAveriaResponseDto } from './dto/registro-publico-averia-response.dto';
 import { UpdateAveriaClasificacionDto } from './dto/update-averia-clasificacion.dto';
+import { UpdateAveriaClasificacionFontaneroDto } from './dto/update-averia-clasificacion-fontanero.dto';
 import { UpdateAveriaEstadoDto } from './dto/update-averia-estado.dto';
 import { UpdateAveriaPrioridadDto } from './dto/update-averia-prioridad.dto';
+import { UpdateAveriaPrioridadFontaneroDto } from './dto/update-averia-prioridad-fontanero.dto';
 import {
   buildCodigoSeguimiento,
   CODIGO_SEGUIMIENTO_MAX_RETRIES,
@@ -80,6 +82,8 @@ const OBSERVACION_ERROR =
 export const AVERIA_ADMIN_NOT_FOUND = 'No se encontró la avería solicitada.';
 export const AVERIA_FONTANERO_FORBIDDEN =
   'No tiene autorización para consultar esta avería.';
+export const AVERIA_FONTANERO_YA_CERRADA =
+  'No se puede calificar una avería resuelta o cancelada.';
 export const TIPO_AVERIA_SIN_CLASIFICAR = 'Sin clasificar';
 export const PRIORIDAD_AVERIA_SIN_ASIGNAR = 'Sin asignar';
 export const OBSERVACIONES_ATENCION_VACIAS = 'Sin observaciones';
@@ -1009,6 +1013,86 @@ export class AveriasService {
         'Error inesperado al iniciar la atención de una avería',
       );
       throw new InternalServerErrorException(INICIO_ATENCION_ERROR);
+    }
+  }
+
+  /**
+   * El Fontanero asignado califica prioridad (Baja / Media / Alta).
+   */
+  async updatePrioridadFontanero(
+    id: number,
+    dto: UpdateAveriaPrioridadFontaneroDto,
+    user: AuthenticatedUser,
+  ): Promise<AveriaFontaneroDetail> {
+    return this.calificarAveriaFontanero(id, user, (averia) => {
+      averia.prioridad = dto.prioridad;
+    });
+  }
+
+  /**
+   * El Fontanero asignado califica tipo (Tubo madre / Tubo medidor).
+   */
+  async updateClasificacionFontanero(
+    id: number,
+    dto: UpdateAveriaClasificacionFontaneroDto,
+    user: AuthenticatedUser,
+  ): Promise<AveriaFontaneroDetail> {
+    return this.calificarAveriaFontanero(id, user, (averia) => {
+      averia.tipoAveria = dto.clasificacion;
+    });
+  }
+
+  private async calificarAveriaFontanero(
+    id: number,
+    user: AuthenticatedUser,
+    apply: (averia: Averia) => void,
+  ): Promise<AveriaFontaneroDetail> {
+    try {
+      return await withDbRetry(async () => {
+        const fontaneroId = resolveAuthenticatedUsuarioId(user);
+        const saved = await this.averiaRepository.manager.transaction(
+          async (manager) => {
+            const qb = manager
+              .createQueryBuilder(Averia, 'averia')
+              .leftJoinAndSelect('averia.fontaneroAsignado', 'fontanero')
+              .where('averia.id = :id', { id });
+            if (manager.connection.options.type === 'mssql') {
+              qb.setLock('pessimistic_write');
+            }
+
+            const averia = await qb.getOne();
+            if (!averia) {
+              throw new NotFoundException(AVERIA_ADMIN_NOT_FOUND);
+            }
+            if (
+              averia.idFontaneroAsignado == null ||
+              Number(averia.idFontaneroAsignado) !== fontaneroId
+            ) {
+              throw new ForbiddenException(AVERIA_FONTANERO_FORBIDDEN);
+            }
+            if (
+              averia.estado === EstadoAveria.RESUELTA ||
+              averia.estado === EstadoAveria.CANCELADA
+            ) {
+              throw new BadRequestException(AVERIA_FONTANERO_YA_CERRADA);
+            }
+
+            apply(averia);
+            return manager.save(averia);
+          },
+        );
+
+        const observaciones = await this.listObservacionesDeAveria(saved.id);
+        return toFontaneroDetail(saved, observaciones);
+      });
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      this.logger.error(
+        'Error inesperado al calificar prioridad o tipo de una avería',
+      );
+      throw new InternalServerErrorException(ACTUALIZACION_ERROR);
     }
   }
 
