@@ -17,6 +17,7 @@ npm-debug.log*
 .DS_Store
 .idea
 .vscode
+.cursor/
 *.suo
 *.ntvs*
 *.njsproj
