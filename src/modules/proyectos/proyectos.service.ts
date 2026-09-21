@@ -46,11 +46,16 @@ export type ProyectoPublicoCard = {
   estado: EstadoProyecto;
 };
 
+export type ProyectoPublicoDetalle = ProyectoAdminDetalle;
+
 export type ImagenProyectoAdminDetalle = {
   id: number;
   url: string;
+  imagenUrl: string;
   descripcion: string | null;
+  textoAlternativo: string | null;
   orden: number;
+  ordenVisualizacion: number;
   createdAt: Date;
 };
 
@@ -73,8 +78,11 @@ const toImagenAdminDetalle = (
 ): ImagenProyectoAdminDetalle => ({
   id: imagen.id,
   url: imagen.url,
+  imagenUrl: imagen.url,
   descripcion: imagen.descripcion,
+  textoAlternativo: imagen.descripcion,
   orden: imagen.orden,
+  ordenVisualizacion: imagen.orden,
   createdAt: imagen.createdAt,
 });
 
@@ -187,6 +195,41 @@ export class ProyectosService {
       this.logger.error('No se pudieron consultar los proyectos públicos');
       throw new InternalServerErrorException(
         'No se pudieron consultar los proyectos públicos',
+      );
+    }
+  }
+
+  async findOnePublic(id: number): Promise<ProyectoPublicoDetalle> {
+    try {
+      return await withDbRetry(async () => {
+        const proyecto = await this.proyectoRepository.findOne({
+          where: { id, activo: true },
+          relations: { imagenes: true },
+        });
+
+        if (!proyecto) {
+          throw new NotFoundException('Proyecto no encontrado');
+        }
+
+        proyecto.imagenes = [...(proyecto.imagenes ?? [])].sort(
+          (left, right) => {
+            if (left.orden !== right.orden) {
+              return left.orden - right.orden;
+            }
+            return left.id - right.id;
+          },
+        );
+
+        return toProyectoAdminDetalle(proyecto);
+      });
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error('No se pudo consultar el proyecto público');
+      throw new InternalServerErrorException(
+        'No se pudo consultar el proyecto público',
       );
     }
   }
