@@ -1,3 +1,4 @@
+
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -592,6 +593,72 @@ describe('Proyectos - Gestión de Imágenes (Unit Tests)', () => {
       const result = await service.findAllPublic();
 
       expect(result).toEqual([]);
+    });
+  });
+
+  describe('Consulta Pública de Detalle de Proyecto (GET /public/proyectos/:id)', () => {
+    it('devuelve el detalle completo y las imágenes ordenadas cuando el proyecto está activo', async () => {
+      const mockProyecto = {
+        id: 10,
+        nombre: 'Proyecto Acueducto Sur',
+        descripcion: 'Descripción detallada del acueducto',
+        encargadoRealizacion: 'Ing. Carlos',
+        duracion: '6 meses',
+        estado: EstadoProyecto.EN_PROCESO,
+        imagenPrincipal: '/api/v1/public/media/proyectos/10_cover_1.jpg',
+        activo: true,
+        createdAt: new Date('2026-01-01'),
+        updatedAt: new Date('2026-01-02'),
+        imagenes: [
+          {
+            id: 2,
+            url: '/api/v1/public/media/proyectos/10_galeria_2.jpg',
+            descripcion: 'Foto 2',
+            orden: 2,
+            createdAt: new Date('2026-01-02'),
+          },
+          {
+            id: 1,
+            url: '/api/v1/public/media/proyectos/10_galeria_1.jpg',
+            descripcion: 'Foto 1',
+            orden: 1,
+            createdAt: new Date('2026-01-01'),
+          },
+        ],
+      };
+
+      proyectoRepo.findOne.mockResolvedValue(mockProyecto as any);
+
+      const result = await service.findOnePublic(10);
+
+      expect(proyectoRepo.findOne).toHaveBeenCalledWith({
+        where: { id: 10, activo: true },
+        relations: { imagenes: true },
+      });
+      expect(result.id).toBe(10);
+      expect(result.nombre).toBe('Proyecto Acueducto Sur');
+      expect(result.activo).toBe(true);
+      expect(result.imagenes).toHaveLength(2);
+      expect(result.imagenes[0].orden).toBe(1);
+      expect(result.imagenes[0].ordenVisualizacion).toBe(1);
+      expect(result.imagenes[0].imagenUrl).toBe(
+        '/api/v1/public/media/proyectos/10_galeria_1.jpg',
+      );
+      expect(result.imagenes[0].textoAlternativo).toBe('Foto 1');
+      expect(result.imagenes[1].orden).toBe(2);
+      expect(result.imagenes[1].ordenVisualizacion).toBe(2);
+    });
+
+    it('lanza NotFoundException (404) cuando el proyecto no existe o no está activo', async () => {
+      proyectoRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.findOnePublic(999)).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(proyectoRepo.findOne).toHaveBeenCalledWith({
+        where: { id: 999, activo: true },
+        relations: { imagenes: true },
+      });
     });
   });
 });

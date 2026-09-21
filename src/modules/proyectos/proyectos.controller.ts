@@ -40,9 +40,9 @@ import { ProyectosService } from './proyectos.service';
 @ApiTags('Proyectos')
 @Controller()
 export class ProyectosController {
-  constructor(private readonly proyectosService: ProyectosService) {}
+  constructor(private readonly proyectosService: ProyectosService) { }
 
-  @Get('public/proyectos')
+  @Get(['public/proyectos', 'proyectos'])
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
@@ -50,6 +50,16 @@ export class ProyectosController {
   })
   findAllPublic() {
     return this.proyectosService.findAllPublic();
+  }
+
+  @Get(['public/proyectos/:id', 'proyectos/:id'])
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Obtener detalle de un proyecto activo para vista pública (Público)',
+  })
+  findOnePublic(@Param('id', ParseIntPipe) id: number) {
+    return this.proyectosService.findOnePublic(id);
   }
 
   @Get('admin/proyectos')
