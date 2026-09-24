@@ -24,6 +24,10 @@ import {
 } from '../usuarios/usuarios.test-helpers';
 import { AveriasModule } from './averias.module';
 import {
+  AVERIAS_TEST_ENTITIES,
+  vaciarNotificacionesAveriaPrueba,
+} from './averias.test-entities';
+import {
   AVERIA_FONTANERO_FORBIDDEN,
   AVERIA_FONTANERO_YA_CERRADA,
 } from './averias.service';
@@ -88,13 +92,7 @@ describe('PATCH /api/v1/fontanero/averias/:id — calificar prioridad y tipo', (
           type: 'sqljs',
           autoSave: false,
           dropSchema: true,
-          entities: [
-            Averia,
-            ObservacionAveria,
-            Usuario,
-            Rol,
-            HorarioLaboralFontanero,
-          ],
+          entities: [...AVERIAS_TEST_ENTITIES],
           synchronize: true,
         }),
         AuthModule,
@@ -141,6 +139,7 @@ describe('PATCH /api/v1/fontanero/averias/:id — calificar prioridad y tipo', (
   });
 
   beforeEach(async () => {
+    await vaciarNotificacionesAveriaPrueba(averias.manager.connection);
     await averias.clear();
   });
 

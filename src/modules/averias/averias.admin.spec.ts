@@ -13,7 +13,6 @@ import { HttpExceptionFilter } from '../../common/filters/http-exception.filter'
 import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
 import jwtConfig from '../../config/jwt.config';
 import { AuthModule } from '../auth/auth.module';
-import { HorarioLaboralFontanero } from '../usuarios/entities/horario-laboral-fontanero.entity';
 import { Rol } from '../usuarios/entities/rol.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import {
@@ -22,8 +21,11 @@ import {
   seedStaffLoginUsers,
 } from '../usuarios/usuarios.test-helpers';
 import { AveriasModule } from './averias.module';
+import {
+  AVERIAS_TEST_ENTITIES,
+  vaciarNotificacionesAveriaPrueba,
+} from './averias.test-entities';
 import { Averia } from './entities/averia.entity';
-import { ObservacionAveria } from './entities/observacion-averia.entity';
 import type {
   AveriaAdminListItem,
   AveriasAdminListado,
@@ -111,7 +113,7 @@ describe('GET /api/v1/admin/averias — listado administrativo', () => {
           type: 'sqljs',
           autoSave: false,
           dropSchema: true,
-          entities: [Averia, ObservacionAveria, Usuario, Rol, HorarioLaboralFontanero],
+          entities: [...AVERIAS_TEST_ENTITIES],
           synchronize: true,
         }),
         AuthModule,
@@ -161,6 +163,7 @@ describe('GET /api/v1/admin/averias — listado administrativo', () => {
   });
 
   beforeEach(async () => {
+    await vaciarNotificacionesAveriaPrueba(averias.manager.connection);
     await averias.clear();
     await usuarios.clear();
     usuarioSeq += 1;

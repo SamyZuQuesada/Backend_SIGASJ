@@ -6,12 +6,18 @@ import { getRepositoryToken, TypeOrmModule } from '@nestjs/typeorm';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { Repository } from 'typeorm';
+import { EstadoSolicitudMaterial } from '../../common/enums/estado-solicitud-material.enum';
 import { Role } from '../../common/enums/role.enum';
 import { TipoMovimientoInventario } from '../../common/enums/tipo-movimiento-inventario.enum';
 import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
 import jwtConfig from '../../config/jwt.config';
 import { AuthModule } from '../auth/auth.module';
+import {
+  AVERIA_ADMIN_NOT_FOUND,
+  AVERIA_FONTANERO_FORBIDDEN,
+} from '../averias/averias.service';
 import { Averia } from '../averias/entities/averia.entity';
+import { ObservacionAveria } from '../averias/entities/observacion-averia.entity';
 import { SolicitudServicio } from '../solicitudes/entities/solicitud-servicio.entity';
 import { Rol } from '../usuarios/entities/rol.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
@@ -44,6 +50,7 @@ const salidasQaTypeOrmModule = TypeOrmModule.forRoot({
     MovimientoInventario,
     DocumentoMovimientoInventario,
     Averia,
+    ObservacionAveria,
     SolicitudServicio,
     SolicitudMaterial,
     DetalleSolicitudMaterial,
@@ -55,6 +62,7 @@ const salidasQaTypeOrmModule = TypeOrmModule.forRoot({
 });
 
 describe('Salidas de Inventario — QA Integral, Validación Funcional y Transaccional (Backlog 4.5)', () => {
+  jest.setTimeout(30_000);
   let app: INestApplication<App>;
   let jwtService: JwtService;
   let materialRepository: Repository<Material>;
@@ -63,6 +71,8 @@ describe('Salidas de Inventario — QA Integral, Validación Funcional y Transac
   let solicitudRepository: Repository<SolicitudServicio>;
   let usuarioRepository: Repository<Usuario>;
 
+  let solicitudMaterialRepository: Repository<SolicitudMaterial>;
+  let alertaReposicionRepository: Repository<AlertaReposicion>;
   let adminUser: Usuario;
   let fontaneroUser: Usuario;
   let otroFontaneroUser: Usuario;
@@ -136,6 +146,12 @@ describe('Salidas de Inventario — QA Integral, Validación Funcional y Transac
     usuarioRepository = moduleRef.get<Repository<Usuario>>(
       getRepositoryToken(Usuario),
     );
+    solicitudMaterialRepository = moduleRef.get<Repository<SolicitudMaterial>>(
+      getRepositoryToken(SolicitudMaterial),
+    );
+    alertaReposicionRepository = moduleRef.get<Repository<AlertaReposicion>>(
+      getRepositoryToken(AlertaReposicion),
+    );
     const rolRepository = moduleRef.get<Repository<Rol>>(
       getRepositoryToken(Rol),
     );
@@ -174,6 +190,8 @@ describe('Salidas de Inventario — QA Integral, Validación Funcional y Transac
 
   beforeEach(async () => {
     await movimientoRepository.clear();
+    await alertaReposicionRepository.clear();
+    await solicitudMaterialRepository.clear();
     await materialRepository.clear();
     await averiaRepository.clear();
     await solicitudRepository.clear();
@@ -606,6 +624,261 @@ describe('Salidas de Inventario — QA Integral, Validación Funcional y Transac
         where: { id: material.id },
       });
       expect(materialSinCambios?.stockActual).toBe(10);
+    });
+
+    it('2.7.1: el Fontanero asignado consulta las salidas de su avería', async () => {
+      const material = await createMaterial({
+        nombre: 'Codo PVC 1/2"',
+        stockActual: 18,
+        activo: true,
+      });
+      const averia = await averiaRepository.save(
+        averiaRepository.create({
+          codigoSeguimiento: 'AVE-QA-271-ASIG',
+          nombreReportante: 'Ana Rojas',
+          telefonoReportante: '8888-2711',
+          ubicacion: 'Calle Central',
+          sectorComunidad: 'Sector 1',
+          descripcion: 'Fuga en acometida',
+          idFontaneroAsignado: fontaneroUser.idUsuario,
+          fechaReporte: new Date(),
+        }),
+      );
+      const tokenFontanero = signAs(
+        Role.FONTANERO,
+        String(fontaneroUser.idUsuario),
+      );
+      await request(app.getHttpServer())
+        .post('/api/v1/inventario/salidas')
+        .set('Authorization', `Bearer ${tokenFontanero}`)
+        .send({
+          idMaterial: material.id,
+          cantidad: 1,
+          idAveria: averia.id,
+        })
+        .expect(HttpStatus.CREATED);
+
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/inventario/salidas/averia/${averia.id}`)
+        .set('Authorization', `Bearer ${tokenFontanero}`);
+
+      expect(res.status).toBe(HttpStatus.OK);
+      expect(res.body).toHaveLength(1);
+      const salidasAsignado = res.body as Array<{
+        idAveria: number;
+        idMaterial: number;
+      }>;
+      expect(salidasAsignado[0].idAveria).toBe(averia.id);
+      expect(salidasAsignado[0].idMaterial).toBe(material.id);
+    });
+
+    it('2.7.1: otro Fontanero no puede consultar salidas de una avería ajena', async () => {
+      const material = await createMaterial({
+        nombre: 'Tee PVC 1/2"',
+        stockActual: 14,
+        activo: true,
+      });
+      const averia = await averiaRepository.save(
+        averiaRepository.create({
+          codigoSeguimiento: 'AVE-QA-271-AJENA',
+          nombreReportante: 'Pedro Vargas',
+          telefonoReportante: '8888-2712',
+          ubicacion: 'Barrio Norte',
+          sectorComunidad: 'Sector 2',
+          descripcion: 'Rotura de tubería',
+          idFontaneroAsignado: fontaneroUser.idUsuario,
+          fechaReporte: new Date(),
+        }),
+      );
+      const tokenAsignado = signAs(
+        Role.FONTANERO,
+        String(fontaneroUser.idUsuario),
+      );
+      await request(app.getHttpServer())
+        .post('/api/v1/inventario/salidas')
+        .set('Authorization', `Bearer ${tokenAsignado}`)
+        .send({
+          idMaterial: material.id,
+          cantidad: 2,
+          idAveria: averia.id,
+        })
+        .expect(HttpStatus.CREATED);
+
+      const tokenAjeno = signAs(
+        Role.FONTANERO,
+        String(otroFontaneroUser.idUsuario),
+      );
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/inventario/salidas/averia/${averia.id}`)
+        .set('Authorization', `Bearer ${tokenAjeno}`);
+
+      expect(res.status).toBe(HttpStatus.FORBIDDEN);
+      expect(res.body).toMatchObject({
+        statusCode: HttpStatus.FORBIDDEN,
+        message: AVERIA_FONTANERO_FORBIDDEN,
+      });
+      expect(res.body).not.toHaveProperty('codigoSeguimiento');
+      expect(Array.isArray(res.body)).toBe(false);
+    });
+
+    it('2.7.1: Administradora y Secretaria conservan acceso de consulta', async () => {
+      const material = await createMaterial({
+        nombre: 'Pegamento PVC',
+        stockActual: 9,
+        activo: true,
+      });
+      const averia = await averiaRepository.save(
+        averiaRepository.create({
+          codigoSeguimiento: 'AVE-QA-271-ADMIN',
+          nombreReportante: 'Lucía Mora',
+          telefonoReportante: '8888-2713',
+          ubicacion: 'Calle 4',
+          sectorComunidad: 'Sector 3',
+          descripcion: 'Fuga en medidor',
+          idFontaneroAsignado: fontaneroUser.idUsuario,
+          fechaReporte: new Date(),
+        }),
+      );
+      const tokenFontanero = signAs(
+        Role.FONTANERO,
+        String(fontaneroUser.idUsuario),
+      );
+      await request(app.getHttpServer())
+        .post('/api/v1/inventario/salidas')
+        .set('Authorization', `Bearer ${tokenFontanero}`)
+        .send({
+          idMaterial: material.id,
+          cantidad: 1,
+          idAveria: averia.id,
+        })
+        .expect(HttpStatus.CREATED);
+
+      const resAdmin = await request(app.getHttpServer())
+        .get(`/api/v1/inventario/salidas/averia/${averia.id}`)
+        .set(
+          'Authorization',
+          `Bearer ${signAs(Role.ADMINISTRADORA, String(adminUser.idUsuario))}`,
+        );
+      expect(resAdmin.status).toBe(HttpStatus.OK);
+      expect(resAdmin.body).toHaveLength(1);
+      const salidasAdmin = resAdmin.body as Array<{ idAveria: number }>;
+      expect(salidasAdmin[0].idAveria).toBe(averia.id);
+
+      const resSecretaria = await request(app.getHttpServer())
+        .get(`/api/v1/inventario/salidas/averia/${averia.id}`)
+        .set(
+          'Authorization',
+          `Bearer ${signAs(Role.SECRETARIA, String(secretariaUser.idUsuario))}`,
+        );
+      expect(resSecretaria.status).toBe(HttpStatus.OK);
+      expect(resSecretaria.body).toHaveLength(1);
+      const salidasSecretaria = resSecretaria.body as Array<{
+        idAveria: number;
+      }>;
+      expect(salidasSecretaria[0].idAveria).toBe(averia.id);
+    });
+
+    it('2.7.1: avería inexistente responde 404 sin listar materiales', async () => {
+      const tokenFontanero = signAs(
+        Role.FONTANERO,
+        String(fontaneroUser.idUsuario),
+      );
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/inventario/salidas/averia/999999')
+        .set('Authorization', `Bearer ${tokenFontanero}`);
+
+      expect(res.status).toBe(HttpStatus.NOT_FOUND);
+      expect(res.body).toMatchObject({
+        statusCode: HttpStatus.NOT_FOUND,
+        message: AVERIA_ADMIN_NOT_FOUND,
+      });
+      expect(Array.isArray(res.body)).toBe(false);
+    });
+
+    it('2.7.1: consultar salidas no modifica el stock ni crea movimientos', async () => {
+      const material = await createMaterial({
+        nombre: 'Abrazadera 1/2"',
+        stockActual: 11,
+        activo: true,
+      });
+      const averia = await averiaRepository.save(
+        averiaRepository.create({
+          codigoSeguimiento: 'AVE-QA-271-STOCK',
+          nombreReportante: 'Mario Soto',
+          telefonoReportante: '8888-2714',
+          ubicacion: 'Calle 8',
+          sectorComunidad: 'Sector 4',
+          descripcion: 'Goteo en unión',
+          idFontaneroAsignado: fontaneroUser.idUsuario,
+          fechaReporte: new Date(),
+        }),
+      );
+      const tokenFontanero = signAs(
+        Role.FONTANERO,
+        String(fontaneroUser.idUsuario),
+      );
+      await request(app.getHttpServer())
+        .post('/api/v1/inventario/salidas')
+        .set('Authorization', `Bearer ${tokenFontanero}`)
+        .send({
+          idMaterial: material.id,
+          cantidad: 3,
+          idAveria: averia.id,
+        })
+        .expect(HttpStatus.CREATED);
+
+      const stockTrasSalida = (
+        await materialRepository.findOne({ where: { id: material.id } })
+      )?.stockActual;
+      const movimientosAntes = await movimientoRepository.count();
+
+      await request(app.getHttpServer())
+        .get(`/api/v1/inventario/salidas/averia/${averia.id}`)
+        .set('Authorization', `Bearer ${tokenFontanero}`)
+        .expect(HttpStatus.OK);
+
+      const materialDespues = await materialRepository.findOne({
+        where: { id: material.id },
+      });
+      const movimientosDespues = await movimientoRepository.count();
+      expect(materialDespues?.stockActual).toBe(stockTrasSalida);
+      expect(materialDespues?.stockActual).toBe(8);
+      expect(movimientosDespues).toBe(movimientosAntes);
+    });
+
+    it('2.7.1: la relación TypeORM SolicitudMaterial → Averia sigue resolviendo', async () => {
+      const averia = await averiaRepository.save(
+        averiaRepository.create({
+          codigoSeguimiento: 'AVE-QA-271-REL',
+          nombreReportante: 'Elena Cruz',
+          telefonoReportante: '8888-2715',
+          ubicacion: 'Calle 9',
+          sectorComunidad: 'Sector 5',
+          descripcion: 'Fuga visible',
+          idFontaneroAsignado: fontaneroUser.idUsuario,
+          fechaReporte: new Date(),
+        }),
+      );
+
+      const solicitud = await solicitudMaterialRepository.save(
+        solicitudMaterialRepository.create({
+          codigo: 'SOL-271-REL',
+          fechaSolicitud: new Date(),
+          estado: EstadoSolicitudMaterial.PENDIENTE,
+          idFontanero: fontaneroUser.idUsuario,
+          idAveria: averia.id,
+        }),
+      );
+
+      const cargada = await solicitudMaterialRepository.findOne({
+        where: { id: solicitud.id },
+        relations: { averia: true, fontanero: true },
+      });
+
+      expect(cargada?.idAveria).toBe(averia.id);
+      expect(cargada?.averia?.id).toBe(averia.id);
+      expect(cargada?.averia?.codigoSeguimiento).toBe('AVE-QA-271-REL');
+      expect(cargada?.fontanero?.idUsuario).toBe(fontaneroUser.idUsuario);
     });
   });
 

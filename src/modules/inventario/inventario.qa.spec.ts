@@ -22,6 +22,7 @@ import { AlertaReposicion } from './entities/alerta-reposicion.entity';
 import { ReposicionMaterial } from './entities/reposicion-material.entity';
 import { DetalleReposicionMaterial } from './entities/detalle-reposicion-material.entity';
 import { Averia } from '../averias/entities/averia.entity';
+import { ObservacionAveria } from '../averias/entities/observacion-averia.entity';
 import { InventarioModule } from './inventario.module';
 
 const inventarioQaTypeOrmModule = TypeOrmModule.forRoot({
@@ -42,6 +43,7 @@ const inventarioQaTypeOrmModule = TypeOrmModule.forRoot({
     ReposicionMaterial,
     DetalleReposicionMaterial,
     Averia,
+    ObservacionAveria,
   ],
   synchronize: true,
 });
@@ -68,6 +70,7 @@ type PaginatedMaterialsResponse = {
 };
 
 describe('Gestión de Materiales de Bodega — QA Integral y Validación Funcional', () => {
+  jest.setTimeout(30_000);
   let app: INestApplication<App>;
   let jwtService: JwtService;
 

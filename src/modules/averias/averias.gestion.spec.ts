@@ -23,6 +23,10 @@ import {
 } from '../usuarios/usuarios.test-helpers';
 import { AveriasModule } from './averias.module';
 import {
+  AVERIAS_TEST_ENTITIES,
+  vaciarNotificacionesAveriaPrueba,
+} from './averias.test-entities';
+import {
   AVERIA_ASIGNADA_SIN_FONTANERO,
   AVERIA_EN_ATENCION_SIN_FONTANERO,
   mensajeTransicionEstadoAveriaInvalida,
@@ -66,7 +70,7 @@ describe('PBI 2.3 — PATCH estado, prioridad y clasificación', () => {
           type: 'sqljs',
           autoSave: false,
           dropSchema: true,
-          entities: [Averia, ObservacionAveria, Usuario, Rol, HorarioLaboralFontanero],
+          entities: [...AVERIAS_TEST_ENTITIES],
           synchronize: true,
         }),
         AuthModule,
@@ -102,6 +106,7 @@ describe('PBI 2.3 — PATCH estado, prioridad y clasificación', () => {
   });
 
   beforeEach(async () => {
+    await vaciarNotificacionesAveriaPrueba(averias.manager.connection);
     await averias.clear();
     await usuarios.clear();
   });

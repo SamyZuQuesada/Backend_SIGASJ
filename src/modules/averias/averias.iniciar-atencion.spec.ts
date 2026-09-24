@@ -23,6 +23,10 @@ import {
 } from '../usuarios/usuarios.test-helpers';
 import { AVERIA_ADMIN_INVALID_ID } from './averia-admin-id.pipe';
 import { AveriasModule } from './averias.module';
+import {
+  AVERIAS_TEST_ENTITIES,
+  vaciarNotificacionesAveriaPrueba,
+} from './averias.test-entities';
 import { MENSAJE_INICIO_ATENCION_FUERA_DE_HORARIO } from './averias.inicio-atencion';
 import { mensajeTransicionEstadoAveriaInvalida } from './averias.estado-transiciones';
 import {
@@ -140,13 +144,7 @@ describe('PATCH /api/v1/fontanero/averias/:id/iniciar-atencion', () => {
           type: 'sqljs',
           autoSave: false,
           dropSchema: true,
-          entities: [
-            Averia,
-            ObservacionAveria,
-            Usuario,
-            Rol,
-            HorarioLaboralFontanero,
-          ],
+          entities: [...AVERIAS_TEST_ENTITIES],
           synchronize: true,
         }),
         AuthModule,
@@ -183,8 +181,16 @@ describe('PATCH /api/v1/fontanero/averias/:id/iniciar-atencion', () => {
       correo: 'fontanero.b.ini@asadasanjuan.cr',
       role: Role.FONTANERO,
     });
-    tokenA = signAs(Role.FONTANERO, String(fontaneroA.idUsuario), 'Fontanero A');
-    tokenB = signAs(Role.FONTANERO, String(fontaneroB.idUsuario), 'Fontanero B');
+    tokenA = signAs(
+      Role.FONTANERO,
+      String(fontaneroA.idUsuario),
+      'Fontanero A',
+    );
+    tokenB = signAs(
+      Role.FONTANERO,
+      String(fontaneroB.idUsuario),
+      'Fontanero B',
+    );
     adminToken = signAs(Role.ADMINISTRADORA, '1', 'Administradora');
   });
 
@@ -193,6 +199,7 @@ describe('PATCH /api/v1/fontanero/averias/:id/iniciar-atencion', () => {
   });
 
   beforeEach(async () => {
+    await vaciarNotificacionesAveriaPrueba(averias.manager.connection);
     await averias.clear();
     await horarios.clear();
   });
@@ -325,9 +332,11 @@ describe('PATCH /api/v1/fontanero/averias/:id/iniciar-atencion', () => {
   });
 
   it('avería inexistente → 404 e ID inválido → 400', async () => {
-    await patchIniciar(9999, tokenA).expect(404).then((res) => {
-      expect(res.body).toMatchObject({ message: AVERIA_ADMIN_NOT_FOUND });
-    });
+    await patchIniciar(9999, tokenA)
+      .expect(404)
+      .then((res) => {
+        expect(res.body).toMatchObject({ message: AVERIA_ADMIN_NOT_FOUND });
+      });
     const invalid = await patchIniciar('abc', tokenA).expect(400);
     expect(invalid.body).toMatchObject({ message: AVERIA_ADMIN_INVALID_ID });
   });

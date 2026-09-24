@@ -21,6 +21,10 @@ import {
   seedRolesBase,
 } from '../usuarios/usuarios.test-helpers';
 import { AveriasModule } from './averias.module';
+import {
+  AVERIAS_TEST_ENTITIES,
+  vaciarNotificacionesAveriaPrueba,
+} from './averias.test-entities';
 import type { AveriasFontaneroListado } from './averias.service';
 import { Averia } from './entities/averia.entity';
 import { ObservacionAveria } from './entities/observacion-averia.entity';
@@ -88,13 +92,7 @@ describe('GET /api/v1/fontanero/averias — listado del Fontanero', () => {
           type: 'sqljs',
           autoSave: false,
           dropSchema: true,
-          entities: [
-            Averia,
-            ObservacionAveria,
-            Usuario,
-            Rol,
-            HorarioLaboralFontanero,
-          ],
+          entities: [...AVERIAS_TEST_ENTITIES],
           synchronize: true,
         }),
         AuthModule,
@@ -129,8 +127,16 @@ describe('GET /api/v1/fontanero/averias — listado del Fontanero', () => {
       correo: 'fontanero.b.list@asadasanjuan.cr',
       role: Role.FONTANERO,
     });
-    tokenA = signAs(Role.FONTANERO, String(fontaneroA.idUsuario), 'Fontanero A');
-    tokenB = signAs(Role.FONTANERO, String(fontaneroB.idUsuario), 'Fontanero B');
+    tokenA = signAs(
+      Role.FONTANERO,
+      String(fontaneroA.idUsuario),
+      'Fontanero A',
+    );
+    tokenB = signAs(
+      Role.FONTANERO,
+      String(fontaneroB.idUsuario),
+      'Fontanero B',
+    );
     adminToken = signAs(Role.ADMINISTRADORA, '1', 'Administradora');
   });
 
@@ -139,6 +145,7 @@ describe('GET /api/v1/fontanero/averias — listado del Fontanero', () => {
   });
 
   beforeEach(async () => {
+    await vaciarNotificacionesAveriaPrueba(averias.manager.connection);
     await averias.clear();
   });
 
@@ -176,7 +183,9 @@ describe('GET /api/v1/fontanero/averias — listado del Fontanero', () => {
     expect(body.data.find((item) => item.id === pendiente.id)?.estado).toBe(
       EstadoAveria.PENDIENTE,
     );
-    expect(body.data.find((item) => item.id === asignada.id)?.fechaInicioAtencion).toBeNull();
+    expect(
+      body.data.find((item) => item.id === asignada.id)?.fechaInicioAtencion,
+    ).toBeNull();
     expect(
       body.data.find((item) => item.id === enAtencion.id)?.fechaInicioAtencion,
     ).toBeTruthy();

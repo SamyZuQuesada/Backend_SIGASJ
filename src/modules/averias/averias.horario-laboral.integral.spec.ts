@@ -12,7 +12,10 @@ import { EstadoAveria } from '../../common/enums/estado-averia.enum';
 import { Role } from '../../common/enums/role.enum';
 import { HttpExceptionFilter } from '../../common/filters/http-exception.filter';
 import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
-import { fechaEnAsada, partesLaboralesEnAsada } from '../../common/time/reloj-asada';
+import {
+  fechaEnAsada,
+  partesLaboralesEnAsada,
+} from '../../common/time/reloj-asada';
 import jwtConfig from '../../config/jwt.config';
 import { AuthModule } from '../auth/auth.module';
 import { HorarioLaboralFontanero } from '../usuarios/entities/horario-laboral-fontanero.entity';
@@ -30,6 +33,10 @@ import {
   seedRolesBase,
 } from '../usuarios/usuarios.test-helpers';
 import { AveriasModule } from './averias.module';
+import {
+  AVERIAS_TEST_ENTITIES,
+  vaciarNotificacionesAveriaPrueba,
+} from './averias.test-entities';
 import { MENSAJE_INICIO_ATENCION_FUERA_DE_HORARIO } from './averias.inicio-atencion';
 import {
   AVERIA_FONTANERO_FORBIDDEN,
@@ -176,15 +183,19 @@ describe('PBI 3.6 — horario laboral integral', () => {
     );
 
   const getAdminDetalle = (id: number, token?: string | null) =>
-    auth(request(app.getHttpServer()).get(`/api/v1/admin/averias/${id}`), token);
+    auth(
+      request(app.getHttpServer()).get(`/api/v1/admin/averias/${id}`),
+      token,
+    );
 
   const getAdminListado = (
     query: Record<string, string | number> = {},
     token?: string | null,
   ) =>
-    auth(request(app.getHttpServer()).get('/api/v1/admin/averias'), token).query(
-      query,
-    );
+    auth(
+      request(app.getHttpServer()).get('/api/v1/admin/averias'),
+      token,
+    ).query(query);
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -194,13 +205,7 @@ describe('PBI 3.6 — horario laboral integral', () => {
           type: 'sqljs',
           autoSave: false,
           dropSchema: true,
-          entities: [
-            Averia,
-            ObservacionAveria,
-            Usuario,
-            Rol,
-            HorarioLaboralFontanero,
-          ],
+          entities: [...AVERIAS_TEST_ENTITIES],
           synchronize: true,
         }),
         AuthModule,
@@ -238,8 +243,16 @@ describe('PBI 3.6 — horario laboral integral', () => {
       correo: 'fontanero.b.36@asadasanjuan.cr',
       role: Role.FONTANERO,
     });
-    tokenA = signAs(Role.FONTANERO, String(fontaneroA.idUsuario), 'Fontanero A');
-    tokenB = signAs(Role.FONTANERO, String(fontaneroB.idUsuario), 'Fontanero B');
+    tokenA = signAs(
+      Role.FONTANERO,
+      String(fontaneroA.idUsuario),
+      'Fontanero A',
+    );
+    tokenB = signAs(
+      Role.FONTANERO,
+      String(fontaneroB.idUsuario),
+      'Fontanero B',
+    );
     adminToken = signAs(Role.ADMINISTRADORA, '1', 'Administradora');
   });
 
@@ -248,6 +261,7 @@ describe('PBI 3.6 — horario laboral integral', () => {
   });
 
   beforeEach(async () => {
+    await vaciarNotificacionesAveriaPrueba(averias.manager.connection);
     await averias.clear();
     await horarios.clear();
   });
@@ -327,27 +341,26 @@ describe('PBI 3.6 — horario laboral integral', () => {
     });
     expect(asignada.estado).not.toBe('FUERA_DE_HORARIO');
 
-    const admin = (
-      await getAdminDetalle(averia.id, adminToken).expect(200)
-    ).body as AveriaAdminDetail;
+    const admin = (await getAdminDetalle(averia.id, adminToken).expect(200))
+      .body as AveriaAdminDetail;
     expect(admin.estado).toBe(EstadoAveria.ASIGNADA);
     expect(admin.fontanero?.id).toBe(fontaneroA.idUsuario);
     expect(admin.fechaAsignacion).toBeTruthy();
     expect(admin.fechaInicioAtencion).toBeNull();
 
     const listado = (
-      await getAdminListado({ estado: EstadoAveria.ASIGNADA }, adminToken).expect(
-        200,
-      )
+      await getAdminListado(
+        { estado: EstadoAveria.ASIGNADA },
+        adminToken,
+      ).expect(200)
     ).body as AveriasAdminListado;
     expect(listado.data.some((item) => item.id === averia.id)).toBe(true);
     expect(
       listado.data.find((item) => item.id === averia.id)?.fontanero?.nombre,
     ).toBe('Fontanero A');
 
-    const fontanero = (
-      await getFontanero(averia.id, tokenA).expect(200)
-    ).body as AveriaFontaneroDetail;
+    const fontanero = (await getFontanero(averia.id, tokenA).expect(200))
+      .body as AveriaFontaneroDetail;
     expect(fontanero.estado).toBe(EstadoAveria.ASIGNADA);
     expect(fontanero.fechaInicioAtencion).toBeNull();
   });
@@ -372,26 +385,25 @@ describe('PBI 3.6 — horario laboral integral', () => {
     expect(persistida?.idFontaneroAsignado).toBe(fontaneroA.idUsuario);
     expect(persistida?.fechaInicioAtencion).toBeNull();
 
-    const admin = (
-      await getAdminDetalle(averia.id, adminToken).expect(200)
-    ).body as AveriaAdminDetail;
+    const admin = (await getAdminDetalle(averia.id, adminToken).expect(200))
+      .body as AveriaAdminDetail;
     expect(admin.estado).toBe(EstadoAveria.PENDIENTE);
     expect(admin.fontanero?.nombre).toBe('Fontanero A');
     expect(admin.fechaAsignacion).toBeTruthy();
     expect(admin.fechaInicioAtencion).toBeNull();
 
     const listado = (
-      await getAdminListado({ estado: EstadoAveria.PENDIENTE }, adminToken).expect(
-        200,
-      )
+      await getAdminListado(
+        { estado: EstadoAveria.PENDIENTE },
+        adminToken,
+      ).expect(200)
     ).body as AveriasAdminListado;
     const item = listado.data.find((row) => row.id === averia.id);
     expect(item?.estado).toBe(EstadoAveria.PENDIENTE);
     expect(item?.fontanero?.id).toBe(fontaneroA.idUsuario);
 
-    const fontanero = (
-      await getFontanero(averia.id, tokenA).expect(200)
-    ).body as AveriaFontaneroDetail;
+    const fontanero = (await getFontanero(averia.id, tokenA).expect(200))
+      .body as AveriaFontaneroDetail;
     expect(fontanero.estado).toBe(EstadoAveria.PENDIENTE);
     expect(fontanero.fechaInicioAtencion).toBeNull();
   });
@@ -409,7 +421,9 @@ describe('PBI 3.6 — horario laboral integral', () => {
     expect(response.body).toMatchObject({
       message: MENSAJE_INICIO_ATENCION_FUERA_DE_HORARIO,
     });
-    expect(JSON.stringify(response.body)).not.toMatch(/TypeORM|SQL Server|stack/i);
+    expect(JSON.stringify(response.body)).not.toMatch(
+      /TypeORM|SQL Server|stack/i,
+    );
 
     const persistida = await averias.findOneBy({ id: averia.id });
     expect(persistida?.estado).toBe(EstadoAveria.PENDIENTE);
@@ -481,9 +495,8 @@ describe('PBI 3.6 — horario laboral integral', () => {
     });
     const before = Date.now();
 
-    const body = (
-      await patchIniciar(averia.id, tokenA).expect(200)
-    ).body as AveriaFontaneroDetail;
+    const body = (await patchIniciar(averia.id, tokenA).expect(200))
+      .body as AveriaFontaneroDetail;
     expect(body.estado).toBe(EstadoAveria.EN_ATENCION);
     expect(body.fechaInicioAtencion).toBeTruthy();
     expect(
@@ -495,9 +508,8 @@ describe('PBI 3.6 — horario laboral integral', () => {
     expect(persistida?.fechaInicioAtencion).toBeInstanceOf(Date);
     expect(persistida?.idFontaneroAsignado).toBe(fontaneroA.idUsuario);
 
-    const admin = (
-      await getAdminDetalle(averia.id, adminToken).expect(200)
-    ).body as AveriaAdminDetail;
+    const admin = (await getAdminDetalle(averia.id, adminToken).expect(200))
+      .body as AveriaAdminDetail;
     expect(admin.estado).toBe(EstadoAveria.EN_ATENCION);
     expect(admin.fontanero?.nombre).toBe('Fontanero A');
     expect(admin.fechaInicioAtencion).toBeTruthy();
@@ -510,9 +522,8 @@ describe('PBI 3.6 — horario laboral integral', () => {
     ).body as AveriasAdminListado;
     expect(listado.data.some((item) => item.id === averia.id)).toBe(true);
 
-    const fontanero = (
-      await getFontanero(averia.id, tokenA).expect(200)
-    ).body as AveriaFontaneroDetail;
+    const fontanero = (await getFontanero(averia.id, tokenA).expect(200))
+      .body as AveriaFontaneroDetail;
     expect(fontanero.estado).toBe(EstadoAveria.EN_ATENCION);
     expect(fontanero.fechaInicioAtencion).toBeTruthy();
   });
@@ -529,9 +540,8 @@ describe('PBI 3.6 — horario laboral integral', () => {
     expect(persistidaAsignada?.fechaInicioAtencion).toBeNull();
 
     const before = Date.now();
-    const body = (
-      await patchIniciar(averia.id, tokenA).expect(200)
-    ).body as AveriaFontaneroDetail;
+    const body = (await patchIniciar(averia.id, tokenA).expect(200))
+      .body as AveriaFontaneroDetail;
     expect(body.estado).toBe(EstadoAveria.EN_ATENCION);
     expect(
       new Date(body.fechaInicioAtencion as unknown as string).getTime(),
@@ -581,16 +591,22 @@ describe('PBI 3.6 — horario laboral integral', () => {
     );
 
     expect(
-      ((await getFontanero(asignada.id, tokenA).expect(200)).body as AveriaFontaneroDetail)
-        .estado,
+      (
+        (await getFontanero(asignada.id, tokenA).expect(200))
+          .body as AveriaFontaneroDetail
+      ).estado,
     ).toBe(EstadoAveria.ASIGNADA);
     expect(
-      ((await getFontanero(pendiente.id, tokenA).expect(200)).body as AveriaFontaneroDetail)
-        .estado,
+      (
+        (await getFontanero(pendiente.id, tokenA).expect(200))
+          .body as AveriaFontaneroDetail
+      ).estado,
     ).toBe(EstadoAveria.PENDIENTE);
     expect(
-      ((await getFontanero(enAtencion.id, tokenA).expect(200)).body as AveriaFontaneroDetail)
-        .estado,
+      (
+        (await getFontanero(enAtencion.id, tokenA).expect(200))
+          .body as AveriaFontaneroDetail
+      ).estado,
     ).toBe(EstadoAveria.EN_ATENCION);
   });
 });

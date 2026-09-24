@@ -13,6 +13,7 @@ import {
   type UploadedImageFile,
 } from '../../common/media/public-media';
 import { withDbRetry } from '../../common/persistence/with-db-retry';
+import { asegurarComunicadosDemo } from './comunicados.demo-seed';
 import { CreateComunicadoDto } from './dto/create-comunicado.dto';
 import { UpdateComunicadoDto } from './dto/update-comunicado.dto';
 import { Comunicado } from './entities/comunicado.entity';
@@ -110,6 +111,12 @@ export class ComunicadosService implements OnModuleInit {
         }
       }
     });
+
+    if (process.env.NODE_ENV !== 'test') {
+      await withDbRetry(async () => {
+        await asegurarComunicadosDemo(this.comunicados);
+      });
+    }
   }
 
   async findPublicos() {

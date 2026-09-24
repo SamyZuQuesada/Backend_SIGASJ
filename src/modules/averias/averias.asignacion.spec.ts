@@ -26,12 +26,14 @@ import {
 import { AVERIA_ADMIN_INVALID_ID } from './averia-admin-id.pipe';
 import { AveriasModule } from './averias.module';
 import {
+  AVERIAS_TEST_ENTITIES,
+  vaciarNotificacionesAveriaPrueba,
+} from './averias.test-entities';
+import {
   AVERIA_ASIGNADA_SIN_FONTANERO,
   mensajeTransicionEstadoAveriaInvalida,
 } from './averias.estado-transiciones';
-import {
-  EVENTO_SMS_FONTANERO_FUERA_DE_HORARIO,
-} from './averias.asignacion-horario';
+import { EVENTO_SMS_FONTANERO_FUERA_DE_HORARIO } from './averias.asignacion-horario';
 import {
   AVERIA_ADMIN_NOT_FOUND,
   AVERIA_YA_ASIGNADA,
@@ -44,7 +46,6 @@ import {
   type AveriasAdminListado,
 } from './averias.service';
 import { Averia } from './entities/averia.entity';
-import { ObservacionAveria } from './entities/observacion-averia.entity';
 
 describe('PBI 2.4 — asignación de avería al Fontanero', () => {
   jest.setTimeout(30_000);
@@ -141,13 +142,7 @@ describe('PBI 2.4 — asignación de avería al Fontanero', () => {
           type: 'sqljs',
           autoSave: false,
           dropSchema: true,
-          entities: [
-            Averia,
-            ObservacionAveria,
-            Usuario,
-            Rol,
-            HorarioLaboralFontanero,
-          ],
+          entities: [...AVERIAS_TEST_ENTITIES],
           synchronize: true,
         }),
         AuthModule,
@@ -198,6 +193,7 @@ describe('PBI 2.4 — asignación de avería al Fontanero', () => {
   });
 
   beforeEach(async () => {
+    await vaciarNotificacionesAveriaPrueba(averias.manager.connection);
     await averias.clear();
     await horarios.clear();
     await usuarios.clear();
