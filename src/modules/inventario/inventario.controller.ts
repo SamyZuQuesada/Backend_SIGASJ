@@ -790,12 +790,30 @@ export class InventarioController {
   @ApiOperation({
     summary: 'Consultar salidas de materiales asociadas a una avería',
     description:
-      'Retorna los movimientos de inventario de tipo SALIDA vinculados a una avería específica.',
+      'Retorna movimientos de tipo SALIDA de la avería. FONTANERO solo si la tiene asignada (JWT sub = idUsuario). ADMINISTRADORA y SECRETARIA consultan según su rol. No altera existencias.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Salidas vinculadas a la avería. Vacío = [].',
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'No autenticado.',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description:
+      'Rol no autorizado o Fontanero consultando una avería que no tiene asignada.',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'No se encontró la avería solicitada.',
   })
   findMovimientosByAveria(
     @Param('idAveria', ParseIntPipe) idAveria: number,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<MovimientoInventario[]> {
-    return this.inventarioService.findMovimientosByAveria(idAveria);
+    return this.inventarioService.findMovimientosByAveria(idAveria, user);
   }
 
   @Post('movimientos/:id/documentos')

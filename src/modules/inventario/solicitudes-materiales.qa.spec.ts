@@ -1225,6 +1225,43 @@ describe('Solicitudes de Materiales por Fontanero (Backlog 4.6) — QA y Pruebas
         .set('Authorization', `Bearer ${signAs(Role.ADMINISTRADORA, '1')}`)
         .expect(HttpStatus.OK);
     });
+
+    it('2.7.6: filtra por idAveria e incluye materiales sin alterar stock', async () => {
+      const stockAntes = materialesDb.get(1)!.stockActual;
+      const creada = await request(app.getHttpServer())
+        .post('/api/v1/fontanero/solicitudes-materiales')
+        .set('Authorization', `Bearer ${signAs(Role.FONTANERO, '7')}`)
+        .send({
+          idAveria: 10,
+          observacion: 'Para atender la fuga',
+          materiales: [{ idMaterial: 1, cantidad: 5, observacion: 'Acoples' }],
+        })
+        .expect(HttpStatus.CREATED);
+
+      await request(app.getHttpServer())
+        .post('/api/v1/fontanero/solicitudes-materiales')
+        .set('Authorization', `Bearer ${signAs(Role.FONTANERO, '7')}`)
+        .send({ materiales: [{ idMaterial: 2, cantidad: 1 }] })
+        .expect(HttpStatus.CREATED);
+
+      const res = await adminGet(
+        '?idAveria=10&limit=100',
+        signAs(Role.ADMINISTRADORA, '1'),
+      ).expect(HttpStatus.OK);
+
+      expect(res.body.total).toBe(1);
+      expect(res.body.data).toHaveLength(1);
+      expect(res.body.data[0].id).toBe(creada.body.id);
+      expect(res.body.data[0].idAveria).toBe(10);
+      expect(res.body.data[0].observacion).toBe('Para atender la fuga');
+      expect(res.body.data[0].detalles).toHaveLength(1);
+      expect(res.body.data[0].detalles[0]).toMatchObject({
+        idMaterial: 1,
+        cantidad: 5,
+        observacion: 'Acoples',
+      });
+      expect(materialesDb.get(1)!.stockActual).toBe(stockAntes);
+    });
   });
 
   describe('3.7.2 Aprobar solicitud de materiales', () => {

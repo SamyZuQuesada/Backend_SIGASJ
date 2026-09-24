@@ -6,6 +6,7 @@ import {
   InternalServerErrorException,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, Repository, SelectQueryBuilder } from 'typeorm';
@@ -30,7 +31,6 @@ import {
   assertTransicionEstadoAveria,
 } from './averias.estado-transiciones';
 import {
-  MENSAJE_INICIO_ATENCION_FUERA_DE_HORARIO,
   assertHorarioPermiteIniciarAtencion,
   registrarInicioAtencionExitoso,
 } from './averias.inicio-atencion';
@@ -68,6 +68,8 @@ import {
 } from './averias.codigo-seguimiento';
 import { Averia } from './entities/averia.entity';
 import { ObservacionAveria } from './entities/observacion-averia.entity';
+import { NotificacionesAveriasService } from '../notificaciones/notificaciones-averias.service';
+import { SmsAveriasService } from '../notificaciones/sms-averias.service';
 
 const REGISTRO_OK = 'Avería registrada correctamente.';
 const REGISTRO_ERROR = 'No se pudo registrar la avería. Intente nuevamente.';
@@ -456,7 +458,39 @@ export class AveriasService {
     @InjectRepository(ObservacionAveria)
     private readonly observacionRepositoryInjected?: Repository<ObservacionAveria>,
     private readonly validacionHorarioLaboral?: ValidacionHorarioLaboralFontaneroService,
+    @Optional()
+    private readonly notificacionesAverias?: NotificacionesAveriasService,
+    @Optional()
+    private readonly smsAverias?: SmsAveriasService,
   ) {}
+
+  private async emitirEventosAveria(
+    trabajo: () => Promise<void>,
+  ): Promise<void> {
+    try {
+      await trabajo();
+    } catch (error) {
+      this.logger.error(
+        'No se pudo registrar la notificación interna o el intento SMS',
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
+  }
+
+  private async emitirSmsPorTransicionEstado(
+    averia: Averia,
+    estadoAnterior: EstadoAveria,
+  ): Promise<void> {
+    if (averia.estado === estadoAnterior) {
+      return;
+    }
+    if (averia.estado === EstadoAveria.PENDIENTE) {
+      await this.smsAverias?.prepararPendiente(averia);
+    }
+    if (averia.estado === EstadoAveria.RESUELTA) {
+      await this.smsAverias?.prepararResuelta(averia);
+    }
+  }
 
   /**
    * Validación de horario para asignación e inicio de atención.
@@ -473,9 +507,7 @@ export class AveriasService {
     return this.validacionHorarioLaboral.evaluarAhora(idFontanero);
   }
 
-  private async assertHorarioParaInicioAtencion(
-    averia: Averia,
-  ): Promise<void> {
+  private async assertHorarioParaInicioAtencion(averia: Averia): Promise<void> {
     const idFontanero = averia.idFontaneroAsignado;
     if (idFontanero == null) {
       return;
@@ -644,6 +676,7 @@ export class AveriasService {
       'Error inesperado al actualizar el estado de una avería',
       async () => {
         const averia = await this.getAveriaForAdminUpdate(id);
+        const estadoAnterior = averia.estado;
         assertTransicionEstadoAveria(averia.estado, dto.estado);
         if (averia.estado === dto.estado) {
           return toAdminDetail(averia);
@@ -658,7 +691,11 @@ export class AveriasService {
         } else {
           averia.estado = dto.estado;
         }
-        return toAdminDetail(await this.averiaRepository.save(averia));
+        const saved = await this.averiaRepository.save(averia);
+        await this.emitirEventosAveria(async () => {
+          await this.emitirSmsPorTransicionEstado(saved, estadoAnterior);
+        });
+        return toAdminDetail(saved);
       },
     );
   }
@@ -701,7 +738,8 @@ export class AveriasService {
    * Asignación inicial al Fontanero (PBI 2.4 + 2.6.3).
    * Reutiliza transiciones de 2.3. Tras ASIGNADA valida el horario del
    * Backend: dentro de jornada permanece ASIGNADA; si no, pasa a PENDIENTE
-   * sin soltar al Fontanero. No reasigna. No envía SMS (2.8).
+   * sin soltar al Fontanero. No reasigna. El SMS de PENDIENTE se prepara
+   * después del commit, sin envío real (2.8).
    */
   async assignFontanero(
     id: number,
@@ -710,78 +748,97 @@ export class AveriasService {
     return this.runAdminUpdate(
       'Error inesperado al asignar un fontanero a una avería',
       async () => {
-        return this.averiaRepository.manager.transaction(async (manager) => {
-          const averia = await manager.findOne(Averia, { where: { id } });
-          if (!averia) {
-            throw new NotFoundException(AVERIA_ADMIN_NOT_FOUND);
-          }
-          if (averia.idFontaneroAsignado != null) {
-            throw new BadRequestException(AVERIA_YA_ASIGNADA);
-          }
+        const resultado = await this.averiaRepository.manager.transaction(
+          async (manager) => {
+            const averia = await manager.findOne(Averia, { where: { id } });
+            if (!averia) {
+              throw new NotFoundException(AVERIA_ADMIN_NOT_FOUND);
+            }
+            if (averia.idFontaneroAsignado != null) {
+              throw new BadRequestException(AVERIA_YA_ASIGNADA);
+            }
 
-          const usuario = await manager.findOne(Usuario, {
-            where: { idUsuario: dto.fontaneroId },
-            relations: { rol: true },
-          });
-          if (!usuario) {
-            throw new NotFoundException(FONTANERO_ASIGNABLE_NOT_FOUND);
-          }
-          if (!usuario.activo) {
-            throw new BadRequestException(FONTANERO_INACTIVO);
-          }
-          if (usuario.rol?.nombre !== Role.FONTANERO) {
-            throw new BadRequestException(FONTANERO_ROL_INVALIDO);
-          }
-
-          assertTransicionEstadoAveria(averia.estado, EstadoAveria.ASIGNADA);
-
-          averia.idFontaneroAsignado = usuario.idUsuario;
-          averia.fontaneroAsignado = usuario;
-          averia.fechaAsignacion = new Date();
-          averia.estado = EstadoAveria.ASIGNADA;
-          assertEstadoAveriaCompatibleConFontanero(
-            averia.estado,
-            averia.idFontaneroAsignado,
-          );
-
-          const evaluacion = await this.evaluarHorarioLaboralFontanero(
-            usuario.idUsuario,
-          );
-          const estadoTrasHorario =
-            estadoTrasValidarHorarioAsignacion(evaluacion);
-          if (estadoTrasHorario !== EstadoAveria.ASIGNADA) {
-            assertTransicionEstadoAveria(
-              EstadoAveria.ASIGNADA,
-              estadoTrasHorario,
-            );
-            averia.estado = estadoTrasHorario;
-          }
-
-          const persistida = await manager.save(averia);
-          const notificacionPendiente =
-            prepararEventoNotificacionHorarioAsignacion({
-              idAveria: persistida.id,
-              codigoSeguimiento: persistida.codigoSeguimiento,
-              telefonoReportante: persistida.telefonoReportante,
-              idFontanero: usuario.idUsuario,
-              evaluacion,
+            const usuario = await manager.findOne(Usuario, {
+              where: { idUsuario: dto.fontaneroId },
+              relations: { rol: true },
             });
-          if (notificacionPendiente) {
-            this.logger.log(
-              `Evento de notificación preparado (${notificacionPendiente.tipo}) para avería ${persistida.id}`,
-            );
-          }
+            if (!usuario) {
+              throw new NotFoundException(FONTANERO_ASIGNABLE_NOT_FOUND);
+            }
+            if (!usuario.activo) {
+              throw new BadRequestException(FONTANERO_INACTIVO);
+            }
+            if (usuario.rol?.nombre !== Role.FONTANERO) {
+              throw new BadRequestException(FONTANERO_ROL_INVALIDO);
+            }
 
-          return {
-            ...toAdminDetail(persistida),
-            horarioLaboral: {
-              resultado: evaluacion.resultado,
-              dentroDeHorario: evaluacion.puedeIniciarAtencion,
-              motivo: evaluacion.motivo,
-            },
-            notificacionPendiente,
-          };
+            assertTransicionEstadoAveria(averia.estado, EstadoAveria.ASIGNADA);
+
+            averia.idFontaneroAsignado = usuario.idUsuario;
+            averia.fontaneroAsignado = usuario;
+            averia.fechaAsignacion = new Date();
+            averia.estado = EstadoAveria.ASIGNADA;
+            assertEstadoAveriaCompatibleConFontanero(
+              averia.estado,
+              averia.idFontaneroAsignado,
+            );
+
+            const evaluacion = await this.evaluarHorarioLaboralFontanero(
+              usuario.idUsuario,
+            );
+            const estadoTrasHorario =
+              estadoTrasValidarHorarioAsignacion(evaluacion);
+            if (estadoTrasHorario !== EstadoAveria.ASIGNADA) {
+              assertTransicionEstadoAveria(
+                EstadoAveria.ASIGNADA,
+                estadoTrasHorario,
+              );
+              averia.estado = estadoTrasHorario;
+            }
+
+            const persistida = await manager.save(averia);
+            const notificacionPendiente =
+              prepararEventoNotificacionHorarioAsignacion({
+                idAveria: persistida.id,
+                codigoSeguimiento: persistida.codigoSeguimiento,
+                telefonoReportante: persistida.telefonoReportante,
+                idFontanero: usuario.idUsuario,
+                evaluacion,
+              });
+            if (notificacionPendiente) {
+              this.logger.log(
+                `Evento de notificación preparado (${notificacionPendiente.tipo}) para avería ${persistida.id}`,
+              );
+            }
+
+            return {
+              ...toAdminDetail(persistida),
+              horarioLaboral: {
+                resultado: evaluacion.resultado,
+                dentroDeHorario: evaluacion.puedeIniciarAtencion,
+                motivo: evaluacion.motivo,
+              },
+              notificacionPendiente,
+            };
+          },
+        );
+
+        await this.emitirEventosAveria(async () => {
+          const persistida = await this.averiaRepository.findOne({
+            where: { id: resultado.id },
+          });
+          if (!persistida) {
+            return;
+          }
+          await this.notificacionesAverias?.notificarFontaneroAsignacion(
+            persistida,
+          );
+          if (persistida.estado === EstadoAveria.PENDIENTE) {
+            await this.smsAverias?.prepararPendiente(persistida);
+          }
         });
+
+        return resultado;
       },
     );
   }
@@ -1131,10 +1188,7 @@ export class AveriasService {
               throw new BadRequestException(AVERIA_NO_EN_ATENCION);
             }
 
-            assertTransicionEstadoAveria(
-              averia.estado,
-              EstadoAveria.RESUELTA,
-            );
+            assertTransicionEstadoAveria(averia.estado, EstadoAveria.RESUELTA);
 
             const autor = await manager.findOne(Usuario, {
               where: { idUsuario: fontaneroId },
@@ -1156,6 +1210,10 @@ export class AveriasService {
             return manager.save(averia);
           },
         );
+
+        await this.emitirEventosAveria(async () => {
+          await this.smsAverias?.prepararResuelta(saved);
+        });
 
         const observaciones = await this.listObservacionesDeAveria(saved.id);
         return {
@@ -1227,6 +1285,12 @@ export class AveriasService {
 
       try {
         const saved = await this.averiaRepository.save(averia);
+        await this.emitirEventosAveria(async () => {
+          await this.notificacionesAverias?.notificarAdministradorasNuevaAveria(
+            saved,
+          );
+          await this.smsAverias?.prepararConfirmacionRegistro(saved);
+        });
         return this.toPublicResponse(saved);
       } catch (error) {
         if (

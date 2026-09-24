@@ -14,7 +14,6 @@ import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
 import jwtConfig from '../../config/jwt.config';
 import { AuthModule } from '../auth/auth.module';
 import { Rol } from '../usuarios/entities/rol.entity';
-import { HorarioLaboralFontanero } from '../usuarios/entities/horario-laboral-fontanero.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import {
   crearUsuarioPrueba,
@@ -23,11 +22,14 @@ import {
 } from '../usuarios/usuarios.test-helpers';
 import { AveriasModule } from './averias.module';
 import {
+  AVERIAS_TEST_ENTITIES,
+  vaciarNotificacionesAveriaPrueba,
+} from './averias.test-entities';
+import {
   AVERIA_ADMIN_NOT_FOUND,
   type AveriaAdminDetail,
 } from './averias.service';
 import { Averia } from './entities/averia.entity';
-import { ObservacionAveria } from './entities/observacion-averia.entity';
 
 const LONG_DESCRIPTION = [
   'Fuga continua en la tubería de distribución frente a la escuela.',
@@ -130,7 +132,7 @@ describe('GET /api/v1/admin/averias/:id — detalle administrativo', () => {
           type: 'sqljs',
           autoSave: false,
           dropSchema: true,
-          entities: [Averia, ObservacionAveria, Usuario, Rol, HorarioLaboralFontanero],
+          entities: [...AVERIAS_TEST_ENTITIES],
           synchronize: true,
         }),
         AuthModule,
@@ -180,6 +182,7 @@ describe('GET /api/v1/admin/averias/:id — detalle administrativo', () => {
   });
 
   beforeEach(async () => {
+    await vaciarNotificacionesAveriaPrueba(averias.manager.connection);
     await averias.clear();
     await usuarios.clear();
     usuarioSeq += 1;

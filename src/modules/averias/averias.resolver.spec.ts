@@ -23,6 +23,10 @@ import {
 import { AVERIA_ADMIN_INVALID_ID } from './averia-admin-id.pipe';
 import { AveriasModule } from './averias.module';
 import {
+  AVERIAS_TEST_ENTITIES,
+  vaciarNotificacionesAveriaPrueba,
+} from './averias.test-entities';
+import {
   AVERIA_ADMIN_NOT_FOUND,
   type AveriaAdminDetail,
   type AveriaFontaneroDetail,
@@ -140,7 +144,7 @@ describe('PATCH /api/v1/fontanero/averias/:id/resolver', () => {
           type: 'sqljs',
           autoSave: false,
           dropSchema: true,
-          entities: [Averia, ObservacionAveria, Usuario, Rol, HorarioLaboralFontanero],
+          entities: [...AVERIAS_TEST_ENTITIES],
           synchronize: true,
         }),
         AuthModule,
@@ -178,8 +182,16 @@ describe('PATCH /api/v1/fontanero/averias/:id/resolver', () => {
       correo: 'fontanero.b@asadasanjuan.cr',
       role: Role.FONTANERO,
     });
-    tokenA = signAs(Role.FONTANERO, String(fontaneroA.idUsuario), 'Fontanero A');
-    tokenB = signAs(Role.FONTANERO, String(fontaneroB.idUsuario), 'Fontanero B');
+    tokenA = signAs(
+      Role.FONTANERO,
+      String(fontaneroA.idUsuario),
+      'Fontanero A',
+    );
+    tokenB = signAs(
+      Role.FONTANERO,
+      String(fontaneroB.idUsuario),
+      'Fontanero B',
+    );
     adminToken = signAs(Role.ADMINISTRADORA, '1', 'Administradora');
   });
 
@@ -188,6 +200,7 @@ describe('PATCH /api/v1/fontanero/averias/:id/resolver', () => {
   });
 
   beforeEach(async () => {
+    await vaciarNotificacionesAveriaPrueba(averias.manager.connection);
     await observaciones.clear();
     await averias.clear();
   });
@@ -217,7 +230,9 @@ describe('PATCH /api/v1/fontanero/averias/:id/resolver', () => {
       new Date(body.data.fechaResolucion as unknown as string).getTime(),
     ).toBeGreaterThanOrEqual(before - 1000);
     expect(JSON.stringify(body)).not.toMatch(SENSITIVE);
-    expect(JSON.stringify(body.data)).not.toMatch(/fontaneroId|"estado":"EN_ATENCION"/);
+    expect(JSON.stringify(body.data)).not.toMatch(
+      /fontaneroId|"estado":"EN_ATENCION"/,
+    );
 
     const persistida = await averias.findOneBy({ id: averia.id });
     expect(persistida?.estado).toBe(EstadoAveria.RESUELTA);
@@ -242,9 +257,9 @@ describe('PATCH /api/v1/fontanero/averias/:id/resolver', () => {
         { observacionFinal },
         tokenA,
       ).expect(400);
-      expect(publicMessage(response.body as { message?: string | string[] })).toContain(
-        OBSERVACION_FINAL_VACIA,
-      );
+      expect(
+        publicMessage(response.body as { message?: string | string[] }),
+      ).toContain(OBSERVACION_FINAL_VACIA);
     }
     expect(await observaciones.count()).toBe(0);
     expect((await averias.findOneBy({ id: averia.id }))?.estado).toBe(
@@ -363,9 +378,13 @@ describe('PATCH /api/v1/fontanero/averias/:id/resolver', () => {
 
   it('ID inválido responde 400', async () => {
     for (const id of ['abc', '0', '-1']) {
-      const response = await patchResolver(id, {
-        observacionFinal: OBSERVACION_FINAL,
-      }, tokenA);
+      const response = await patchResolver(
+        id,
+        {
+          observacionFinal: OBSERVACION_FINAL,
+        },
+        tokenA,
+      );
       expect(response.status).toBe(400);
       expect(response.body).toMatchObject({
         message: AVERIA_ADMIN_INVALID_ID,

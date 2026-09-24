@@ -9,6 +9,7 @@ import databaseConfig from './config/database.config';
 import jwtConfig from './config/jwt.config';
 import authConfig from './config/auth.config';
 import acueductosCrConfig from './config/acueductos-cr.config';
+import smsConfig from './config/sms.config';
 
 import { AuthModule } from './modules/auth/auth.module';
 import { UsuariosModule } from './modules/usuarios/usuarios.module';
@@ -22,6 +23,7 @@ import { InventarioModule } from './modules/inventario/inventario.module';
 import { ActividadesFontaneroModule } from './modules/actividades-fontanero/actividades-fontanero.module';
 import { ProyectosModule } from './modules/proyectos/proyectos.module';
 import { RecibosModule } from './modules/recibos/recibos.module';
+import { NotificacionesModule } from './modules/notificaciones/notificaciones.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -35,6 +37,7 @@ import { AppService } from './app.service';
         jwtConfig,
         authConfig,
         acueductosCrConfig,
+        smsConfig,
       ],
     }),
     TypeOrmModule.forRootAsync({
@@ -54,6 +57,7 @@ import { AppService } from './app.service';
     ActividadesFontaneroModule,
     ProyectosModule,
     RecibosModule,
+    NotificacionesModule,
   ],
 
   controllers: [AppController],

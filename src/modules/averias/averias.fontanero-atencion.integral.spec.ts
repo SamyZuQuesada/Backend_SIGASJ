@@ -25,6 +25,10 @@ import {
 } from '../usuarios/usuarios.test-helpers';
 import { AveriasModule } from './averias.module';
 import {
+  AVERIAS_TEST_ENTITIES,
+  vaciarNotificacionesAveriaPrueba,
+} from './averias.test-entities';
+import {
   AVERIA_ADMIN_NOT_FOUND,
   AVERIA_FONTANERO_FORBIDDEN,
   type AveriaAdminDetail,
@@ -167,7 +171,7 @@ describe('PBI 2.5 — atención integral del Fontanero', () => {
           type: 'sqljs',
           autoSave: false,
           dropSchema: true,
-          entities: [Averia, ObservacionAveria, Usuario, Rol, HorarioLaboralFontanero],
+          entities: [...AVERIAS_TEST_ENTITIES],
           synchronize: true,
         }),
         AuthModule,
@@ -206,8 +210,16 @@ describe('PBI 2.5 — atención integral del Fontanero', () => {
       correo: 'fontanero.b.int@asadasanjuan.cr',
       role: Role.FONTANERO,
     });
-    tokenA = signAs(Role.FONTANERO, String(fontaneroA.idUsuario), 'Fontanero A');
-    tokenB = signAs(Role.FONTANERO, String(fontaneroB.idUsuario), 'Fontanero B');
+    tokenA = signAs(
+      Role.FONTANERO,
+      String(fontaneroA.idUsuario),
+      'Fontanero A',
+    );
+    tokenB = signAs(
+      Role.FONTANERO,
+      String(fontaneroB.idUsuario),
+      'Fontanero B',
+    );
     adminToken = signAs(Role.ADMINISTRADORA, '1', 'Administradora');
   });
 
@@ -216,6 +228,7 @@ describe('PBI 2.5 — atención integral del Fontanero', () => {
   });
 
   beforeEach(async () => {
+    await vaciarNotificacionesAveriaPrueba(averias.manager.connection);
     await observaciones.clear();
     await averias.clear();
     await horarios.clear();
@@ -348,9 +361,9 @@ describe('PBI 2.5 — atención integral del Fontanero', () => {
       order: { id: 'ASC' },
     });
     expect(rows).toHaveLength(3);
-    expect(rows.every((row) => row.idUsuarioAutor === fontaneroA.idUsuario)).toBe(
-      true,
-    );
+    expect(
+      rows.every((row) => row.idUsuarioAutor === fontaneroA.idUsuario),
+    ).toBe(true);
   });
 
   it('el Fontanero ve prioridad y clasificación persistidas por Administración (2.3)', async () => {
@@ -437,9 +450,9 @@ describe('PBI 2.5 — atención integral del Fontanero', () => {
       { observacionFinal: '' },
       tokenA,
     ).expect(400);
-    expect(publicMessage(vacia.body as { message?: string | string[] })).toContain(
-      OBSERVACION_FINAL_VACIA,
-    );
+    expect(
+      publicMessage(vacia.body as { message?: string | string[] }),
+    ).toContain(OBSERVACION_FINAL_VACIA);
     const espacios = await patchResolver(
       averia.id,
       { observacionFinal: '    ' },
@@ -451,7 +464,9 @@ describe('PBI 2.5 — atención integral del Fontanero', () => {
     expect((await averias.findOneBy({ id: averia.id }))?.estado).toBe(
       EstadoAveria.EN_ATENCION,
     );
-    expect((await averias.findOneBy({ id: averia.id }))?.fechaResolucion).toBeNull();
+    expect(
+      (await averias.findOneBy({ id: averia.id }))?.fechaResolucion,
+    ).toBeNull();
 
     const cierre = (
       await patchResolver(
@@ -486,7 +501,9 @@ describe('PBI 2.5 — atención integral del Fontanero', () => {
       await getAdminListado({ estado: EstadoAveria.EN_ATENCION }).expect(200)
     ).body as AveriasAdminListado;
     expect(
-      enAtencion.data.some((item) => item.codigoSeguimiento === 'AV-INT-CIERRE'),
+      enAtencion.data.some(
+        (item) => item.codigoSeguimiento === 'AV-INT-CIERRE',
+      ),
     ).toBe(false);
 
     const resueltas = (
@@ -562,8 +579,8 @@ describe('PBI 2.5 — atención integral del Fontanero', () => {
       { observacion: '' },
       tokenA,
     ).expect(400);
-    expect(publicMessage(response.body as { message?: string | string[] })).toContain(
-      OBSERVACION_AVERIA_VACIA,
-    );
+    expect(
+      publicMessage(response.body as { message?: string | string[] }),
+    ).toContain(OBSERVACION_AVERIA_VACIA);
   });
 });

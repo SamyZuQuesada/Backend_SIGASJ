@@ -4,6 +4,7 @@ import { Usuario } from '../usuarios/entities/usuario.entity';
 import { Rol } from '../usuarios/entities/rol.entity';
 import { HorarioLaboralFontanero } from '../usuarios/entities/horario-laboral-fontanero.entity';
 import { ValidacionHorarioLaboralFontaneroService } from '../usuarios/validacion-horario-laboral-fontanero.service';
+import { NotificacionesModule } from '../notificaciones/notificaciones.module';
 import { AveriasAdminController } from './averias-admin.controller';
 import { AveriasController } from './averias.controller';
 import { AveriasFontaneroController } from './averias-fontanero.controller';
@@ -20,6 +21,7 @@ import { ObservacionAveria } from './entities/observacion-averia.entity';
       Rol,
       HorarioLaboralFontanero,
     ]),
+    NotificacionesModule,
   ],
   controllers: [
     AveriasController,

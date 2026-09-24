@@ -9,6 +9,7 @@ import { Averia } from '../../averias/entities/averia.entity';
 import { Usuario } from '../../usuarios/entities/usuario.entity';
 import { DetalleSolicitudMaterial } from './detalle-solicitud-material.entity';
 import { Material } from './material.entity';
+import { MovimientoInventario } from './movimiento-inventario.entity';
 import { SolicitudMaterial } from './solicitud-material.entity';
 
 describe('SolicitudMaterial Entity (Inventario ASADA)', () => {
@@ -420,6 +421,39 @@ describe('SolicitudMaterial Entity (Inventario ASADA)', () => {
       );
       expect(createdDet?.mode).toBe('createDate');
       expect(updatedDet?.mode).toBe('updateDate');
+    });
+
+    it('MovimientoInventario.idAveria es columna nullable sin ManyToOne hacia Averia', () => {
+      const column = storage.columns.find(
+        (c) =>
+          c.target === MovimientoInventario && c.propertyName === 'idAveria',
+      );
+      expect(column).toBeDefined();
+      expect(column?.options.nullable).toBe(true);
+
+      const relationAveria = storage.relations.find(
+        (r) =>
+          r.target === MovimientoInventario &&
+          (r.propertyName === 'averia' || r.propertyName === 'idAveria'),
+      );
+      expect(relationAveria).toBeUndefined();
+    });
+
+    it('MovimientoInventario.idSolicitud es columna, no FK hacia SolicitudMaterial', () => {
+      const column = storage.columns.find(
+        (c) =>
+          c.target === MovimientoInventario && c.propertyName === 'idSolicitud',
+      );
+      expect(column).toBeDefined();
+      expect(column?.options.nullable).toBe(true);
+
+      const relationSolicitudMaterial = storage.relations.find(
+        (r) =>
+          r.target === MovimientoInventario &&
+          (r.propertyName === 'solicitudMaterial' ||
+            r.propertyName === 'solicitud'),
+      );
+      expect(relationSolicitudMaterial).toBeUndefined();
     });
   });
 });

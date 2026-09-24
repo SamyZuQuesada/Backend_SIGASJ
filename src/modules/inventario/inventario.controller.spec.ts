@@ -83,6 +83,7 @@ describe('InventarioController — Endpoints de Materiales', () => {
   let cambiarEstadoProveedorServiceSpy: jest.Mock;
   let registrarEntradaServiceSpy: jest.Mock;
   let registrarSalidaServiceSpy: jest.Mock;
+  let findMovimientosByAveriaServiceSpy: jest.Mock;
   let validarDisponibilidadStockSpy: jest.Mock;
 
   const signAs = (role: Role | string, sub = '1') => {
@@ -411,6 +412,8 @@ describe('InventarioController — Endpoints de Materiales', () => {
         });
       });
 
+    findMovimientosByAveriaServiceSpy = jest.fn().mockResolvedValue([]);
+
     registrarSalidaServiceSpy = jest
       .fn()
       .mockImplementation((dto: any, user: any) => {
@@ -517,6 +520,7 @@ describe('InventarioController — Endpoints de Materiales', () => {
       cambiarEstadoProveedor: cambiarEstadoProveedorServiceSpy,
       registrarEntrada: registrarEntradaServiceSpy,
       registrarSalida: registrarSalidaServiceSpy,
+      findMovimientosByAveria: findMovimientosByAveriaServiceSpy,
       validarDisponibilidadStock: validarDisponibilidadStockSpy,
       listarAlertasReposicionAdmin: jest.fn().mockResolvedValue({
         data: [],
@@ -707,6 +711,19 @@ describe('InventarioController — Endpoints de Materiales', () => {
 
       expect(registrarSalidaServiceSpy).toHaveBeenCalledWith(dto, user);
       expect(result.stockActual).toBe(25);
+    });
+
+    it('debe delegar la consulta de salidas por avería con el usuario autenticado', async () => {
+      const user = {
+        userId: '3',
+        idUsuario: 3,
+        email: 'fontanero@sigasj.cr',
+        role: Role.FONTANERO,
+      };
+
+      await controller.findMovimientosByAveria(12, user);
+
+      expect(findMovimientosByAveriaServiceSpy).toHaveBeenCalledWith(12, user);
     });
 
     it('debe delegar la verificación de disponibilidad de stock al servicio', async () => {

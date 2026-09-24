@@ -23,6 +23,10 @@ import {
 import { AVERIA_ADMIN_INVALID_ID } from './averia-admin-id.pipe';
 import { AveriasModule } from './averias.module';
 import {
+  AVERIAS_TEST_ENTITIES,
+  vaciarNotificacionesAveriaPrueba,
+} from './averias.test-entities';
+import {
   AVERIA_ADMIN_NOT_FOUND,
   AVERIA_FONTANERO_FORBIDDEN,
   type AveriaAdminDetail,
@@ -146,7 +150,7 @@ describe('POST /api/v1/fontanero/averias/:id/observaciones', () => {
           type: 'sqljs',
           autoSave: false,
           dropSchema: true,
-          entities: [Averia, ObservacionAveria, Usuario, Rol, HorarioLaboralFontanero],
+          entities: [...AVERIAS_TEST_ENTITIES],
           synchronize: true,
         }),
         AuthModule,
@@ -203,6 +207,7 @@ describe('POST /api/v1/fontanero/averias/:id/observaciones', () => {
   });
 
   beforeEach(async () => {
+    await vaciarNotificacionesAveriaPrueba(averias.manager.connection);
     await observaciones.clear();
     await averias.clear();
   });

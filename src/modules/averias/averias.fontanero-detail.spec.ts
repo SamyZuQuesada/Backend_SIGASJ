@@ -22,6 +22,10 @@ import {
 } from '../usuarios/usuarios.test-helpers';
 import { AveriasModule } from './averias.module';
 import {
+  AVERIAS_TEST_ENTITIES,
+  vaciarNotificacionesAveriaPrueba,
+} from './averias.test-entities';
+import {
   AVERIA_ADMIN_NOT_FOUND,
   AVERIA_FONTANERO_FORBIDDEN,
   OBSERVACIONES_ATENCION_VACIAS,
@@ -135,7 +139,7 @@ describe('GET /api/v1/fontanero/averias/:id — detalle asignado al Fontanero', 
           type: 'sqljs',
           autoSave: false,
           dropSchema: true,
-          entities: [Averia, ObservacionAveria, Usuario, Rol, HorarioLaboralFontanero],
+          entities: [...AVERIAS_TEST_ENTITIES],
           synchronize: true,
         }),
         AuthModule,
@@ -181,6 +185,7 @@ describe('GET /api/v1/fontanero/averias/:id — detalle asignado al Fontanero', 
   });
 
   beforeEach(async () => {
+    await vaciarNotificacionesAveriaPrueba(averias.manager.connection);
     await averias.clear();
   });
 

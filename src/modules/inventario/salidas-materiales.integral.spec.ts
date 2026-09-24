@@ -18,6 +18,7 @@ import type { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
 import jwtConfig from '../../config/jwt.config';
 import { AuthModule } from '../auth/auth.module';
 import { Averia } from '../averias/entities/averia.entity';
+import { ObservacionAveria } from '../averias/entities/observacion-averia.entity';
 import { SolicitudServicio } from '../solicitudes/entities/solicitud-servicio.entity';
 import { Rol } from '../usuarios/entities/rol.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
@@ -51,6 +52,7 @@ const integralSalidasTypeOrmModule = TypeOrmModule.forRoot({
     MovimientoInventario,
     DocumentoMovimientoInventario,
     Averia,
+    ObservacionAveria,
     SolicitudServicio,
     SolicitudMaterial,
     DetalleSolicitudMaterial,

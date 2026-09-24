@@ -49,6 +49,11 @@ import { RegistrarSolicitudMaterialDto } from './dto/registrar-solicitud-materia
 import { UpdateCategoriaDto } from './dto/update-categoria.dto';
 import { UpdateMaterialDto } from './dto/update-material.dto';
 import { UpdateProveedorDto } from './dto/update-proveedor.dto';
+import {
+  AVERIA_ADMIN_NOT_FOUND,
+  AVERIA_FONTANERO_FORBIDDEN,
+  resolveAuthenticatedUsuarioId,
+} from '../averias/averias.service';
 import { Averia } from '../averias/entities/averia.entity';
 import { CategoriaMaterial } from './entities/categoria-material.entity';
 import { DocumentoMovimientoInventario } from './entities/documento-movimiento-inventario.entity';
@@ -2577,21 +2582,47 @@ export class InventarioService {
   }
 
   /**
-   * Consulta los movimientos de salida vinculados a una avería específica.
+   * Consulta los movimientos de salida vinculados a una avería.
+   * FONTANERO: solo si la avería está asignada al JWT (misma regla que Averías 2.5).
+   * ADMINISTRADORA / SECRETARIA: consulta sin filtro de asignación.
+   * No altera stock.
    */
   async findMovimientosByAveria(
     idAveria: number,
+    user: AuthenticatedUser,
   ): Promise<MovimientoInventario[]> {
     if (!idAveria || isNaN(idAveria) || idAveria <= 0) {
       throw new BadRequestException('ID de avería inválido');
     }
-    return withDbRetry(() =>
-      this.movimientoRepository.find({
+
+    return withDbRetry(async () => {
+      const averiaRepo =
+        this.averiaRepository ??
+        this.movimientoRepository.manager.getRepository(Averia);
+      const averia = await averiaRepo.findOne({
+        where: { id: idAveria },
+      });
+
+      if (!averia) {
+        throw new NotFoundException(AVERIA_ADMIN_NOT_FOUND);
+      }
+
+      if (user.role === Role.FONTANERO) {
+        const fontaneroId = resolveAuthenticatedUsuarioId(user);
+        if (
+          averia.idFontaneroAsignado == null ||
+          Number(averia.idFontaneroAsignado) !== fontaneroId
+        ) {
+          throw new ForbiddenException(AVERIA_FONTANERO_FORBIDDEN);
+        }
+      }
+
+      return this.movimientoRepository.find({
         where: { idAveria, tipo: TipoMovimientoInventario.SALIDA },
         relations: { material: true },
         order: { id: 'DESC' },
-      }),
-    );
+      });
+    });
   }
 
   /**
@@ -3104,6 +3135,7 @@ export class InventarioService {
             nombre: fontaneroNombre,
           },
           idAveria: sol.idAveria,
+          observacion: sol.observacion,
           cantidadMateriales,
           averia: sol.averia
             ? {
@@ -3112,6 +3144,21 @@ export class InventarioService {
                 codigoSeguimiento: sol.averia.codigoSeguimiento,
               }
             : null,
+          detalles: (sol.detalles || []).map((d) => ({
+            id: d.id,
+            idSolicitud: d.idSolicitud,
+            idMaterial: d.idMaterial,
+            cantidad: d.cantidad,
+            observacion: d.observacion,
+            material: d.material
+              ? {
+                  id: d.material.id,
+                  nombre: d.material.nombre,
+                  unidadMedida: d.material.unidadMedida,
+                  stockActual: d.material.stockActual,
+                }
+              : null,
+          })),
         };
       });
 

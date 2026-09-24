@@ -8,13 +8,13 @@ import { QueryFailedError, Repository } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { EstadoAveria } from '../../common/enums/estado-averia.enum';
 import { HttpExceptionFilter } from '../../common/filters/http-exception.filter';
-import { HorarioLaboralFontanero } from '../usuarios/entities/horario-laboral-fontanero.entity';
-import { Usuario } from '../usuarios/entities/usuario.entity';
-import { Rol } from '../usuarios/entities/rol.entity';
 import { AveriasModule } from './averias.module';
+import {
+  AVERIAS_TEST_ENTITIES,
+  vaciarNotificacionesAveriaPrueba,
+} from './averias.test-entities';
 import { AveriasService } from './averias.service';
 import { Averia } from './entities/averia.entity';
-import { ObservacionAveria } from './entities/observacion-averia.entity';
 
 const payloadMinimo = {
   nombreReportante: 'María Rodríguez',
@@ -50,7 +50,7 @@ describe('POST /api/v1/public/averias — registro público', () => {
           type: 'sqljs',
           autoSave: false,
           dropSchema: true,
-          entities: [Averia, ObservacionAveria, Usuario, Rol, HorarioLaboralFontanero],
+          entities: [...AVERIAS_TEST_ENTITIES],
           synchronize: true,
         }),
         AveriasModule,
@@ -79,6 +79,7 @@ describe('POST /api/v1/public/averias — registro público', () => {
   });
 
   beforeEach(async () => {
+    await vaciarNotificacionesAveriaPrueba(averias.manager.connection);
     await averias.clear();
   });
 
