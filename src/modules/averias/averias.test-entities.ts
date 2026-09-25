@@ -1,5 +1,6 @@
 import { DataSource } from 'typeorm';
 import { Averia } from './entities/averia.entity';
+import { HistorialAveria } from './entities/historial-averia.entity';
 import { ObservacionAveria } from './entities/observacion-averia.entity';
 import { HorarioLaboralFontanero } from '../usuarios/entities/horario-laboral-fontanero.entity';
 import { Rol } from '../usuarios/entities/rol.entity';
@@ -11,6 +12,7 @@ import { NotificacionAveria } from '../notificaciones/entities/notificacion-aver
 export const AVERIAS_TEST_ENTITIES = [
   Averia,
   ObservacionAveria,
+  HistorialAveria,
   Usuario,
   Rol,
   HorarioLaboralFontanero,
@@ -21,6 +23,9 @@ export const AVERIAS_TEST_ENTITIES = [
 export async function vaciarNotificacionesAveriaPrueba(
   dataSource: DataSource,
 ): Promise<void> {
+  if (dataSource.hasMetadata(HistorialAveria)) {
+    await dataSource.getRepository(HistorialAveria).clear();
+  }
   await dataSource.getRepository(NotificacionAveria).clear();
   await dataSource.getRepository(IntentoSmsAveria).clear();
 }

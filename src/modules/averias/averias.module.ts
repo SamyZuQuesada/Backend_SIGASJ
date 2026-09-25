@@ -10,13 +10,16 @@ import { AveriasController } from './averias.controller';
 import { AveriasFontaneroController } from './averias-fontanero.controller';
 import { AveriasService } from './averias.service';
 import { Averia } from './entities/averia.entity';
+import { HistorialAveria } from './entities/historial-averia.entity';
 import { ObservacionAveria } from './entities/observacion-averia.entity';
+import { HistorialAveriasService } from './historial-averias.service';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
       Averia,
       ObservacionAveria,
+      HistorialAveria,
       Usuario,
       Rol,
       HorarioLaboralFontanero,
@@ -28,7 +31,11 @@ import { ObservacionAveria } from './entities/observacion-averia.entity';
     AveriasAdminController,
     AveriasFontaneroController,
   ],
-  providers: [AveriasService, ValidacionHorarioLaboralFontaneroService],
-  exports: [TypeOrmModule, AveriasService],
+  providers: [
+    AveriasService,
+    HistorialAveriasService,
+    ValidacionHorarioLaboralFontaneroService,
+  ],
+  exports: [TypeOrmModule, AveriasService, HistorialAveriasService],
 })
 export class AveriasModule {}

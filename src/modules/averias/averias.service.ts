@@ -9,12 +9,19 @@ import {
   Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, Repository, SelectQueryBuilder } from 'typeorm';
+import {
+  Brackets,
+  EntityManager,
+  Repository,
+  SelectQueryBuilder,
+} from 'typeorm';
 import {
   ESTADO_AVERIA_LABELS,
   EstadoAveria,
+  isEstadoAveriaValido,
 } from '../../common/enums/estado-averia.enum';
 import { Role } from '../../common/enums/role.enum';
+import { TipoEventoAveria } from '../../common/enums/tipo-evento-averia.enum';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { ahoraDelSistema } from '../../common/time/reloj-asada';
 import { withDbRetry } from '../../common/persistence/with-db-retry';
@@ -41,6 +48,8 @@ import {
   ADMIN_AVERIAS_PRIORIDAD_SIN_ASIGNAR,
   QueryAveriasAdminDto,
 } from './dto/query-averias-admin.dto';
+import { QueryHistorialAveriasAdminDto } from './dto/query-historial-averias-admin.dto';
+import { QueryReporteResumenAveriasDto } from './dto/query-reporte-resumen-averias.dto';
 import { AssignAveriaFontaneroDto } from './dto/assign-averia-fontanero.dto';
 import { CreatePublicAveriaDto } from './dto/create-public-averia.dto';
 import {
@@ -67,13 +76,25 @@ import {
   parseConsecutiveFromCodigo,
 } from './averias.codigo-seguimiento';
 import { Averia } from './entities/averia.entity';
+import { HistorialAveria } from './entities/historial-averia.entity';
 import { ObservacionAveria } from './entities/observacion-averia.entity';
+import { HistorialAveriasService } from './historial-averias.service';
+import {
+  describirCambioEstado,
+  describirCambioPrioridad,
+  describirClasificacion,
+  type RegistrarEventoHistorialInput,
+} from './historial-averias.registro';
 import { NotificacionesAveriasService } from '../notificaciones/notificaciones-averias.service';
 import { SmsAveriasService } from '../notificaciones/sms-averias.service';
 
 const REGISTRO_OK = 'Avería registrada correctamente.';
 const REGISTRO_ERROR = 'No se pudo registrar la avería. Intente nuevamente.';
 const LISTADO_ERROR = 'No se pudieron consultar las averías';
+const HISTORIAL_ERROR = 'No se pudo consultar el historial de averías';
+const EVENTOS_HISTORIAL_ERROR =
+  'No se pudo consultar el historial de la avería';
+const REPORTE_RESUMEN_ERROR = 'No se pudo consultar el resumen de averías';
 const DETALLE_ERROR = 'No se pudo consultar la avería';
 const ACTUALIZACION_ERROR = 'No se pudo actualizar la avería';
 const INICIO_ATENCION_ERROR =
@@ -158,6 +179,139 @@ export type AveriasAdminListado = {
   limit: number;
   totalPages: number;
 };
+
+/**
+ * Fila del historial general. Resumen para seguimiento: no incluye teléfono,
+ * correo, identificación, ubicación, descripción ni observaciones.
+ */
+export type AveriaHistorialItem = {
+  id: number;
+  codigoSeguimiento: string;
+  fechaReporte: Date;
+  nombreReportante: string;
+  sectorComunidad: string;
+  estado: EstadoAveria;
+  tipoAveria: string | null;
+  prioridad: string | null;
+  fontanero: AveriaAdminFontanero | null;
+  fechaAsignacion: Date | null;
+  fechaInicioAtencion: Date | null;
+  fechaResolucion: Date | null;
+};
+
+export type AveriasHistorialListado = {
+  data: AveriaHistorialItem[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+};
+
+export type AveriaEventoHistorialUsuario = {
+  id: number;
+  nombre: string;
+};
+
+export type AveriaEventoHistorialReferencia = {
+  tipo: string;
+  id: number;
+};
+
+/** Fila de la línea de tiempo de una avería. Sin datos del reportante. */
+export type AveriaEventoHistorialItem = {
+  id: number;
+  tipoEvento: TipoEventoAveria;
+  descripcion: string;
+  fechaHora: Date;
+  usuario: AveriaEventoHistorialUsuario | null;
+  estadoAnterior: EstadoAveria | null;
+  estadoNuevo: EstadoAveria | null;
+  referencia: AveriaEventoHistorialReferencia | null;
+};
+
+export type AveriaEventosHistorial = {
+  id: number;
+  codigoSeguimiento: string;
+  data: AveriaEventoHistorialItem[];
+};
+
+function toEventoHistorialItem(
+  evento: HistorialAveria,
+): AveriaEventoHistorialItem {
+  const referenciaTipo = evento.referenciaTipo?.trim() || null;
+  const referenciaId =
+    evento.referenciaId != null && Number(evento.referenciaId) > 0
+      ? Number(evento.referenciaId)
+      : null;
+  return {
+    id: evento.id,
+    tipoEvento: evento.tipoEvento,
+    descripcion: evento.descripcion,
+    fechaHora: evento.fechaHora,
+    usuario: evento.usuario
+      ? { id: evento.usuario.idUsuario, nombre: evento.usuario.nombre }
+      : null,
+    estadoAnterior: evento.estadoAnterior ?? null,
+    estadoNuevo: evento.estadoNuevo ?? null,
+    referencia:
+      referenciaTipo && referenciaId != null
+        ? { tipo: referenciaTipo, id: referenciaId }
+        : null,
+  };
+}
+
+/**
+ * Conteos del resumen administrativo. `total` incluye todos los estados
+ * vigentes del periodo. `otros` agrupa valores que no son un EstadoAveria
+ * actual; no representa “En proceso”.
+ */
+export type AveriasReporteResumen = {
+  fechaDesde: string | null;
+  fechaHasta: string | null;
+  total: number;
+  porEstado: Record<EstadoAveria, number>;
+  otros: number;
+};
+
+export function buildAveriasReporteResumen(
+  rows: Array<{ estado?: string | null; cantidad?: number | string | null }>,
+  fechas: { fechaDesde?: string | null; fechaHasta?: string | null },
+): AveriasReporteResumen {
+  const porEstado = Object.values(EstadoAveria).reduce(
+    (acc, estado) => {
+      acc[estado] = 0;
+      return acc;
+    },
+    {} as Record<EstadoAveria, number>,
+  );
+  let otros = 0;
+
+  for (const row of rows) {
+    const estado = String(row.estado ?? '').trim();
+    const cantidad = Number(row.cantidad ?? 0);
+    const safeCantidad =
+      Number.isFinite(cantidad) && cantidad > 0 ? Math.trunc(cantidad) : 0;
+    if (!estado || safeCantidad === 0) {
+      continue;
+    }
+    if (isEstadoAveriaValido(estado)) {
+      porEstado[estado] += safeCantidad;
+    } else {
+      otros += safeCantidad;
+    }
+  }
+
+  const total =
+    otros + Object.values(porEstado).reduce((sum, value) => sum + value, 0);
+
+  return {
+    fechaDesde: fechas.fechaDesde?.trim() || null,
+    fechaHasta: fechas.fechaHasta?.trim() || null,
+    total,
+    porEstado,
+    otros,
+  };
+}
 
 export type AveriasAdminFontanerosListado = {
   data: AveriaAdminFontanero[];
@@ -305,6 +459,23 @@ function toAdminListItem(averia: Averia): AveriaAdminListItem {
     tipoAveria: averia.tipoAveria ?? null,
     prioridad: averia.prioridad ?? null,
     fontanero: toAdminFontanero(averia),
+  };
+}
+
+function toHistorialItem(averia: Averia): AveriaHistorialItem {
+  return {
+    id: averia.id,
+    codigoSeguimiento: averia.codigoSeguimiento,
+    fechaReporte: averia.fechaReporte,
+    nombreReportante: averia.nombreReportante,
+    sectorComunidad: averia.sectorComunidad,
+    estado: averia.estado,
+    tipoAveria: averia.tipoAveria ?? null,
+    prioridad: averia.prioridad ?? null,
+    fontanero: toAdminFontanero(averia),
+    fechaAsignacion: averia.fechaAsignacion ?? null,
+    fechaInicioAtencion: averia.fechaInicioAtencion ?? null,
+    fechaResolucion: averia.fechaResolucion ?? null,
   };
 }
 
@@ -462,7 +633,96 @@ export class AveriasService {
     private readonly notificacionesAverias?: NotificacionesAveriasService,
     @Optional()
     private readonly smsAverias?: SmsAveriasService,
+    @Optional()
+    private readonly historialAverias?: HistorialAveriasService,
   ) {}
+
+  private idResponsable(user?: AuthenticatedUser): number | null {
+    if (!user) {
+      return null;
+    }
+    const raw = user.idUsuario ?? user.userId;
+    const id = Number(raw);
+    if (!Number.isInteger(id) || id <= 0) {
+      return null;
+    }
+    return id;
+  }
+
+  /** No guarda un id que ya no existe: la FK no debe revertir la operación. */
+  private async idResponsablePersistido(
+    manager: EntityManager,
+    user?: AuthenticatedUser,
+  ): Promise<number | null> {
+    const id = this.idResponsable(user);
+    if (id == null) {
+      return null;
+    }
+    const existe = await manager.findOne(Usuario, {
+      where: { idUsuario: id },
+      select: { idUsuario: true },
+    });
+    return existe ? id : null;
+  }
+
+  private registrarEvento(
+    input: RegistrarEventoHistorialInput,
+    manager?: EntityManager,
+  ): Promise<void> {
+    if (!this.historialAverias) {
+      return Promise.resolve();
+    }
+    return this.historialAverias.registrar(input, manager);
+  }
+
+  private async registrarTransicionEstado(
+    manager: EntityManager,
+    idAveria: number,
+    estadoAnterior: EstadoAveria,
+    estadoNuevo: EstadoAveria,
+    idUsuario: number | null,
+  ): Promise<void> {
+    if (estadoAnterior === estadoNuevo) {
+      return;
+    }
+    await this.registrarEvento(
+      {
+        idAveria,
+        tipoEvento: TipoEventoAveria.CAMBIO_ESTADO,
+        descripcion: describirCambioEstado(estadoAnterior, estadoNuevo),
+        estadoAnterior,
+        estadoNuevo,
+        idUsuario,
+      },
+      manager,
+    );
+    if (estadoNuevo === EstadoAveria.EN_ATENCION) {
+      await this.registrarEvento(
+        {
+          idAveria,
+          tipoEvento: TipoEventoAveria.INICIO_ATENCION,
+          descripcion: 'Inicio de atención',
+          estadoAnterior,
+          estadoNuevo,
+          idUsuario,
+        },
+        manager,
+      );
+    }
+    if (estadoNuevo === EstadoAveria.RESUELTA) {
+      await this.registrarEvento(
+        {
+          idAveria,
+          tipoEvento: TipoEventoAveria.RESOLUCION,
+          descripcion: 'Avería resuelta',
+          estadoAnterior,
+          estadoNuevo,
+          idUsuario,
+        },
+        manager,
+      );
+    }
+  }
 
   private async emitirEventosAveria(
     trabajo: () => Promise<void>,
@@ -637,6 +897,225 @@ export class AveriasService {
   }
 
   /**
+   * Historial general: averías activas y resueltas, con filtros combinables.
+   * No es la línea de tiempo de eventos de un solo caso.
+   */
+  async findHistorialAdmin(
+    query: QueryHistorialAveriasAdminDto,
+  ): Promise<AveriasHistorialListado> {
+    try {
+      return await withDbRetry(async () => {
+        this.assertRangoFechasAdmin(query);
+
+        const page = query.page ?? ADMIN_AVERIAS_PAGE_DEFAULT;
+        const limit = query.limit ?? ADMIN_AVERIAS_LIMIT_DEFAULT;
+
+        const qb = this.averiaRepository
+          .createQueryBuilder('averia')
+          .leftJoin('averia.fontaneroAsignado', 'fontanero')
+          .select([
+            'averia.id',
+            'averia.codigoSeguimiento',
+            'averia.fechaReporte',
+            'averia.nombreReportante',
+            'averia.sectorComunidad',
+            'averia.estado',
+            'averia.tipoAveria',
+            'averia.prioridad',
+            'averia.idFontaneroAsignado',
+            'averia.fechaAsignacion',
+            'averia.fechaInicioAtencion',
+            'averia.fechaResolucion',
+            'fontanero.idUsuario',
+            'fontanero.nombre',
+          ]);
+
+        if (query.estado) {
+          qb.andWhere('averia.estado = :estado', { estado: query.estado });
+        }
+
+        if (query.prioridad === ADMIN_AVERIAS_PRIORIDAD_SIN_ASIGNAR) {
+          qb.andWhere('averia.prioridad IS NULL');
+        } else if (query.prioridad) {
+          qb.andWhere('averia.prioridad = :prioridad', {
+            prioridad: query.prioridad,
+          });
+        }
+
+        if (query.tipo) {
+          qb.andWhere('averia.tipoAveria = :tipo', { tipo: query.tipo });
+        }
+
+        if (query.fontaneroId !== undefined) {
+          qb.andWhere('averia.idFontaneroAsignado = :fontaneroId', {
+            fontaneroId: query.fontaneroId,
+          });
+        }
+
+        const sector = query.sector?.trim();
+        if (sector) {
+          qb.andWhere('LOWER(averia.sectorComunidad) = :sector', {
+            sector: sector.toLowerCase(),
+          });
+        }
+
+        if (query.fechaDesde) {
+          qb.andWhere('averia.fechaReporte >= :fechaDesde', {
+            fechaDesde: toStartOfUtcDay(query.fechaDesde),
+          });
+        }
+
+        if (query.fechaHasta) {
+          qb.andWhere('averia.fechaReporte < :fechaHastaExclusiva', {
+            fechaHastaExclusiva: toStartOfNextUtcDay(query.fechaHasta),
+          });
+        }
+
+        const codigo = query.codigoSeguimiento?.trim();
+        if (codigo) {
+          qb.andWhere(
+            'LOWER(averia.codigoSeguimiento) LIKE :codigoSeguimiento ESCAPE :likeEscape',
+            {
+              codigoSeguimiento: `%${escapeLikePattern(codigo.toLowerCase())}%`,
+              likeEscape: '\\',
+            },
+          );
+        }
+
+        qb.orderBy('averia.fechaReporte', 'DESC').addOrderBy(
+          'averia.id',
+          'DESC',
+        );
+
+        qb.skip((page - 1) * limit).take(limit);
+
+        const [rows, total] = await qb.getManyAndCount();
+
+        return {
+          data: rows.map(toHistorialItem),
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit) || 0,
+        };
+      });
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(
+        'Error inesperado al consultar el historial de averías',
+      );
+      throw new InternalServerErrorException(HISTORIAL_ERROR);
+    }
+  }
+
+  /**
+   * Línea de tiempo de una avería. Orden cronológico: fechaHora y luego id.
+   * No incluye teléfono, correo ni identificación del reportante.
+   */
+  async findEventosHistorialAdmin(id: number): Promise<AveriaEventosHistorial> {
+    try {
+      return await withDbRetry(async () => {
+        const averia = await this.averiaRepository.findOne({
+          where: { id },
+          select: { id: true, codigoSeguimiento: true },
+        });
+        if (!averia) {
+          throw new NotFoundException(AVERIA_ADMIN_NOT_FOUND);
+        }
+
+        const eventos = await this.averiaRepository.manager
+          .getRepository(HistorialAveria)
+          .createQueryBuilder('evento')
+          .leftJoin('evento.usuario', 'usuario')
+          .select([
+            'evento.id',
+            'evento.tipoEvento',
+            'evento.descripcion',
+            'evento.fechaHora',
+            'evento.estadoAnterior',
+            'evento.estadoNuevo',
+            'evento.referenciaTipo',
+            'evento.referenciaId',
+            'usuario.idUsuario',
+            'usuario.nombre',
+          ])
+          .where('evento.idAveria = :id', { id })
+          .orderBy('evento.fechaHora', 'ASC')
+          .addOrderBy('evento.id', 'ASC')
+          .getMany();
+
+        return {
+          id: averia.id,
+          codigoSeguimiento: averia.codigoSeguimiento,
+          data: eventos.map(toEventoHistorialItem),
+        };
+      });
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      this.logger.error(
+        'Error inesperado al consultar los eventos de una avería',
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new InternalServerErrorException(EVENTOS_HISTORIAL_ERROR);
+    }
+  }
+
+  /**
+   * Resumen por estado sobre fechaReporte. No exporta archivos.
+   * El total es la suma de los estados vigentes del periodo, más `otros`
+   * si hubiera un valor que ya no pertenece al catálogo.
+   */
+  async reporteResumenAdmin(
+    query: QueryReporteResumenAveriasDto,
+  ): Promise<AveriasReporteResumen> {
+    try {
+      return await withDbRetry(async () => {
+        this.assertRangoFechasAdmin(query);
+
+        const qb = this.averiaRepository
+          .createQueryBuilder('averia')
+          .select('averia.estado', 'estado')
+          .addSelect('COUNT(averia.id)', 'cantidad')
+          .groupBy('averia.estado');
+
+        if (query.fechaDesde) {
+          qb.andWhere('averia.fechaReporte >= :fechaDesde', {
+            fechaDesde: toStartOfUtcDay(query.fechaDesde),
+          });
+        }
+
+        if (query.fechaHasta) {
+          qb.andWhere('averia.fechaReporte < :fechaHastaExclusiva', {
+            fechaHastaExclusiva: toStartOfNextUtcDay(query.fechaHasta),
+          });
+        }
+
+        const rows = await qb.getRawMany<{
+          estado?: string | null;
+          cantidad?: number | string | null;
+        }>();
+
+        return buildAveriasReporteResumen(rows, {
+          fechaDesde: query.fechaDesde ?? null,
+          fechaHasta: query.fechaHasta ?? null,
+        });
+      });
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error('Error inesperado al consultar el resumen de averías');
+      throw new InternalServerErrorException(REPORTE_RESUMEN_ERROR);
+    }
+  }
+
+  /**
    * Fontaneros activos con rol persistido FONTANERO.
    */
   async listFontanerosAsignables(): Promise<AveriasAdminFontanerosListado> {
@@ -671,6 +1150,7 @@ export class AveriasService {
   async updateEstado(
     id: number,
     dto: UpdateAveriaEstadoDto,
+    user?: AuthenticatedUser,
   ): Promise<AveriaAdminDetail> {
     return this.runAdminUpdate(
       'Error inesperado al actualizar el estado de una avería',
@@ -691,7 +1171,20 @@ export class AveriasService {
         } else {
           averia.estado = dto.estado;
         }
-        const saved = await this.averiaRepository.save(averia);
+        const saved = await this.averiaRepository.manager.transaction(
+          async (manager) => {
+            const idUsuario = await this.idResponsablePersistido(manager, user);
+            const persistida = await manager.save(averia);
+            await this.registrarTransicionEstado(
+              manager,
+              persistida.id,
+              estadoAnterior,
+              persistida.estado,
+              idUsuario,
+            );
+            return persistida;
+          },
+        );
         await this.emitirEventosAveria(async () => {
           await this.emitirSmsPorTransicionEstado(saved, estadoAnterior);
         });
@@ -703,6 +1196,7 @@ export class AveriasService {
   async updatePrioridad(
     id: number,
     dto: UpdateAveriaPrioridadDto,
+    user?: AuthenticatedUser,
   ): Promise<AveriaAdminDetail> {
     return this.runAdminUpdate(
       'Error inesperado al actualizar la prioridad de una avería',
@@ -711,8 +1205,25 @@ export class AveriasService {
         if (averia.prioridad === dto.prioridad) {
           return toAdminDetail(averia);
         }
+        const anterior = averia.prioridad;
         averia.prioridad = dto.prioridad;
-        return toAdminDetail(await this.averiaRepository.save(averia));
+        const saved = await this.averiaRepository.manager.transaction(
+          async (manager) => {
+            const idUsuario = await this.idResponsablePersistido(manager, user);
+            const persistida = await manager.save(averia);
+            await this.registrarEvento(
+              {
+                idAveria: persistida.id,
+                tipoEvento: TipoEventoAveria.CAMBIO_PRIORIDAD,
+                descripcion: describirCambioPrioridad(anterior, dto.prioridad),
+                idUsuario,
+              },
+              manager,
+            );
+            return persistida;
+          },
+        );
+        return toAdminDetail(saved);
       },
     );
   }
@@ -720,6 +1231,7 @@ export class AveriasService {
   async updateClasificacion(
     id: number,
     dto: UpdateAveriaClasificacionDto,
+    user?: AuthenticatedUser,
   ): Promise<AveriaAdminDetail> {
     return this.runAdminUpdate(
       'Error inesperado al actualizar la clasificación de una avería',
@@ -728,8 +1240,28 @@ export class AveriasService {
         if (averia.tipoAveria === dto.clasificacion) {
           return toAdminDetail(averia);
         }
+        const anterior = averia.tipoAveria;
         averia.tipoAveria = dto.clasificacion;
-        return toAdminDetail(await this.averiaRepository.save(averia));
+        const saved = await this.averiaRepository.manager.transaction(
+          async (manager) => {
+            const idUsuario = await this.idResponsablePersistido(manager, user);
+            const persistida = await manager.save(averia);
+            await this.registrarEvento(
+              {
+                idAveria: persistida.id,
+                tipoEvento: TipoEventoAveria.CLASIFICACION_TIPO,
+                descripcion: describirClasificacion(
+                  anterior,
+                  dto.clasificacion,
+                ),
+                idUsuario,
+              },
+              manager,
+            );
+            return persistida;
+          },
+        );
+        return toAdminDetail(saved);
       },
     );
   }
@@ -744,6 +1276,7 @@ export class AveriasService {
   async assignFontanero(
     id: number,
     dto: AssignAveriaFontaneroDto,
+    user?: AuthenticatedUser,
   ): Promise<AveriaAsignacionResult> {
     return this.runAdminUpdate(
       'Error inesperado al asignar un fontanero a una avería',
@@ -773,6 +1306,7 @@ export class AveriasService {
             }
 
             assertTransicionEstadoAveria(averia.estado, EstadoAveria.ASIGNADA);
+            const estadoInicial = averia.estado;
 
             averia.idFontaneroAsignado = usuario.idUsuario;
             averia.fontaneroAsignado = usuario;
@@ -797,6 +1331,34 @@ export class AveriasService {
             }
 
             const persistida = await manager.save(averia);
+            const idUsuario = await this.idResponsablePersistido(manager, user);
+            await this.registrarEvento(
+              {
+                idAveria: persistida.id,
+                tipoEvento: TipoEventoAveria.ASIGNACION_FONTANERO,
+                descripcion: `Avería asignada al Fontanero ${usuario.nombre}`,
+                estadoAnterior: estadoInicial,
+                estadoNuevo: EstadoAveria.ASIGNADA,
+                idUsuario,
+              },
+              manager,
+            );
+            await this.registrarTransicionEstado(
+              manager,
+              persistida.id,
+              estadoInicial,
+              EstadoAveria.ASIGNADA,
+              idUsuario,
+            );
+            if (persistida.estado === EstadoAveria.PENDIENTE) {
+              await this.registrarTransicionEstado(
+                manager,
+                persistida.id,
+                EstadoAveria.ASIGNADA,
+                EstadoAveria.PENDIENTE,
+                idUsuario,
+              );
+            }
             const notificacionPendiente =
               prepararEventoNotificacionHorarioAsignacion({
                 idAveria: persistida.id,
@@ -982,6 +1544,17 @@ export class AveriasService {
               : await manager.findOneByOrFail(ObservacionAveria, {
                   id: saved.id,
                 });
+          await this.registrarEvento(
+            {
+              idAveria: averia.id,
+              tipoEvento: TipoEventoAveria.OBSERVACION,
+              descripcion: 'Observación registrada',
+              idUsuario: autor.idUsuario,
+              referenciaTipo: 'ObservacionAveria',
+              referenciaId: persisted.id,
+            },
+            manager,
+          );
 
           return {
             message: OBSERVACION_AVERIA_REGISTRADA,
@@ -1049,13 +1622,22 @@ export class AveriasService {
               return averia;
             }
 
+            const estadoAnterior = averia.estado;
             assertEstadoAveriaCompatibleConFontanero(
               EstadoAveria.EN_ATENCION,
               averia.idFontaneroAsignado,
             );
             await this.assertHorarioParaInicioAtencion(averia);
             registrarInicioAtencionExitoso(averia, ahoraDelSistema());
-            return manager.save(averia);
+            const persistida = await manager.save(averia);
+            await this.registrarTransicionEstado(
+              manager,
+              persistida.id,
+              estadoAnterior,
+              persistida.estado,
+              fontaneroId,
+            );
+            return persistida;
           },
         );
 
@@ -1134,8 +1716,39 @@ export class AveriasService {
               throw new BadRequestException(AVERIA_FONTANERO_YA_CERRADA);
             }
 
+            const prioridadAntes = averia.prioridad;
+            const tipoAntes = averia.tipoAveria;
             apply(averia);
-            return manager.save(averia);
+            const persistida = await manager.save(averia);
+            if (persistida.prioridad !== prioridadAntes) {
+              await this.registrarEvento(
+                {
+                  idAveria: persistida.id,
+                  tipoEvento: TipoEventoAveria.CAMBIO_PRIORIDAD,
+                  descripcion: describirCambioPrioridad(
+                    prioridadAntes,
+                    persistida.prioridad ?? '',
+                  ),
+                  idUsuario: fontaneroId,
+                },
+                manager,
+              );
+            }
+            if (persistida.tipoAveria !== tipoAntes) {
+              await this.registrarEvento(
+                {
+                  idAveria: persistida.id,
+                  tipoEvento: TipoEventoAveria.CLASIFICACION_TIPO,
+                  descripcion: describirClasificacion(
+                    tipoAntes,
+                    persistida.tipoAveria ?? '',
+                  ),
+                  idUsuario: fontaneroId,
+                },
+                manager,
+              );
+            }
+            return persistida;
           },
         );
 
@@ -1203,11 +1816,31 @@ export class AveriasService {
               idAveria: averia.id,
               idUsuarioAutor: autor.idUsuario,
             });
-            await manager.save(observacion);
+            const observacionGuardada = await manager.save(observacion);
+            await this.registrarEvento(
+              {
+                idAveria: averia.id,
+                tipoEvento: TipoEventoAveria.OBSERVACION,
+                descripcion: 'Observación registrada',
+                idUsuario: autor.idUsuario,
+                referenciaTipo: 'ObservacionAveria',
+                referenciaId: observacionGuardada.id,
+              },
+              manager,
+            );
 
+            const estadoAnterior = averia.estado;
             averia.estado = EstadoAveria.RESUELTA;
             averia.fechaResolucion = new Date();
-            return manager.save(averia);
+            const persistida = await manager.save(averia);
+            await this.registrarTransicionEstado(
+              manager,
+              persistida.id,
+              estadoAnterior,
+              persistida.estado,
+              autor.idUsuario,
+            );
+            return persistida;
           },
         );
 
@@ -1284,7 +1917,29 @@ export class AveriasService {
       const averia = this.buildPublicAveria(dto, codigoSeguimiento, now);
 
       try {
-        const saved = await this.averiaRepository.save(averia);
+        const saved = await this.averiaRepository.manager.transaction(
+          async (manager) => {
+            const persistida = await manager.save(averia);
+            await this.registrarEvento(
+              {
+                idAveria: persistida.id,
+                tipoEvento: TipoEventoAveria.REGISTRO,
+                descripcion: 'Avería registrada',
+                estadoNuevo: EstadoAveria.RECIBIDA,
+              },
+              manager,
+            );
+            await this.registrarEvento(
+              {
+                idAveria: persistida.id,
+                tipoEvento: TipoEventoAveria.CODIGO_SEGUIMIENTO,
+                descripcion: `Código de seguimiento generado: ${persistida.codigoSeguimiento}`,
+              },
+              manager,
+            );
+            return persistida;
+          },
+        );
         await this.emitirEventosAveria(async () => {
           await this.notificacionesAverias?.notificarAdministradorasNuevaAveria(
             saved,
@@ -1404,7 +2059,10 @@ export class AveriasService {
         throw error;
       }
 
-      this.logger.error(logMessage);
+      this.logger.error(
+        logMessage,
+        error instanceof Error ? error.stack : undefined,
+      );
       throw new InternalServerErrorException(ACTUALIZACION_ERROR);
     }
   }
@@ -1420,7 +2078,10 @@ export class AveriasService {
     };
   }
 
-  private assertRangoFechasAdmin(query: QueryAveriasAdminDto): void {
+  private assertRangoFechasAdmin(query: {
+    fechaDesde?: string;
+    fechaHasta?: string;
+  }): void {
     if (query.fechaDesde && !isValidIsoDateOnly(query.fechaDesde)) {
       throw new BadRequestException(FECHA_CALENDARIO_INVALIDA);
     }

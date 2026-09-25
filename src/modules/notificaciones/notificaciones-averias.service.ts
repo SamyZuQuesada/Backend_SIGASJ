@@ -5,12 +5,14 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { QueryFailedError, Repository } from 'typeorm';
+import { EntityManager, QueryFailedError, Repository } from 'typeorm';
+import { TipoEventoAveria } from '../../common/enums/tipo-evento-averia.enum';
 import { TipoNotificacionAveria } from '../../common/enums/tipo-notificacion-averia.enum';
 import { Role } from '../../common/enums/role.enum';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { Averia } from '../averias/entities/averia.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
+import { registrarEventoHistorialEnManager } from '../averias/historial-averias.registro';
 import { NotificacionAveria } from './entities/notificacion-averia.entity';
 
 export type NotificacionAveriaItem = {
@@ -90,17 +92,7 @@ export class NotificacionesAveriasService {
     }
 
     try {
-      return await this.notificacionRepository.save(
-        this.notificacionRepository.create({
-          idUsuarioDestinatario: input.idUsuarioDestinatario,
-          idAveria: input.idAveria,
-          tipo: input.tipo,
-          titulo: input.titulo,
-          mensaje: input.mensaje,
-          leida: false,
-          fechaLectura: null,
-        }),
-      );
+      return await this.insertarNotificacion(input);
     } catch (error) {
       if (isUniqueViolation(error)) {
         return this.notificacionRepository.findOne({
@@ -113,6 +105,57 @@ export class NotificacionesAveriasService {
       }
       throw error;
     }
+  }
+
+  private managerTransaccional(): EntityManager | null {
+    const manager = this.notificacionRepository.manager;
+    if (
+      !manager ||
+      typeof manager.transaction !== 'function' ||
+      !manager.connection ||
+      typeof manager.connection.hasMetadata !== 'function'
+    ) {
+      return null;
+    }
+    return manager;
+  }
+
+  private async insertarNotificacion(input: {
+    idUsuarioDestinatario: number;
+    idAveria: number;
+    tipo: TipoNotificacionAveria;
+    titulo: string;
+    mensaje: string;
+  }): Promise<NotificacionAveria> {
+    const data = {
+      idUsuarioDestinatario: input.idUsuarioDestinatario,
+      idAveria: input.idAveria,
+      tipo: input.tipo,
+      titulo: input.titulo,
+      mensaje: input.mensaje,
+      leida: false,
+      fechaLectura: null,
+    };
+    const manager = this.managerTransaccional();
+    if (!manager) {
+      return this.notificacionRepository.save(
+        this.notificacionRepository.create(data),
+      );
+    }
+    return manager.transaction(async (tx) => {
+      const saved = await tx.save(
+        NotificacionAveria,
+        tx.create(NotificacionAveria, data),
+      );
+      await registrarEventoHistorialEnManager(tx, {
+        idAveria: input.idAveria,
+        tipoEvento: TipoEventoAveria.NOTIFICACION,
+        descripcion: `Notificación interna registrada: ${input.titulo}. Resultado: registrada.`,
+        referenciaTipo: 'NotificacionAveria',
+        referenciaId: saved.id,
+      });
+      return saved;
+    });
   }
 
   async notificarAdministradorasNuevaAveria(averia: Averia): Promise<void> {

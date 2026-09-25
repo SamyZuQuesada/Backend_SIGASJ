@@ -1,13 +1,15 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import {
   EstadoEnvioSmsAveria,
   MotivoBloqueoSmsAveria,
 } from '../../common/enums/estado-envio-sms-averia.enum';
+import { TipoEventoAveria } from '../../common/enums/tipo-evento-averia.enum';
 import { TipoEventoSmsAveria } from '../../common/enums/tipo-evento-sms-averia.enum';
 import { Averia } from '../averias/entities/averia.entity';
+import { registrarEventoHistorialEnManager } from '../averias/historial-averias.registro';
 import { IntentoSmsAveria } from './entities/intento-sms-averia.entity';
 import { isUniqueViolation } from './notificaciones-averias.service';
 import {
@@ -85,15 +87,7 @@ export class SmsAveriasService {
     }
 
     try {
-      const saved = await this.intentoRepository.save(
-        this.intentoRepository.create({
-          idAveria: averia.id,
-          tipoEvento,
-          destinatarioClase: 'reportante',
-          estadoEnvio: resultado.estado,
-          motivoBloqueo: resultado.motivo,
-        }),
-      );
+      const saved = await this.persistirIntento(averia, tipoEvento, resultado);
       return toPreparacion(saved);
     } catch (error) {
       if (isUniqueViolation(error)) {
@@ -106,6 +100,59 @@ export class SmsAveriasService {
       }
       throw error;
     }
+  }
+
+  private managerTransaccional(): EntityManager | null {
+    const manager = this.intentoRepository.manager;
+    if (
+      !manager ||
+      typeof manager.transaction !== 'function' ||
+      !manager.connection ||
+      typeof manager.connection.hasMetadata !== 'function'
+    ) {
+      return null;
+    }
+    return manager;
+  }
+
+  private async persistirIntento(
+    averia: Averia,
+    tipoEvento: TipoEventoSmsAveria,
+    resultado: SmsAveriaResultado,
+  ): Promise<IntentoSmsAveria> {
+    const data = {
+      idAveria: averia.id,
+      tipoEvento,
+      destinatarioClase: 'reportante' as const,
+      estadoEnvio: resultado.estado,
+      motivoBloqueo: resultado.motivo,
+    };
+    const manager = this.managerTransaccional();
+    if (!manager) {
+      return this.intentoRepository.save(this.intentoRepository.create(data));
+    }
+    return manager.transaction(async (tx) => {
+      const saved = await tx.save(
+        IntentoSmsAveria,
+        tx.create(IntentoSmsAveria, data),
+      );
+      const motivo =
+        resultado.motivo && resultado.motivo !== MotivoBloqueoSmsAveria.NINGUNO
+          ? ` (${resultado.motivo})`
+          : '';
+      await registrarEventoHistorialEnManager(tx, {
+        idAveria: averia.id,
+        tipoEvento: TipoEventoAveria.NOTIFICACION,
+        descripcion:
+          `Notificación SMS ${tipoEvento}. Resultado: ${resultado.estado}${motivo}.`.slice(
+            0,
+            500,
+          ),
+        referenciaTipo: 'IntentoSmsAveria',
+        referenciaId: saved.id,
+      });
+      return saved;
+    });
   }
 
   /**
