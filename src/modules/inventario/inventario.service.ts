@@ -54,6 +54,8 @@ import {
   AVERIA_FONTANERO_FORBIDDEN,
   resolveAuthenticatedUsuarioId,
 } from '../averias/averias.service';
+import { TipoEventoAveria } from '../../common/enums/tipo-evento-averia.enum';
+import { registrarEventoHistorialEnManager } from '../averias/historial-averias.registro';
 import { Averia } from '../averias/entities/averia.entity';
 import { CategoriaMaterial } from './entities/categoria-material.entity';
 import { DocumentoMovimientoInventario } from './entities/documento-movimiento-inventario.entity';
@@ -1248,6 +1250,17 @@ export class InventarioService {
 
             const movimientoGuardado = await movimientoRepo.save(movimiento);
 
+            if (movimientoGuardado.idAveria) {
+              await registrarEventoHistorialEnManager(manager, {
+                idAveria: movimientoGuardado.idAveria,
+                tipoEvento: TipoEventoAveria.SALIDA_MATERIAL,
+                descripcion: `Salida de material registrada: ${material.nombre}, cantidad ${dto.cantidad}`,
+                idUsuario,
+                referenciaTipo: 'MovimientoInventario',
+                referenciaId: movimientoGuardado.id,
+              });
+            }
+
             await this.evaluarYGenerarAlertaReposicion(material, manager);
 
             this.logger.log(
@@ -1391,7 +1404,9 @@ export class InventarioService {
         qb.skip(skip).take(take);
         const alertas = await qb.getMany();
 
-        const data = alertas.map((alerta) => this.mapAlertaReposicionAdmin(alerta));
+        const data = alertas.map((alerta) =>
+          this.mapAlertaReposicionAdmin(alerta),
+        );
 
         return {
           data,
@@ -1406,10 +1421,7 @@ export class InventarioService {
         throw error;
       }
 
-      this.logger.error(
-        'Error al consultar las alertas de reposición:',
-        error,
-      );
+      this.logger.error('Error al consultar las alertas de reposición:', error);
       throw new InternalServerErrorException(
         'No se pudieron consultar las alertas de reposición',
       );
@@ -1539,103 +1551,106 @@ export class InventarioService {
 
     try {
       return await withDbRetry(async () => {
-        return await this.materialRepository.manager.transaction(async (manager) => {
-          const alertaRepo = manager.getRepository(AlertaReposicion);
-          const reposicionRepo = manager.getRepository(ReposicionMaterial);
-          const detalleRepo = manager.getRepository(DetalleReposicionMaterial);
-
-          const alerta = await alertaRepo.findOne({
-            where: { id: idAlerta },
-            relations: { material: true },
-          });
-
-          if (!alerta) {
-            throw new NotFoundException(
-              `Alerta de reposición con ID ${idAlerta} no encontrada`,
+        return await this.materialRepository.manager.transaction(
+          async (manager) => {
+            const alertaRepo = manager.getRepository(AlertaReposicion);
+            const reposicionRepo = manager.getRepository(ReposicionMaterial);
+            const detalleRepo = manager.getRepository(
+              DetalleReposicionMaterial,
             );
-          }
 
-          if (alerta.estado === EstadoAlertaReposicion.RESUELTA) {
-            throw new BadRequestException(
-              'La alerta ya fue resuelta y no requiere una nueva reposición',
-            );
-          }
+            const alerta = await alertaRepo.findOne({
+              where: { id: idAlerta },
+              relations: { material: true },
+            });
 
-          const material = alerta.material;
-          if (!material || !alerta.idMaterial) {
-            throw new BadRequestException(
-              'La alerta no está asociada a un material válido',
-            );
-          }
+            if (!alerta) {
+              throw new NotFoundException(
+                `Alerta de reposición con ID ${idAlerta} no encontrada`,
+              );
+            }
 
-          if (!material.activo) {
-            throw new BadRequestException(
-              `El material "${material.nombre}" se encuentra inactivo y no puede reponerse`,
-            );
-          }
+            if (alerta.estado === EstadoAlertaReposicion.RESUELTA) {
+              throw new BadRequestException(
+                'La alerta ya fue resuelta y no requiere una nueva reposición',
+              );
+            }
 
-          const duplicada = await reposicionRepo.findOne({
-            where: {
+            const material = alerta.material;
+            if (!material || !alerta.idMaterial) {
+              throw new BadRequestException(
+                'La alerta no está asociada a un material válido',
+              );
+            }
+
+            if (!material.activo) {
+              throw new BadRequestException(
+                `El material "${material.nombre}" se encuentra inactivo y no puede reponerse`,
+              );
+            }
+
+            const duplicada = await reposicionRepo.findOne({
+              where: {
+                idAlertaReposicion: alerta.id,
+                estado: In(estadosActivos),
+              },
+            });
+
+            if (duplicada) {
+              throw new ConflictException(
+                `Ya existe una reposición activa (${duplicada.codigo ?? duplicada.id}) para esta alerta`,
+              );
+            }
+
+            const cantidad =
+              dto?.cantidad ??
+              Math.max(alerta.stockMinimo - alerta.stockActual, 1);
+
+            const totalReposiciones = await reposicionRepo.count();
+            const codigo = `REP-${String(totalReposiciones + 1).padStart(4, '0')}`;
+
+            const stockAntes = material.stockActual;
+            const nueva = reposicionRepo.create({
+              codigo,
+              fechaGeneracion: new Date(),
+              origen: OrigenReposicionMaterial.ALERTA_STOCK_MINIMO,
+              estado: EstadoReposicionMaterial.PENDIENTE,
               idAlertaReposicion: alerta.id,
-              estado: In(estadosActivos),
-            },
-          });
+              idSolicitudMaterial: null,
+              idUsuarioResponsable: idUsuario,
+              observacion: dto?.observacion?.trim() || null,
+              detalles: [
+                detalleRepo.create({
+                  idMaterial: material.id,
+                  cantidad,
+                }),
+              ],
+            });
 
-          if (duplicada) {
-            throw new ConflictException(
-              `Ya existe una reposición activa (${duplicada.codigo ?? duplicada.id}) para esta alerta`,
-            );
-          }
+            const guardada = await reposicionRepo.save(nueva);
+            const recargada = await reposicionRepo.findOne({
+              where: { id: guardada.id },
+              relations: {
+                detalles: { material: true },
+                alertaReposicion: true,
+                usuarioResponsable: true,
+              },
+            });
 
-          const cantidad =
-            dto?.cantidad ??
-            Math.max(alerta.stockMinimo - alerta.stockActual, 1);
+            const materialDespues = await manager
+              .getRepository(Material)
+              .findOne({
+                where: { id: material.id },
+              });
+            if (materialDespues && materialDespues.stockActual !== stockAntes) {
+              this.logger.warn(
+                `La generación de reposición no debe alterar stock. Material ${material.id} cambió de ${stockAntes} a ${materialDespues.stockActual}`,
+              );
+            }
 
-          const totalReposiciones = await reposicionRepo.count();
-          const codigo = `REP-${String(totalReposiciones + 1).padStart(4, '0')}`;
-
-          const stockAntes = material.stockActual;
-          const nueva = reposicionRepo.create({
-            codigo,
-            fechaGeneracion: new Date(),
-            origen: OrigenReposicionMaterial.ALERTA_STOCK_MINIMO,
-            estado: EstadoReposicionMaterial.PENDIENTE,
-            idAlertaReposicion: alerta.id,
-            idSolicitudMaterial: null,
-            idUsuarioResponsable: idUsuario,
-            observacion: dto?.observacion?.trim() || null,
-            detalles: [
-              detalleRepo.create({
-                idMaterial: material.id,
-                cantidad,
-              }),
-            ],
-          });
-
-          const guardada = await reposicionRepo.save(nueva);
-          const recargada = await reposicionRepo.findOne({
-            where: { id: guardada.id },
-            relations: {
-              detalles: { material: true },
-              alertaReposicion: true,
-              usuarioResponsable: true,
-            },
-          });
-
-          const materialDespues = await manager.getRepository(Material).findOne({
-            where: { id: material.id },
-          });
-          if (
-            materialDespues &&
-            materialDespues.stockActual !== stockAntes
-          ) {
-            this.logger.warn(
-              `La generación de reposición no debe alterar stock. Material ${material.id} cambió de ${stockAntes} a ${materialDespues.stockActual}`,
-            );
-          }
-
-          return this.mapReposicionMaterialAdmin(recargada ?? guardada);
-        });
+            return this.mapReposicionMaterialAdmin(recargada ?? guardada);
+          },
+        );
       });
     } catch (error) {
       if (error instanceof HttpException) {
@@ -1655,9 +1670,7 @@ export class InventarioService {
   /**
    * Listado administrativo de reposiciones de materiales (3.9.4).
    */
-  async listarReposicionesAdmin(
-    query?: QueryReposicionesDto,
-  ): Promise<{
+  async listarReposicionesAdmin(query?: QueryReposicionesDto): Promise<{
     data: Record<string, unknown>[];
     total: number;
     page: number;
@@ -1676,11 +1689,15 @@ export class InventarioService {
         const countQb = reposicionRepo.createQueryBuilder('reposicion');
 
         if (query?.estado) {
-          countQb.andWhere('reposicion.estado = :estado', { estado: query.estado });
+          countQb.andWhere('reposicion.estado = :estado', {
+            estado: query.estado,
+          });
         }
 
         if (query?.origen) {
-          countQb.andWhere('reposicion.origen = :origen', { origen: query.origen });
+          countQb.andWhere('reposicion.origen = :origen', {
+            origen: query.origen,
+          });
         }
 
         const total = await countQb.getCount();
@@ -1690,7 +1707,10 @@ export class InventarioService {
           .leftJoinAndSelect('reposicion.detalles', 'detalle')
           .leftJoinAndSelect('detalle.material', 'material')
           .leftJoinAndSelect('reposicion.proveedor', 'proveedor')
-          .leftJoinAndSelect('reposicion.usuarioResponsable', 'usuarioResponsable');
+          .leftJoinAndSelect(
+            'reposicion.usuarioResponsable',
+            'usuarioResponsable',
+          );
 
         if (query?.estado) {
           qb.andWhere('reposicion.estado = :estado', { estado: query.estado });
@@ -1724,7 +1744,10 @@ export class InventarioService {
         throw error;
       }
 
-      this.logger.error('Error al consultar las reposiciones de materiales:', error);
+      this.logger.error(
+        'Error al consultar las reposiciones de materiales:',
+        error,
+      );
       throw new InternalServerErrorException(
         'No se pudieron consultar las reposiciones de materiales',
       );
@@ -1813,166 +1836,179 @@ export class InventarioService {
 
     try {
       return await withDbRetry(async () => {
-        return await this.materialRepository.manager.transaction(async (manager) => {
-          const reposicionRepo = manager.getRepository(ReposicionMaterial);
-          const detalleRepo = manager.getRepository(DetalleReposicionMaterial);
-          const materialRepo = manager.getRepository(Material);
-          const proveedorRepo = manager.getRepository(Proveedor);
-
-          const reposicion = await reposicionRepo.findOne({
-            where: { id: idReposicion },
-            relations: { detalles: { material: true } },
-          });
-
-          if (!reposicion) {
-            throw new NotFoundException(
-              `Reposición con ID ${idReposicion} no encontrada`,
+        return await this.materialRepository.manager.transaction(
+          async (manager) => {
+            const reposicionRepo = manager.getRepository(ReposicionMaterial);
+            const detalleRepo = manager.getRepository(
+              DetalleReposicionMaterial,
             );
-          }
+            const materialRepo = manager.getRepository(Material);
+            const proveedorRepo = manager.getRepository(Proveedor);
 
-          if (!estadosPermitidos.includes(reposicion.estado)) {
-            if (
-              reposicion.estado === EstadoReposicionMaterial.COMPRA_REGISTRADA ||
-              reposicion.estado === EstadoReposicionMaterial.PENDIENTE_RECEPCION
-            ) {
-              throw new ConflictException(
-                `La reposición ${reposicion.codigo ?? reposicion.id} ya tiene una compra registrada`,
-              );
-            }
-
-            throw new BadRequestException(
-              `No se puede registrar una compra cuando la reposición está en estado ${reposicion.estado}`,
-            );
-          }
-
-          if (!reposicion.detalles?.length) {
-            throw new BadRequestException(
-              'La reposición no tiene materiales asociados para registrar la compra',
-            );
-          }
-
-          const proveedor = await proveedorRepo.findOne({
-            where: { id: idProveedor },
-          });
-
-          if (!proveedor) {
-            throw new NotFoundException(
-              `Proveedor con ID ${idProveedor} no encontrado`,
-            );
-          }
-
-          if (!proveedor.activo) {
-            throw new BadRequestException(
-              `El proveedor "${proveedor.nombre}" se encuentra inactivo y no puede utilizarse`,
-            );
-          }
-
-          const idsReposicion = new Set(
-            reposicion.detalles.map((detalle) => detalle.idMaterial),
-          );
-          const idsCompra = new Set<number>();
-
-          for (const item of dto.detalles) {
-            const idMaterial = item.idMaterial ?? item.materialId;
-            if (!idMaterial || !Number.isInteger(idMaterial) || idMaterial <= 0) {
-              throw new BadRequestException(
-                'Cada detalle de compra debe indicar un material válido',
-              );
-            }
-
-            if (idsCompra.has(idMaterial)) {
-              throw new BadRequestException(
-                `El material ${idMaterial} está repetido en los detalles de la compra`,
-              );
-            }
-            idsCompra.add(idMaterial);
-
-            if (!idsReposicion.has(idMaterial)) {
-              throw new BadRequestException(
-                `El material ${idMaterial} no pertenece a la reposición ${reposicion.codigo ?? reposicion.id}`,
-              );
-            }
-
-            const material = await materialRepo.findOne({
-              where: { id: idMaterial },
+            const reposicion = await reposicionRepo.findOne({
+              where: { id: idReposicion },
+              relations: { detalles: { material: true } },
             });
 
-            if (!material) {
+            if (!reposicion) {
               throw new NotFoundException(
-                `Material con ID ${idMaterial} no encontrado`,
+                `Reposición con ID ${idReposicion} no encontrada`,
               );
             }
 
-            if (!material.activo) {
+            if (!estadosPermitidos.includes(reposicion.estado)) {
+              if (
+                reposicion.estado ===
+                  EstadoReposicionMaterial.COMPRA_REGISTRADA ||
+                reposicion.estado ===
+                  EstadoReposicionMaterial.PENDIENTE_RECEPCION
+              ) {
+                throw new ConflictException(
+                  `La reposición ${reposicion.codigo ?? reposicion.id} ya tiene una compra registrada`,
+                );
+              }
+
               throw new BadRequestException(
-                `El material "${material.nombre}" se encuentra inactivo y no puede comprarse`,
+                `No se puede registrar una compra cuando la reposición está en estado ${reposicion.estado}`,
               );
             }
-          }
 
-          if (idsCompra.size !== idsReposicion.size) {
-            throw new BadRequestException(
-              'Debe registrar la compra de todos los materiales incluidos en la reposición',
-            );
-          }
-
-          const stocksAntes = new Map<number, number>();
-          for (const detalle of reposicion.detalles) {
-            stocksAntes.set(detalle.idMaterial, detalle.material?.stockActual ?? 0);
-          }
-
-          for (const item of dto.detalles) {
-            const idMaterial = item.idMaterial ?? item.materialId;
-            const detalle = reposicion.detalles.find(
-              (d) => d.idMaterial === idMaterial,
-            );
-            if (!detalle) {
-              continue;
+            if (!reposicion.detalles?.length) {
+              throw new BadRequestException(
+                'La reposición no tiene materiales asociados para registrar la compra',
+              );
             }
 
-            detalle.cantidad = item.cantidad;
-            if (item.observacion !== undefined) {
-              detalle.observacion = item.observacion?.trim() || null;
-            }
-            await detalleRepo.save(detalle);
-          }
-
-          reposicion.idProveedor = proveedor.id;
-          reposicion.fechaCompra = dto.fechaCompra;
-          reposicion.idUsuarioResponsable = idUsuario;
-          reposicion.estado = EstadoReposicionMaterial.PENDIENTE_RECEPCION;
-          reposicion.observacion = this.construirObservacionCompra(
-            dto.referenciaCompra,
-            dto.observacion,
-          );
-
-          await reposicionRepo.save(reposicion);
-
-          const recargada = await reposicionRepo.findOne({
-            where: { id: reposicion.id },
-            relations: {
-              detalles: { material: true },
-              proveedor: true,
-              usuarioResponsable: true,
-            },
-          });
-
-          for (const [idMaterial, stockAntes] of stocksAntes) {
-            const materialDespues = await materialRepo.findOne({
-              where: { id: idMaterial },
+            const proveedor = await proveedorRepo.findOne({
+              where: { id: idProveedor },
             });
-            if (
-              materialDespues &&
-              materialDespues.stockActual !== stockAntes
-            ) {
-              this.logger.warn(
-                `Registrar compra no debe alterar stock. Material ${idMaterial} cambió de ${stockAntes} a ${materialDespues.stockActual}`,
+
+            if (!proveedor) {
+              throw new NotFoundException(
+                `Proveedor con ID ${idProveedor} no encontrado`,
               );
             }
-          }
 
-          return this.mapReposicionMaterialAdmin(recargada ?? reposicion);
-        });
+            if (!proveedor.activo) {
+              throw new BadRequestException(
+                `El proveedor "${proveedor.nombre}" se encuentra inactivo y no puede utilizarse`,
+              );
+            }
+
+            const idsReposicion = new Set(
+              reposicion.detalles.map((detalle) => detalle.idMaterial),
+            );
+            const idsCompra = new Set<number>();
+
+            for (const item of dto.detalles) {
+              const idMaterial = item.idMaterial ?? item.materialId;
+              if (
+                !idMaterial ||
+                !Number.isInteger(idMaterial) ||
+                idMaterial <= 0
+              ) {
+                throw new BadRequestException(
+                  'Cada detalle de compra debe indicar un material válido',
+                );
+              }
+
+              if (idsCompra.has(idMaterial)) {
+                throw new BadRequestException(
+                  `El material ${idMaterial} está repetido en los detalles de la compra`,
+                );
+              }
+              idsCompra.add(idMaterial);
+
+              if (!idsReposicion.has(idMaterial)) {
+                throw new BadRequestException(
+                  `El material ${idMaterial} no pertenece a la reposición ${reposicion.codigo ?? reposicion.id}`,
+                );
+              }
+
+              const material = await materialRepo.findOne({
+                where: { id: idMaterial },
+              });
+
+              if (!material) {
+                throw new NotFoundException(
+                  `Material con ID ${idMaterial} no encontrado`,
+                );
+              }
+
+              if (!material.activo) {
+                throw new BadRequestException(
+                  `El material "${material.nombre}" se encuentra inactivo y no puede comprarse`,
+                );
+              }
+            }
+
+            if (idsCompra.size !== idsReposicion.size) {
+              throw new BadRequestException(
+                'Debe registrar la compra de todos los materiales incluidos en la reposición',
+              );
+            }
+
+            const stocksAntes = new Map<number, number>();
+            for (const detalle of reposicion.detalles) {
+              stocksAntes.set(
+                detalle.idMaterial,
+                detalle.material?.stockActual ?? 0,
+              );
+            }
+
+            for (const item of dto.detalles) {
+              const idMaterial = item.idMaterial ?? item.materialId;
+              const detalle = reposicion.detalles.find(
+                (d) => d.idMaterial === idMaterial,
+              );
+              if (!detalle) {
+                continue;
+              }
+
+              detalle.cantidad = item.cantidad;
+              if (item.observacion !== undefined) {
+                detalle.observacion = item.observacion?.trim() || null;
+              }
+              await detalleRepo.save(detalle);
+            }
+
+            reposicion.idProveedor = proveedor.id;
+            reposicion.fechaCompra = dto.fechaCompra;
+            reposicion.idUsuarioResponsable = idUsuario;
+            reposicion.estado = EstadoReposicionMaterial.PENDIENTE_RECEPCION;
+            reposicion.observacion = this.construirObservacionCompra(
+              dto.referenciaCompra,
+              dto.observacion,
+            );
+
+            await reposicionRepo.save(reposicion);
+
+            const recargada = await reposicionRepo.findOne({
+              where: { id: reposicion.id },
+              relations: {
+                detalles: { material: true },
+                proveedor: true,
+                usuarioResponsable: true,
+              },
+            });
+
+            for (const [idMaterial, stockAntes] of stocksAntes) {
+              const materialDespues = await materialRepo.findOne({
+                where: { id: idMaterial },
+              });
+              if (
+                materialDespues &&
+                materialDespues.stockActual !== stockAntes
+              ) {
+                this.logger.warn(
+                  `Registrar compra no debe alterar stock. Material ${idMaterial} cambió de ${stockAntes} a ${materialDespues.stockActual}`,
+                );
+              }
+            }
+
+            return this.mapReposicionMaterialAdmin(recargada ?? reposicion);
+          },
+        );
       });
     } catch (error) {
       if (error instanceof HttpException) {
@@ -2123,16 +2159,11 @@ export class InventarioService {
       );
     }
 
-    const reposicionRepo =
-      this.reposicionMaterialRepository ??
-      this.materialRepository.manager.getRepository(ReposicionMaterial);
-
     try {
       return await withDbRetry(async () => {
         return await this.materialRepository.manager.transaction(
           async (manager) => {
-            const reposicionRepoTx =
-              manager.getRepository(ReposicionMaterial);
+            const reposicionRepoTx = manager.getRepository(ReposicionMaterial);
             const movimientoRepoTx =
               manager.getRepository(MovimientoInventario);
             const materialRepoTx = manager.getRepository(Material);
@@ -2148,7 +2179,9 @@ export class InventarioService {
               );
             }
 
-            if (reposicion.estado !== EstadoReposicionMaterial.PENDIENTE_RECEPCION) {
+            if (
+              reposicion.estado !== EstadoReposicionMaterial.PENDIENTE_RECEPCION
+            ) {
               throw new BadRequestException(
                 `Solo se pueden recibir reposiciones en estado ${EstadoReposicionMaterial.PENDIENTE_RECEPCION}. Estado actual: ${reposicion.estado}`,
               );
@@ -2208,7 +2241,9 @@ export class InventarioService {
             }> = [];
 
             for (const detalle of detallesCompra) {
-              const cantidadRecibida = cantidadPorMaterial.get(detalle.idMaterial);
+              const cantidadRecibida = cantidadPorMaterial.get(
+                detalle.idMaterial,
+              );
               if (cantidadRecibida === undefined) {
                 throw new BadRequestException(
                   `Falta indicar la cantidad recibida del material ${detalle.idMaterial}`,
@@ -2257,7 +2292,8 @@ export class InventarioService {
                 idReposicion: reposicion.id,
               });
 
-              const movimientoGuardado = await movimientoRepoTx.save(movimiento);
+              const movimientoGuardado =
+                await movimientoRepoTx.save(movimiento);
               movimientosCreados.push(movimientoGuardado);
               existenciasActualizadas.push({
                 idMaterial: material.id,
@@ -2375,7 +2411,9 @@ export class InventarioService {
           .andWhere('material.activo = :activo', { activo: true })
           .getCount();
 
-        const materialesStockBajo = await this.crearQueryMaterialesReporte(query)
+        const materialesStockBajo = await this.crearQueryMaterialesReporte(
+          query,
+        )
           .andWhere('material.stockActual <= material.stockMinimo')
           .getCount();
 
@@ -2483,9 +2521,7 @@ export class InventarioService {
   /**
    * Historial paginado de movimientos de inventario (3.11.1).
    */
-  async listarMovimientosInventario(
-    query?: QueryMovimientosDto,
-  ): Promise<{
+  async listarMovimientosInventario(query?: QueryMovimientosDto): Promise<{
     data: Record<string, unknown>[];
     total: number;
     page: number;
@@ -2522,7 +2558,10 @@ export class InventarioService {
         throw error;
       }
 
-      this.logger.error('Error al consultar el historial de movimientos:', error);
+      this.logger.error(
+        'Error al consultar el historial de movimientos:',
+        error,
+      );
       throw new InternalServerErrorException(
         'No se pudo consultar el historial de movimientos de inventario',
       );
@@ -2532,7 +2571,9 @@ export class InventarioService {
   /**
    * Detalle de un movimiento de inventario (3.11.3).
    */
-  async obtenerMovimientoInventario(id: number): Promise<Record<string, unknown>> {
+  async obtenerMovimientoInventario(
+    id: number,
+  ): Promise<Record<string, unknown>> {
     if (!id || !Number.isInteger(id) || id <= 0) {
       throw new BadRequestException(
         'El identificador del movimiento debe ser un número entero mayor a cero',
@@ -2568,7 +2609,9 @@ export class InventarioService {
         throw new NotFoundException(`Movimiento con ID ${id} no encontrado`);
       }
 
-      return this.mapMovimientoInventarioAdmin(movimiento, { incluirDocumentos: true });
+      return this.mapMovimientoInventarioAdmin(movimiento, {
+        incluirDocumentos: true,
+      });
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -2941,6 +2984,17 @@ export class InventarioService {
           );
 
           const solicitudGuardada = await solicitudRepo.save(nuevaSolicitud);
+
+          if (averiaAsociada) {
+            await registrarEventoHistorialEnManager(manager, {
+              idAveria: averiaAsociada.id,
+              tipoEvento: TipoEventoAveria.SOLICITUD_MATERIAL,
+              descripcion: `Solicitud de materiales ${solicitudGuardada.codigo} registrada para la atención`,
+              idUsuario: idFontanero,
+              referenciaTipo: 'SolicitudMaterial',
+              referenciaId: solicitudGuardada.id,
+            });
+          }
 
           return (await solicitudRepo.findOne({
             where: { id: solicitudGuardada.id },
@@ -3395,7 +3449,9 @@ export class InventarioService {
     const qb = this.materialRepository.createQueryBuilder('material');
 
     if (query?.idMaterial) {
-      qb.andWhere('material.id = :idMaterial', { idMaterial: query.idMaterial });
+      qb.andWhere('material.id = :idMaterial', {
+        idMaterial: query.idMaterial,
+      });
     }
 
     if (query?.idCategoria) {
@@ -3588,7 +3644,11 @@ export class InventarioService {
   ): Record<string, unknown> {
     const averia = movimiento.averia ?? null;
     const solicitud = movimiento.solicitudMaterial ?? null;
-    const referencia = this.referenciaMovimientoResumen(movimiento, averia, solicitud);
+    const referencia = this.referenciaMovimientoResumen(
+      movimiento,
+      averia,
+      solicitud,
+    );
 
     return {
       id: movimiento.id,
@@ -3738,7 +3798,9 @@ export class InventarioService {
     };
   }
 
-  private mapAlertaReposicionAdmin(alerta: AlertaReposicion): Record<string, unknown> {
+  private mapAlertaReposicionAdmin(
+    alerta: AlertaReposicion,
+  ): Record<string, unknown> {
     return {
       id: alerta.id,
       idMaterial: alerta.idMaterial,
@@ -3769,8 +3831,16 @@ export class InventarioService {
       return null;
     }
     const record = usuario as Record<string, unknown>;
-    const partes = [record.nombre, record.name, record.apellidos, record.lastName]
-      .filter((value): value is string => typeof value === 'string' && value.trim() !== '')
+    const partes = [
+      record.nombre,
+      record.name,
+      record.apellidos,
+      record.lastName,
+    ]
+      .filter(
+        (value): value is string =>
+          typeof value === 'string' && value.trim() !== '',
+      )
       .map((value) => value.trim());
     if (partes.length === 0) {
       return null;

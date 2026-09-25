@@ -21,6 +21,9 @@ const mssqlOptions = {
   requestTimeout: 30_000,
   enableKeepAlive: true,
   keepAliveInitialDelay: 10_000,
+  // El datetime de SQL Server se guardó en UTC. Sin esto, el driver lo lee
+  // como hora local y la pantalla muestra seis horas de más.
+  useUTC: true,
 };
 
 const tryLoadMssqlNativeDriver = (): unknown | undefined => {

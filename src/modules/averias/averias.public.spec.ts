@@ -237,12 +237,14 @@ describe('POST /api/v1/public/averias — registro público', () => {
   });
 
   it('ante un fallo de persistencia responde 500 sin filtrar SQL ni TypeORM', async () => {
-    const saveSpy = jest.spyOn(averias, 'save').mockRejectedValueOnce(
-      new QueryFailedError('INSERT INTO Averia SELECT * FROM Averia', [], {
-        name: 'QueryFailedError',
-        message: 'driverError stack SELECT * FROM Averia constraint',
-      }),
-    );
+    const saveSpy = jest
+      .spyOn(averias.manager, 'transaction')
+      .mockRejectedValueOnce(
+        new QueryFailedError('INSERT INTO Averia SELECT * FROM Averia', [], {
+          name: 'QueryFailedError',
+          message: 'driverError stack SELECT * FROM Averia constraint',
+        }),
+      );
 
     const response = await postAveria(payloadMinimo);
     saveSpy.mockRestore();
