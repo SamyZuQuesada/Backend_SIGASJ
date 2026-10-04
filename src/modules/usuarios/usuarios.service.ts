@@ -32,7 +32,7 @@ const CUENTAS_LOGIN_DESARROLLO: ReadonlyArray<{
     rol: Role.SECRETARIA,
   },
   {
-    nombre: 'Fontanero demo',
+    nombre: 'Fontanero',
     correo: 'fontanero@asadasanjuan.cr',
     rol: Role.FONTANERO,
   },
