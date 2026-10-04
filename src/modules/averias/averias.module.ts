@@ -9,6 +9,7 @@ import { AveriasAdminController } from './averias-admin.controller';
 import { AveriasController } from './averias.controller';
 import { AveriasFontaneroController } from './averias-fontanero.controller';
 import { AveriasService } from './averias.service';
+import { ConsultaCedulaService } from './consulta-cedula.service';
 import { Averia } from './entities/averia.entity';
 import { HistorialAveria } from './entities/historial-averia.entity';
 import { ObservacionAveria } from './entities/observacion-averia.entity';
@@ -33,6 +34,7 @@ import { HistorialAveriasService } from './historial-averias.service';
   ],
   providers: [
     AveriasService,
+    ConsultaCedulaService,
     HistorialAveriasService,
     ValidacionHorarioLaboralFontaneroService,
   ],

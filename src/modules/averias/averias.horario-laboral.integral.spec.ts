@@ -37,7 +37,6 @@ import {
   AVERIAS_TEST_ENTITIES,
   vaciarNotificacionesAveriaPrueba,
 } from './averias.test-entities';
-import { MENSAJE_INICIO_ATENCION_FUERA_DE_HORARIO } from './averias.inicio-atencion';
 import {
   AVERIA_FONTANERO_FORBIDDEN,
   type AveriaAdminDetail,
@@ -408,7 +407,7 @@ describe('PBI 3.6 — horario laboral integral', () => {
     expect(fontanero.fechaInicioAtencion).toBeNull();
   });
 
-  it('fuera de horario rechaza el inicio y no registra fechaInicioAtencion', async () => {
+  it('fuera de horario igual inicia la atención y registra fechaInicioAtencion', async () => {
     await definirHorarioFueraDeAhora(fontaneroA.idUsuario);
     const averia = await persistAveria({
       codigoSeguimiento: 'AV-H36-REJ',
@@ -417,17 +416,15 @@ describe('PBI 3.6 — horario laboral integral', () => {
       fechaAsignacion: new Date('2026-09-13T08:15:00.000Z'),
     });
 
-    const response = await patchIniciar(averia.id, tokenA).expect(400);
-    expect(response.body).toMatchObject({
-      message: MENSAJE_INICIO_ATENCION_FUERA_DE_HORARIO,
-    });
+    const response = await patchIniciar(averia.id, tokenA).expect(200);
+    expect(response.body.estado).toBe(EstadoAveria.EN_ATENCION);
     expect(JSON.stringify(response.body)).not.toMatch(
       /TypeORM|SQL Server|stack/i,
     );
 
     const persistida = await averias.findOneBy({ id: averia.id });
-    expect(persistida?.estado).toBe(EstadoAveria.PENDIENTE);
-    expect(persistida?.fechaInicioAtencion).toBeNull();
+    expect(persistida?.estado).toBe(EstadoAveria.EN_ATENCION);
+    expect(persistida?.fechaInicioAtencion).toBeInstanceOf(Date);
     expect(persistida?.idFontaneroAsignado).toBe(fontaneroA.idUsuario);
   });
 
@@ -452,14 +449,12 @@ describe('PBI 3.6 — horario laboral integral', () => {
       adminToken,
     )
       .send({ estado: EstadoAveria.EN_ATENCION })
-      .expect(400);
-    expect(adminPatch.body).toMatchObject({
-      message: MENSAJE_INICIO_ATENCION_FUERA_DE_HORARIO,
-    });
+      .expect(200);
+    expect(adminPatch.body.estado).toBe(EstadoAveria.EN_ATENCION);
 
     const persistida = await averias.findOneBy({ id: averia.id });
-    expect(persistida?.estado).toBe(EstadoAveria.PENDIENTE);
-    expect(persistida?.fechaInicioAtencion).toBeNull();
+    expect(persistida?.estado).toBe(EstadoAveria.EN_ATENCION);
+    expect(persistida?.fechaInicioAtencion).toBeInstanceOf(Date);
   });
 
   it('responde 401 sin sesión y 403 a otro Fontanero o a la Administradora', async () => {
