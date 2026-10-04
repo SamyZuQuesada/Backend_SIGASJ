@@ -149,7 +149,7 @@ export class AveriasFontaneroController {
   @ApiOperation({
     summary: 'Iniciar la atención de una avería asignada',
     description:
-      'Solo el Fontanero asignado. Exige horario laboral del Backend. Si está fuera de jornada, rechaza y no registra fecha de inicio. Un PATCH administrativo a EN_ATENCION aplica la misma regla.',
+      'Solo el Fontanero asignado. Puede iniciar la atención a cualquier hora. La fecha de inicio la registra el servidor. Un PATCH administrativo a EN_ATENCION aplica la misma regla.',
   })
   @ApiParam({
     name: 'id',
@@ -164,7 +164,7 @@ export class AveriasFontaneroController {
   @ApiResponse({
     status: HttpStatus.BAD_REQUEST,
     description:
-      'Transición no permitida o Fontanero fuera de horario laboral.',
+      'Transición de estado no permitida.',
   })
   @ApiResponse({
     status: HttpStatus.UNAUTHORIZED,

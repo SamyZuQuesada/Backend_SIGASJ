@@ -1,4 +1,3 @@
-import { BadRequestException } from '@nestjs/common';
 import { EstadoAveria } from '../../common/enums/estado-averia.enum';
 import {
   MOTIVO_DENTRO_DE_HORARIO,
@@ -9,7 +8,6 @@ import {
 import { esTransicionEstadoAveriaValida } from './averias.estado-transiciones';
 import {
   ESTADOS_QUE_PERMITEN_INICIAR_ATENCION,
-  MENSAJE_INICIO_ATENCION_FUERA_DE_HORARIO,
   assertHorarioPermiteIniciarAtencion,
   registrarInicioAtencionExitoso,
 } from './averias.inicio-atencion';
@@ -37,7 +35,7 @@ describe('inicio de atención por horario', () => {
     }
   });
 
-  it('rechaza fuera de horario con el mensaje de negocio', () => {
+  it('permite iniciar aunque esté fuera de horario o sin horario', () => {
     expect(() =>
       assertHorarioPermiteIniciarAtencion(
         evaluacion({
@@ -46,7 +44,7 @@ describe('inicio de atención por horario', () => {
           motivo: MOTIVO_FUERA_DE_HORARIO,
         }),
       ),
-    ).toThrow(BadRequestException);
+    ).not.toThrow();
     expect(() =>
       assertHorarioPermiteIniciarAtencion(
         evaluacion({
@@ -54,7 +52,7 @@ describe('inicio de atención por horario', () => {
           puedeIniciarAtencion: false,
         }),
       ),
-    ).toThrow(MENSAJE_INICIO_ATENCION_FUERA_DE_HORARIO);
+    ).not.toThrow();
   });
 
   it('registra estado y fecha solo en una transición exitosa', () => {

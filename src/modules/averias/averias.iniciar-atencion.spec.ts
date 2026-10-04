@@ -27,7 +27,6 @@ import {
   AVERIAS_TEST_ENTITIES,
   vaciarNotificacionesAveriaPrueba,
 } from './averias.test-entities';
-import { MENSAJE_INICIO_ATENCION_FUERA_DE_HORARIO } from './averias.inicio-atencion';
 import { mensajeTransicionEstadoAveriaInvalida } from './averias.estado-transiciones';
 import {
   AVERIA_ADMIN_NOT_FOUND,
@@ -235,39 +234,35 @@ describe('PATCH /api/v1/fontanero/averias/:id/iniciar-atencion', () => {
     expect(persistida?.fechaInicioAtencion).toBeInstanceOf(Date);
   });
 
-  it('fuera de horario rechaza, deja PENDIENTE y no registra fecha', async () => {
+  it('fuera de horario igual inicia la atención y registra la fecha', async () => {
     await definirHorarioFueraDeAhora(fontaneroA.idUsuario);
     const averia = await persistAveria({
       codigoSeguimiento: 'AV-INI-OUT',
       estado: EstadoAveria.PENDIENTE,
     });
 
-    const response = await patchIniciar(averia.id, tokenA).expect(400);
-    expect(response.body).toMatchObject({
-      message: MENSAJE_INICIO_ATENCION_FUERA_DE_HORARIO,
-    });
+    const response = await patchIniciar(averia.id, tokenA).expect(200);
+    expect(response.body.estado).toBe(EstadoAveria.EN_ATENCION);
 
     const persistida = await averias.findOneBy({ id: averia.id });
-    expect(persistida?.estado).toBe(EstadoAveria.PENDIENTE);
-    expect(persistida?.fechaInicioAtencion).toBeNull();
+    expect(persistida?.estado).toBe(EstadoAveria.EN_ATENCION);
+    expect(persistida?.fechaInicioAtencion).toBeInstanceOf(Date);
     expect(persistida?.idFontaneroAsignado).toBe(fontaneroA.idUsuario);
   });
 
-  it('sin horario no asume que puede iniciar', async () => {
+  it('sin horario igual puede iniciar la atención', async () => {
     const averia = await persistAveria({
       codigoSeguimiento: 'AV-INI-NOH',
       estado: EstadoAveria.PENDIENTE,
     });
-    const response = await patchIniciar(averia.id, tokenA).expect(400);
-    expect(response.body).toMatchObject({
-      message: MENSAJE_INICIO_ATENCION_FUERA_DE_HORARIO,
-    });
+    const response = await patchIniciar(averia.id, tokenA).expect(200);
+    expect(response.body.estado).toBe(EstadoAveria.EN_ATENCION);
     const persistida = await averias.findOneBy({ id: averia.id });
-    expect(persistida?.estado).toBe(EstadoAveria.PENDIENTE);
-    expect(persistida?.fechaInicioAtencion).toBeNull();
+    expect(persistida?.estado).toBe(EstadoAveria.EN_ATENCION);
+    expect(persistida?.fechaInicioAtencion).toBeInstanceOf(Date);
   });
 
-  it('un PATCH administrativo tampoco omite la regla de horario', async () => {
+  it('un PATCH administrativo inicia la atención aunque esté fuera de horario', async () => {
     await definirHorarioFueraDeAhora(fontaneroA.idUsuario);
     const averia = await persistAveria({
       codigoSeguimiento: 'AV-INI-ADM',
@@ -278,14 +273,12 @@ describe('PATCH /api/v1/fontanero/averias/:id/iniciar-atencion', () => {
       .patch(`/api/v1/admin/averias/${averia.id}/estado`)
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ estado: EstadoAveria.EN_ATENCION })
-      .expect(400);
-    expect(response.body).toMatchObject({
-      message: MENSAJE_INICIO_ATENCION_FUERA_DE_HORARIO,
-    });
+      .expect(200);
+    expect(response.body.estado).toBe(EstadoAveria.EN_ATENCION);
 
     const persistida = await averias.findOneBy({ id: averia.id });
-    expect(persistida?.estado).toBe(EstadoAveria.PENDIENTE);
-    expect(persistida?.fechaInicioAtencion).toBeNull();
+    expect(persistida?.estado).toBe(EstadoAveria.EN_ATENCION);
+    expect(persistida?.fechaInicioAtencion).toBeInstanceOf(Date);
   });
 
   it('rechaza un body con fecha de inicio enviada por el cliente', async () => {

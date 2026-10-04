@@ -246,7 +246,7 @@ export class AveriasAdminController {
   @ApiOperation({
     summary: 'Cambiar el estado administrativo de una avería',
     description:
-      'Valida transiciones en Backend (PBI 2.3). ASIGNADA y EN_ATENCION exigen fontanero ya asignado. Pasar a EN_ATENCION exige horario laboral del Fontanero asignado y registra fechaInicioAtencion en el servidor. Roles: ADMINISTRADORA y SECRETARIA.',
+      'Valida transiciones en Backend (PBI 2.3). ASIGNADA y EN_ATENCION exigen fontanero ya asignado. Pasar a EN_ATENCION registra fechaInicioAtencion en el servidor a cualquier hora. Roles: ADMINISTRADORA y SECRETARIA.',
   })
   @ApiParam({
     name: 'id',
