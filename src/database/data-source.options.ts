@@ -91,8 +91,8 @@ export function buildMigrationDataSourceOptions(): DataSourceOptions {
             pool: mssqlPool,
             connectionTimeout: 30_000,
             requestTimeout: 30_000,
-            options: mssqlOptions,
           }
         : undefined,
+    options: dbType === 'mssql' ? mssqlOptions : undefined,
   } as DataSourceOptions;
 }
