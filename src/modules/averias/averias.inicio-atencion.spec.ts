@@ -8,6 +8,7 @@ import {
 import { esTransicionEstadoAveriaValida } from './averias.estado-transiciones';
 import {
   ESTADOS_QUE_PERMITEN_INICIAR_ATENCION,
+  MENSAJE_INICIO_ATENCION_FUERA_DE_HORARIO,
   assertHorarioPermiteIniciarAtencion,
   registrarInicioAtencionExitoso,
 } from './averias.inicio-atencion';
@@ -35,7 +36,7 @@ describe('inicio de atención por horario', () => {
     }
   });
 
-  it('permite iniciar aunque esté fuera de horario o sin horario', () => {
+  it('rechaza el inicio fuera de horario o sin horario', () => {
     expect(() =>
       assertHorarioPermiteIniciarAtencion(
         evaluacion({
@@ -44,7 +45,7 @@ describe('inicio de atención por horario', () => {
           motivo: MOTIVO_FUERA_DE_HORARIO,
         }),
       ),
-    ).not.toThrow();
+    ).toThrow(MENSAJE_INICIO_ATENCION_FUERA_DE_HORARIO);
     expect(() =>
       assertHorarioPermiteIniciarAtencion(
         evaluacion({
@@ -52,7 +53,7 @@ describe('inicio de atención por horario', () => {
           puedeIniciarAtencion: false,
         }),
       ),
-    ).not.toThrow();
+    ).toThrow(MENSAJE_INICIO_ATENCION_FUERA_DE_HORARIO);
   });
 
   it('registra estado y fecha solo en una transición exitosa', () => {

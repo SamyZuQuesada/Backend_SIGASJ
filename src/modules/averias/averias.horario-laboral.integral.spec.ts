@@ -9,6 +9,8 @@ import { App } from 'supertest/types';
 import { DataSource, Repository } from 'typeorm';
 import { DiaSemana } from '../../common/enums/dia-semana.enum';
 import { EstadoAveria } from '../../common/enums/estado-averia.enum';
+import { PrioridadAveria } from '../../common/enums/prioridad-averia.enum';
+import { TipoAveria } from '../../common/enums/tipo-averia.enum';
 import { Role } from '../../common/enums/role.enum';
 import { HttpExceptionFilter } from '../../common/filters/http-exception.filter';
 import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
@@ -32,6 +34,7 @@ import {
   crearUsuarioPrueba,
   seedRolesBase,
 } from '../usuarios/usuarios.test-helpers';
+import { MENSAJE_INICIO_ATENCION_FUERA_DE_HORARIO } from './averias.inicio-atencion';
 import { AveriasModule } from './averias.module';
 import {
   AVERIAS_TEST_ENTITIES,
@@ -94,6 +97,14 @@ describe('PBI 3.6 — horario laboral integral', () => {
         ubicacion: 'Frente a la escuela',
         sectorComunidad: 'San Juan',
         descripcion: 'Fuga visible',
+        prioridad:
+          overrides.prioridad === undefined
+            ? PrioridadAveria.ALTA
+            : overrides.prioridad,
+        tipoAveria:
+          overrides.tipoAveria === undefined
+            ? TipoAveria.TUBO_MADRE
+            : overrides.tipoAveria,
         estado: overrides.estado ?? EstadoAveria.EN_REVISION,
         idFontaneroAsignado:
           overrides.idFontaneroAsignado === undefined
@@ -407,7 +418,7 @@ describe('PBI 3.6 — horario laboral integral', () => {
     expect(fontanero.fechaInicioAtencion).toBeNull();
   });
 
-  it('fuera de horario igual inicia la atención y registra fechaInicioAtencion', async () => {
+  it('fuera de horario no inicia la atención y avisa con 400', async () => {
     await definirHorarioFueraDeAhora(fontaneroA.idUsuario);
     const averia = await persistAveria({
       codigoSeguimiento: 'AV-H36-REJ',
@@ -416,15 +427,15 @@ describe('PBI 3.6 — horario laboral integral', () => {
       fechaAsignacion: new Date('2026-09-13T08:15:00.000Z'),
     });
 
-    const response = await patchIniciar(averia.id, tokenA).expect(200);
-    expect(response.body.estado).toBe(EstadoAveria.EN_ATENCION);
+    const response = await patchIniciar(averia.id, tokenA).expect(400);
+    expect(response.body.message).toBe(MENSAJE_INICIO_ATENCION_FUERA_DE_HORARIO);
     expect(JSON.stringify(response.body)).not.toMatch(
       /TypeORM|SQL Server|stack/i,
     );
 
     const persistida = await averias.findOneBy({ id: averia.id });
-    expect(persistida?.estado).toBe(EstadoAveria.EN_ATENCION);
-    expect(persistida?.fechaInicioAtencion).toBeInstanceOf(Date);
+    expect(persistida?.estado).toBe(EstadoAveria.PENDIENTE);
+    expect(persistida?.fechaInicioAtencion).toBeNull();
     expect(persistida?.idFontaneroAsignado).toBe(fontaneroA.idUsuario);
   });
 

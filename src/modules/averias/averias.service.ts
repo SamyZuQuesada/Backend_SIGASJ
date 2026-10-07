@@ -38,6 +38,7 @@ import {
   assertTransicionEstadoAveria,
 } from './averias.estado-transiciones';
 import {
+  assertCalificacionPermiteIniciarAtencion,
   assertHorarioPermiteIniciarAtencion,
   registrarInicioAtencionExitoso,
 } from './averias.inicio-atencion';
@@ -368,6 +369,7 @@ export type AveriaFontaneroListItem = {
 
 export type AveriasFontaneroListado = {
   data: AveriaFontaneroListItem[];
+  dentroDeHorario: boolean;
 };
 
 /**
@@ -391,6 +393,8 @@ export type AveriaFontaneroDetail = {
   fechaResolucion: Date | null;
   observacionesAtencion: string;
   observaciones: AveriaObservacionItem[];
+  /** Jornada actual del Fontanero. Fuera de horario no puede iniciar la atención. */
+  dentroDeHorario?: boolean;
 };
 
 export type ResolverAveriaResponse = {
@@ -1166,7 +1170,6 @@ export class AveriasService {
           averia.idFontaneroAsignado,
         );
         if (dto.estado === EstadoAveria.EN_ATENCION) {
-          await this.assertHorarioParaInicioAtencion(averia);
           registrarInicioAtencionExitoso(averia, ahoraDelSistema());
         } else {
           averia.estado = dto.estado;
@@ -1438,7 +1441,12 @@ export class AveriasService {
           .addOrderBy('averia.id', 'DESC')
           .getMany();
 
-        return { data: rows.map(toFontaneroListItem) };
+        const evaluacion =
+          await this.evaluarHorarioLaboralFontanero(fontaneroId);
+        return {
+          data: rows.map(toFontaneroListItem),
+          dentroDeHorario: evaluacion.puedeIniciarAtencion,
+        };
       });
     } catch (error) {
       if (error instanceof HttpException) {
@@ -1479,7 +1487,12 @@ export class AveriasService {
         }
 
         const observaciones = await this.listObservacionesDeAveria(averia.id);
-        return toFontaneroDetail(averia, observaciones);
+        const evaluacion =
+          await this.evaluarHorarioLaboralFontanero(fontaneroId);
+        return {
+          ...toFontaneroDetail(averia, observaciones),
+          dentroDeHorario: evaluacion.puedeIniciarAtencion,
+        };
       });
     } catch (error) {
       if (error instanceof HttpException) {
@@ -1627,6 +1640,7 @@ export class AveriasService {
               EstadoAveria.EN_ATENCION,
               averia.idFontaneroAsignado,
             );
+            assertCalificacionPermiteIniciarAtencion(averia);
             await this.assertHorarioParaInicioAtencion(averia);
             registrarInicioAtencionExitoso(averia, ahoraDelSistema());
             const persistida = await manager.save(averia);

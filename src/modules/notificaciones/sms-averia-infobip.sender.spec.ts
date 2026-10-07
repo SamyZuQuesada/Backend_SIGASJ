@@ -215,7 +215,7 @@ describe('InfobipSmsAveriaProvider', () => {
 
   it.each([
     [TipoEventoSmsAveria.CONFIRMACION_REGISTRO, 'fue registrado correctamente'],
-    [TipoEventoSmsAveria.AVERIA_PENDIENTE, 'pendiente de atención'],
+    [TipoEventoSmsAveria.AVERIA_PENDIENTE, 'no está en horario laboral'],
     [TipoEventoSmsAveria.AVERIA_RESUELTA, 'completada exitosamente'],
   ] as const)('texto %s', async (tipoEvento, fragmento) => {
     fetchMock.mockResolvedValue(respuestaOk());

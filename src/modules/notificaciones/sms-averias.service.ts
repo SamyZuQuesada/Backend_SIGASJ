@@ -65,11 +65,24 @@ export class SmsAveriasService {
     const existente = await this.intentoRepository.findOne({
       where: { idAveria: averia.id, tipoEvento },
     });
-    if (existente) {
+    if (existente && !intentoSmsReintentable(existente)) {
       return toPreparacion(existente);
     }
 
     const resultado = await this.resolverEnvio(averia, tipoEvento);
+    if (
+      existente &&
+      resultado.estado === existente.estadoEnvio &&
+      resultado.motivo === existente.motivoBloqueo
+    ) {
+      return toPreparacion(existente);
+    }
+    if (existente) {
+      existente.estadoEnvio = resultado.estado;
+      existente.motivoBloqueo = resultado.motivo;
+      const actualizado = await this.intentoRepository.save(existente);
+      return toPreparacion(actualizado);
+    }
     if (resultado.estado === EstadoEnvioSmsAveria.NO_ENVIADO) {
       this.logger.log(
         `SMS ${tipoEvento} no enviado (avería ${averia.id}): ${resultado.motivo}`,
@@ -202,6 +215,19 @@ export class SmsAveriasService {
     }
     return crudo;
   }
+}
+
+const MOTIVOS_SMS_REINTENTABLES = new Set<MotivoBloqueoSmsAveria>([
+  MotivoBloqueoSmsAveria.PROVEEDOR_NO_CONFIGURADO,
+  MotivoBloqueoSmsAveria.SMS_TEST_TO_AUSENTE,
+]);
+
+/** Un intento bloqueado por falta de proveedor puede enviarse cuando ya hay configuración. */
+function intentoSmsReintentable(row: IntentoSmsAveria): boolean {
+  return (
+    row.estadoEnvio === EstadoEnvioSmsAveria.NO_ENVIADO &&
+    MOTIVOS_SMS_REINTENTABLES.has(row.motivoBloqueo)
+  );
 }
 
 const toPreparacion = (row: IntentoSmsAveria): PreparacionSmsAveria => ({
