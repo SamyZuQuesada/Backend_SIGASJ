@@ -149,7 +149,7 @@ export class AveriasFontaneroController {
   @ApiOperation({
     summary: 'Iniciar la atención de una avería asignada',
     description:
-      'Solo el Fontanero asignado. Puede iniciar la atención a cualquier hora. La fecha de inicio la registra el servidor. Un PATCH administrativo a EN_ATENCION aplica la misma regla.',
+      'Solo el Fontanero asignado, dentro de su horario laboral, y después de calificar prioridad (Baja, Media o Alta) y tipo (Tubo madre o Tubo medidor). La fecha de inicio la registra el servidor.',
   })
   @ApiParam({
     name: 'id',

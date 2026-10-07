@@ -157,6 +157,32 @@ export class AveriasAdminController {
     return this.averiasService.listFontanerosAsignables();
   }
 
+  @Get('ayudantes')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @ApiOperation({
+    summary: 'Listar usuarios asignables como Ayudante del Fontanero',
+    description:
+      'Devuelve `{ data: [{ id, nombre }] }` de Ayudantes activos (`Role.AYUDANTE`). Roles: ADMINISTRADORA y SECRETARIA.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Listado `{ data: [{ id, nombre }] }`. Vacío = data=[].',
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'Sin autenticación o token inválido',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Rol autenticado sin permiso (p. ej. FONTANERO)',
+  })
+  listAyudantesAsignables() {
+    return this.averiasService.listAyudantesAsignables();
+  }
+
   @Get(':id/historial')
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()

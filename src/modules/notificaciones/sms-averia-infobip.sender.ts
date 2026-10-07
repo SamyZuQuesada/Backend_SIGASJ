@@ -152,8 +152,8 @@ export function textoSmsAveria(
       );
     case TipoEventoSmsAveria.AVERIA_PENDIENTE:
       return (
-        `SIGASJ: Su avería ${codigoSeguimiento} ` +
-        'se encuentra pendiente de atención.'
+        `SIGASJ: El Fontanero de su avería ${codigoSeguimiento} ` +
+        'no está en horario laboral. La reparación no continúa hasta la jornada.'
       );
     case TipoEventoSmsAveria.AVERIA_RESUELTA:
       return (

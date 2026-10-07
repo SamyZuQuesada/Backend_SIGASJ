@@ -1,6 +1,6 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, type TransformFnParams } from 'class-transformer';
-import { IsInt, IsNotEmpty, Min } from 'class-validator';
+import { IsInt, IsNotEmpty, IsOptional, Min } from 'class-validator';
 
 const rawValue = ({ value, obj, key }: TransformFnParams): unknown => {
   if (obj && typeof obj === 'object' && key in obj) {
@@ -43,4 +43,16 @@ export class AssignAveriaFontaneroDto {
   @IsInt({ message: 'fontaneroId debe ser un número entero' })
   @Min(1, { message: 'fontaneroId debe ser un entero positivo' })
   fontaneroId: number;
+
+  @ApiPropertyOptional({
+    example: 8,
+    minimum: 1,
+    description:
+      'PK numérica de Usuario (`idUsuario`) con rol AYUDANTE que acompaña al Fontanero. Opcional.',
+  })
+  @Transform(toFontaneroId)
+  @IsOptional()
+  @IsInt({ message: 'ayudanteId debe ser un número entero' })
+  @Min(1, { message: 'ayudanteId debe ser un entero positivo' })
+  ayudanteId?: number | null;
 }

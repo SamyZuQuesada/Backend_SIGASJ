@@ -74,6 +74,55 @@ describe('SmsAveriasService — preparación sin envío real', () => {
     expect(sender.enviar).not.toHaveBeenCalled();
   });
 
+  it('reintenta un aviso que quedó sin proveedor cuando Infobip ya está activo', async () => {
+    intentos.findOne.mockResolvedValue({
+      id: 9,
+      idAveria: 7,
+      tipoEvento: TipoEventoSmsAveria.AVERIA_PENDIENTE,
+      destinatarioClase: 'reportante',
+      estadoEnvio: EstadoEnvioSmsAveria.NO_ENVIADO,
+      motivoBloqueo: MotivoBloqueoSmsAveria.PROVEEDOR_NO_CONFIGURADO,
+    });
+    const moduleConConfig = await Test.createTestingModule({
+      providers: [
+        SmsAveriasService,
+        { provide: getRepositoryToken(IntentoSmsAveria), useValue: intentos },
+        { provide: SMS_AVERIA_SENDER, useValue: sender },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: (key: string) =>
+              key === 'sms.enabled'
+                ? true
+                : key === 'sms.provider'
+                  ? 'infobip'
+                  : undefined,
+          },
+        },
+      ],
+    }).compile();
+    sender.enviar.mockResolvedValue({
+      estado: EstadoEnvioSmsAveria.ENVIADO,
+      motivo: MotivoBloqueoSmsAveria.NINGUNO,
+      httpStatus: 200,
+      messageId: 'msg-reintento',
+    });
+    const prep = await moduleConConfig
+      .get(SmsAveriasService)
+      .prepararPendiente({
+        ...averia,
+        telefonoReportante: '8888-1111',
+      } as Averia);
+    expect(sender.enviar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tipoEvento: TipoEventoSmsAveria.AVERIA_PENDIENTE,
+        telefonoDestino: '8888-1111',
+      }),
+    );
+    expect(prep.estadoEnvio).toBe(EstadoEnvioSmsAveria.ENVIADO);
+    expect(intentos.save).toHaveBeenCalled();
+  });
+
   it('no registra un segundo intento del mismo evento', async () => {
     intentos.findOne.mockResolvedValue({
       idAveria: 7,

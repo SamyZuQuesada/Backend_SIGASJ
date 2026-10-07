@@ -37,6 +37,10 @@ import { EVENTO_SMS_FONTANERO_FUERA_DE_HORARIO } from './averias.asignacion-hora
 import {
   AVERIA_ADMIN_NOT_FOUND,
   AVERIA_YA_ASIGNADA,
+  AYUDANTE_IGUAL_FONTANERO,
+  AYUDANTE_INACTIVO,
+  AYUDANTE_NOT_FOUND,
+  AYUDANTE_ROL_INVALIDO,
   FONTANERO_ASIGNABLE_NOT_FOUND,
   FONTANERO_INACTIVO,
   FONTANERO_ROL_INVALIDO,
@@ -304,6 +308,121 @@ describe('PBI 2.4 — asignación de avería al Fontanero', () => {
     ).expect(200);
     const persistida = await averias.findOneBy({ id: saved.id });
     expect(persistida?.estado).toBe(EstadoAveria.ASIGNADA);
+  });
+
+  it('registra un ayudante opcional junto al Fontanero', async () => {
+    const fontanero = await persistUsuario();
+    const ayudante = await persistUsuario({
+      nombre: 'Ayudante Uno',
+      role: Role.AYUDANTE,
+    });
+    await definirHorarioJornadaCompleta(fontanero.idUsuario);
+    const saved = await persistAveria({ codigoSeguimiento: 'AV-ASG-AYU' });
+
+    const response = await patchAsignacion(
+      saved.id,
+      { fontaneroId: fontanero.idUsuario, ayudanteId: ayudante.idUsuario },
+      adminToken,
+    ).expect(200);
+    expect((response.body as AveriaAdminDetail).ayudante).toEqual({
+      id: ayudante.idUsuario,
+      nombre: 'Ayudante Uno',
+    });
+
+    const persistida = await averias.findOneBy({ id: saved.id });
+    expect(persistida?.idFontaneroAsignado).toBe(fontanero.idUsuario);
+    expect(persistida?.idAyudante).toBe(ayudante.idUsuario);
+
+    const detalle = await request(app.getHttpServer())
+      .get(`/api/v1/admin/averias/${saved.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    expect(detalle.body).toMatchObject({
+      ayudante: { id: ayudante.idUsuario, nombre: 'Ayudante Uno' },
+    });
+  });
+
+  it('sin ayudante queda en null', async () => {
+    const fontanero = await persistUsuario();
+    await definirHorarioJornadaCompleta(fontanero.idUsuario);
+    const saved = await persistAveria({ codigoSeguimiento: 'AV-ASG-SAY' });
+
+    const response = await patchAsignacion(
+      saved.id,
+      { fontaneroId: fontanero.idUsuario, ayudanteId: null },
+      adminToken,
+    ).expect(200);
+    expect((response.body as AveriaAdminDetail).ayudante).toBeNull();
+  });
+
+  it('lista solo ayudantes activos y no los mezcla con los fontaneros', async () => {
+    const fontanero = await persistUsuario({ nombre: 'Fontanero Lista' });
+    const ayudante = await persistUsuario({
+      nombre: 'Ayudante Lista',
+      role: Role.AYUDANTE,
+    });
+    await persistUsuario({
+      nombre: 'Ayudante Inactivo',
+      role: Role.AYUDANTE,
+      activo: false,
+    });
+
+    const ayudantes = await request(app.getHttpServer())
+      .get('/api/v1/admin/averias/ayudantes')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    const idsAyudantes = (
+      ayudantes.body as AveriasAdminFontanerosListado
+    ).data.map((item) => item.id);
+    expect(idsAyudantes).toContain(ayudante.idUsuario);
+    expect(idsAyudantes).not.toContain(fontanero.idUsuario);
+    expect(
+      (ayudantes.body as AveriasAdminFontanerosListado).data.some(
+        (item) => item.nombre === 'Ayudante Inactivo',
+      ),
+    ).toBe(false);
+
+    const fontaneros = await request(app.getHttpServer())
+      .get('/api/v1/admin/averias/fontaneros')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    const idsFontaneros = (
+      fontaneros.body as AveriasAdminFontanerosListado
+    ).data.map((item) => item.id);
+    expect(idsFontaneros).toContain(fontanero.idUsuario);
+    expect(idsFontaneros).not.toContain(ayudante.idUsuario);
+  });
+
+  it('rechaza un ayudante igual al Fontanero, sin rol AYUDANTE o inactivo', async () => {
+    const fontanero = await persistUsuario();
+    const otroFontanero = await persistUsuario();
+    const secretaria = await persistUsuario({ role: Role.SECRETARIA });
+    const inactivo = await persistUsuario({
+      role: Role.AYUDANTE,
+      activo: false,
+    });
+
+    const casos: Array<[number, number, string]> = [
+      [fontanero.idUsuario, 400, AYUDANTE_IGUAL_FONTANERO],
+      [otroFontanero.idUsuario, 400, AYUDANTE_ROL_INVALIDO],
+      [secretaria.idUsuario, 400, AYUDANTE_ROL_INVALIDO],
+      [inactivo.idUsuario, 400, AYUDANTE_INACTIVO],
+      [999_999, 404, AYUDANTE_NOT_FOUND],
+    ];
+    for (const [index, [ayudanteId, status, message]] of casos.entries()) {
+      const saved = await persistAveria({
+        codigoSeguimiento: `AV-ASG-AYX-${index}`,
+      });
+      const response = await patchAsignacion(
+        saved.id,
+        { fontaneroId: fontanero.idUsuario, ayudanteId },
+        adminToken,
+      ).expect(status);
+      expect(response.body).toMatchObject({ message });
+      const persistida = await averias.findOneBy({ id: saved.id });
+      expect(persistida?.idFontaneroAsignado).toBeNull();
+      expect(persistida?.idAyudante).toBeNull();
+    }
   });
 
   it('avería inexistente → 404', async () => {
