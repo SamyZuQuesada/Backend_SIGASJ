@@ -3,6 +3,8 @@ export enum Role {
   SECRETARIA = 'SECRETARIA',
   FONTANERO = 'FONTANERO',
   ABONADO = 'ABONADO',
+  /** Acompaña al Fontanero en una avería. Solo queda registrado; no atiende. */
+  AYUDANTE = 'AYUDANTE',
 }
 
 export const ROLES_SISTEMA: readonly Role[] = [
@@ -10,4 +12,5 @@ export const ROLES_SISTEMA: readonly Role[] = [
   Role.SECRETARIA,
   Role.FONTANERO,
   Role.ABONADO,
+  Role.AYUDANTE,
 ];

@@ -42,7 +42,10 @@ import {
   assertHorarioPermiteIniciarAtencion,
   registrarInicioAtencionExitoso,
 } from './averias.inicio-atencion';
-import { usuarioEsFontaneroAsignable } from './averias.fontanero-asignable';
+import {
+  usuarioEsAyudanteAsignable,
+  usuarioEsFontaneroAsignable,
+} from './averias.fontanero-asignable';
 import {
   ADMIN_AVERIAS_LIMIT_DEFAULT,
   ADMIN_AVERIAS_PAGE_DEFAULT,
@@ -101,6 +104,7 @@ const ACTUALIZACION_ERROR = 'No se pudo actualizar la avería';
 const INICIO_ATENCION_ERROR =
   'No se pudo iniciar la atención. Intente nuevamente.';
 const FONTANEROS_ERROR = 'No se pudieron consultar los fontaneros';
+const AYUDANTES_ERROR = 'No se pudieron consultar los ayudantes';
 const OBSERVACION_ERROR =
   'No se pudo registrar la observación. Intente nuevamente.';
 export const AVERIA_ADMIN_NOT_FOUND = 'No se encontró la avería solicitada.';
@@ -118,6 +122,13 @@ export const FONTANERO_ROL_INVALIDO =
 export const FONTANERO_INACTIVO =
   'El fontanero seleccionado se encuentra inactivo.';
 export const AVERIA_YA_ASIGNADA = 'La avería ya tiene un fontanero asignado.';
+export const AYUDANTE_NOT_FOUND = 'No se encontró el ayudante solicitado.';
+export const AYUDANTE_ROL_INVALIDO =
+  'El ayudante seleccionado no tiene rol AYUDANTE.';
+export const AYUDANTE_INACTIVO =
+  'El ayudante seleccionado se encuentra inactivo.';
+export const AYUDANTE_IGUAL_FONTANERO =
+  'El ayudante debe ser una persona distinta al fontanero asignado.';
 const RANGO_FECHAS_INVALIDO = 'fechaDesde no puede ser posterior a fechaHasta';
 const FECHA_CALENDARIO_INVALIDA =
   'fechaDesde y fechaHasta deben ser una fecha calendario válida (YYYY-MM-DD)';
@@ -152,6 +163,7 @@ export type AveriaAdminDetail = {
   tipoAveria: string | null;
   prioridad: string | null;
   fontanero: AveriaAdminFontanero | null;
+  ayudante: AveriaAdminFontanero | null;
   fechaAsignacion: Date | null;
   fechaInicioAtencion: Date | null;
   fechaResolucion: Date | null;
@@ -450,6 +462,17 @@ function toAdminFontanero(averia: Averia): AveriaAdminFontanero | null {
   };
 }
 
+function toAdminAyudante(averia: Averia): AveriaAdminFontanero | null {
+  if (averia.idAyudante == null) {
+    return null;
+  }
+  const nombre = averia.ayudante?.nombre?.trim();
+  return {
+    id: averia.idAyudante,
+    ...(nombre ? { nombre } : {}),
+  };
+}
+
 function toAdminListItem(averia: Averia): AveriaAdminListItem {
   return {
     id: averia.id,
@@ -503,6 +526,7 @@ export function toAdminDetail(
     tipoAveria: averia.tipoAveria ?? null,
     prioridad: averia.prioridad ?? null,
     fontanero: toAdminFontanero(averia),
+    ayudante: toAdminAyudante(averia),
     fechaAsignacion: averia.fechaAsignacion ?? null,
     fechaInicioAtencion: averia.fechaInicioAtencion ?? null,
     fechaResolucion: averia.fechaResolucion ?? null,
@@ -595,6 +619,7 @@ export function buildFindOneAdminQuery(
   return repository
     .createQueryBuilder('averia')
     .leftJoin('averia.fontaneroAsignado', 'fontanero')
+    .leftJoin('averia.ayudante', 'ayudante')
     .select([
       'averia.id',
       'averia.codigoSeguimiento',
@@ -615,8 +640,11 @@ export function buildFindOneAdminQuery(
       'averia.fechaInicioAtencion',
       'averia.fechaResolucion',
       'averia.observacionesAtencion',
+      'averia.idAyudante',
       'fontanero.idUsuario',
       'fontanero.nombre',
+      'ayudante.idUsuario',
+      'ayudante.nombre',
     ])
     .where('averia.id = :id', { id });
 }
@@ -1151,6 +1179,38 @@ export class AveriasService {
     }
   }
 
+  /**
+   * Ayudantes activos con rol persistido AYUDANTE.
+   */
+  async listAyudantesAsignables(): Promise<AveriasAdminFontanerosListado> {
+    try {
+      return await withDbRetry(async () => {
+        const rows = await this.usuarioRepository.find({
+          relations: { rol: true },
+          where: {
+            activo: true,
+            rol: { nombre: Role.AYUDANTE },
+          },
+          order: { idUsuario: 'ASC' },
+        });
+        return {
+          data: rows
+            .filter((usuario) => usuarioEsAyudanteAsignable(usuario))
+            .map((usuario) => ({
+              id: usuario.idUsuario,
+              nombre: usuario.nombre,
+            })),
+        };
+      });
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      this.logger.error('Error inesperado al listar ayudantes asignables');
+      throw new InternalServerErrorException(AYUDANTES_ERROR);
+    }
+  }
+
   async updateEstado(
     id: number,
     dto: UpdateAveriaEstadoDto,
@@ -1308,11 +1368,33 @@ export class AveriasService {
               throw new BadRequestException(FONTANERO_ROL_INVALIDO);
             }
 
+            let ayudante: Usuario | null = null;
+            if (dto.ayudanteId != null) {
+              if (dto.ayudanteId === usuario.idUsuario) {
+                throw new BadRequestException(AYUDANTE_IGUAL_FONTANERO);
+              }
+              ayudante = await manager.findOne(Usuario, {
+                where: { idUsuario: dto.ayudanteId },
+                relations: { rol: true },
+              });
+              if (!ayudante) {
+                throw new NotFoundException(AYUDANTE_NOT_FOUND);
+              }
+              if (!ayudante.activo) {
+                throw new BadRequestException(AYUDANTE_INACTIVO);
+              }
+              if (ayudante.rol?.nombre !== Role.AYUDANTE) {
+                throw new BadRequestException(AYUDANTE_ROL_INVALIDO);
+              }
+            }
+
             assertTransicionEstadoAveria(averia.estado, EstadoAveria.ASIGNADA);
             const estadoInicial = averia.estado;
 
             averia.idFontaneroAsignado = usuario.idUsuario;
             averia.fontaneroAsignado = usuario;
+            averia.idAyudante = ayudante?.idUsuario ?? null;
+            averia.ayudante = ayudante;
             averia.fechaAsignacion = new Date();
             averia.estado = EstadoAveria.ASIGNADA;
             assertEstadoAveriaCompatibleConFontanero(
@@ -1339,7 +1421,9 @@ export class AveriasService {
               {
                 idAveria: persistida.id,
                 tipoEvento: TipoEventoAveria.ASIGNACION_FONTANERO,
-                descripcion: `Avería asignada al Fontanero ${usuario.nombre}`,
+                descripcion: ayudante
+                  ? `Avería asignada al Fontanero ${usuario.nombre} con el ayudante ${ayudante.nombre}`
+                  : `Avería asignada al Fontanero ${usuario.nombre}`,
                 estadoAnterior: estadoInicial,
                 estadoNuevo: EstadoAveria.ASIGNADA,
                 idUsuario,
@@ -2014,6 +2098,8 @@ export class AveriasService {
       prioridad: null,
       idFontaneroAsignado: null,
       fontaneroAsignado: null,
+      idAyudante: null,
+      ayudante: null,
       fechaAsignacion: null,
       fechaInicioAtencion: null,
       fechaResolucion: null,
@@ -2054,7 +2140,7 @@ export class AveriasService {
   private async getAveriaForAdminUpdate(id: number): Promise<Averia> {
     const averia = await this.averiaRepository.findOne({
       where: { id },
-      relations: { fontaneroAsignado: true },
+      relations: { fontaneroAsignado: true, ayudante: true },
     });
     if (!averia) {
       throw new NotFoundException(AVERIA_ADMIN_NOT_FOUND);

@@ -105,6 +105,25 @@ export class Averia {
   })
   fontaneroAsignado: Usuario | null;
 
+  /**
+   * Ayudante opcional (rol AYUDANTE) que acompaña al Fontanero. Solo queda registrado:
+   * no ve la avería en su listado ni puede atenderla.
+   * SQL Server no admite una segunda FK con SET NULL hacia Usuario
+   * (rutas de cascada múltiples), por eso usa NO ACTION.
+   */
+  @Column({ type: 'int', nullable: true })
+  idAyudante: number | null;
+
+  @ManyToOne(() => Usuario, {
+    nullable: true,
+    onDelete: 'NO ACTION',
+  })
+  @JoinColumn({
+    name: 'idAyudante',
+    referencedColumnName: 'idUsuario',
+  })
+  ayudante: Usuario | null;
+
   @Column({ type: 'datetime', nullable: true })
   fechaAsignacion: Date | null;
 
