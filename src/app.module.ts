@@ -25,6 +25,7 @@ import { ProyectosModule } from './modules/proyectos/proyectos.module';
 import { RecibosModule } from './modules/recibos/recibos.module';
 import { NotificacionesModule } from './modules/notificaciones/notificaciones.module';
 import { AsociadosModule } from './modules/asociados/asociados.module';
+import { RecursosHumanosModule } from './modules/recursos-humanos/recursos-humanos.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -60,6 +61,7 @@ import { AppService } from './app.service';
     RecibosModule,
     NotificacionesModule,
     AsociadosModule,
+    RecursosHumanosModule,
   ],
 
   controllers: [AppController],
