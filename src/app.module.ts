@@ -24,6 +24,7 @@ import { ActividadesFontaneroModule } from './modules/actividades-fontanero/acti
 import { ProyectosModule } from './modules/proyectos/proyectos.module';
 import { RecibosModule } from './modules/recibos/recibos.module';
 import { NotificacionesModule } from './modules/notificaciones/notificaciones.module';
+import { AsociadosModule } from './modules/asociados/asociados.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -58,6 +59,7 @@ import { AppService } from './app.service';
     ProyectosModule,
     RecibosModule,
     NotificacionesModule,
+    AsociadosModule,
   ],
 
   controllers: [AppController],
