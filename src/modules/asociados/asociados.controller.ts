@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -19,6 +20,7 @@ import {
 import { AsociadosListado, AsociadosService } from './asociados.service';
 import { CreateAsociadoDto } from './dto/create-asociado.dto';
 import { QueryAsociadosDto } from './dto/query-asociados.dto';
+import { UpdateAsociadoDto } from './dto/update-asociado.dto';
 import { Asociado } from './entities/asociado.entity';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -112,5 +114,40 @@ export class AsociadosController {
   @ApiResponse({ status: 404, description: 'El asociado no existe.' })
   async findOne(@Param('id', ParseIntPipe) id: number): Promise<Asociado> {
     return this.asociadosService.findOne(id);
+  }
+
+  @Patch(':id')
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @ApiOperation({
+    summary: 'Modificar información de un asociado',
+    description:
+      'Modifica nombre, apellidos, cédula y correo de un asociado existente. Si cambia la cédula se comprueba nuevamente su unicidad. Requiere rol ADMINISTRADORA o SECRETARIA.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'El asociado ha sido modificado exitosamente.',
+    type: Asociado,
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Datos inválidos, cuerpo vacío o el ID no es un número entero.',
+  })
+  @ApiResponse({ status: 401, description: 'No autenticado.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Sin rol ADMINISTRADORA ni SECRETARIA.',
+  })
+  @ApiResponse({ status: 404, description: 'El asociado no existe.' })
+  @ApiResponse({
+    status: 409,
+    description:
+      'Conflicto: Ya existe un asociado registrado con la misma cédula.',
+  })
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateAsociadoDto: UpdateAsociadoDto,
+  ): Promise<Asociado> {
+    return this.asociadosService.update(id, updateAsociadoDto);
   }
 }

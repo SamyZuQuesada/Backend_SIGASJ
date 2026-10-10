@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   Logger,
@@ -8,6 +9,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, Repository } from 'typeorm';
 import { Asociado } from './entities/asociado.entity';
 import { CreateAsociadoDto } from './dto/create-asociado.dto';
+import { UpdateAsociadoDto } from './dto/update-asociado.dto';
 import {
   ASOCIADOS_LIMIT_DEFAULT,
   ASOCIADOS_PAGE_DEFAULT,
@@ -158,5 +160,68 @@ export class AsociadosService {
       throw new NotFoundException(`No existe un asociado con id ${id}`);
     }
     return asociado;
+  }
+
+  async update(id: number, dto: UpdateAsociadoDto): Promise<Asociado> {
+    const cambios = Object.entries(dto).filter(([, v]) => v !== undefined);
+    if (cambios.length === 0) {
+      throw new BadRequestException(
+        'Debe enviar al menos un campo para actualizar',
+      );
+    }
+
+    const asociado = await this.findOne(id);
+
+    if (dto.cedula !== undefined) {
+      const cedulaNormalizada = dto.cedula.trim();
+      if (cedulaNormalizada !== asociado.cedula) {
+        const asociadoExistente = await this.asociadoRepository.findOne({
+          where: { cedula: cedulaNormalizada },
+        });
+
+        if (asociadoExistente && asociadoExistente.id !== id) {
+          throw new ConflictException(
+            `Ya existe un asociado registrado con la cédula "${cedulaNormalizada}"`,
+          );
+        }
+      }
+      asociado.cedula = cedulaNormalizada;
+    }
+
+    if (dto.nombre !== undefined) {
+      asociado.nombre = dto.nombre.trim();
+    }
+
+    if (dto.apellidos !== undefined) {
+      asociado.apellidos = dto.apellidos.trim();
+    }
+
+    const correo = dto.correoElectronico ?? dto.correo;
+    if (correo !== undefined) {
+      asociado.correoElectronico = correo.trim().toLowerCase();
+    }
+
+    asociado.updatedAt = new Date();
+
+    try {
+      const guardado = await this.asociadoRepository.save(asociado);
+      this.logger.log(`Asociado modificado exitosamente: id=${guardado.id}`);
+      return guardado;
+    } catch (error: any) {
+      if (
+        error?.number === 2601 ||
+        error?.number === 2627 ||
+        error?.code === '23505' ||
+        error?.code === 'SQLITE_CONSTRAINT' ||
+        error?.message?.includes('UQ_') ||
+        error?.message?.includes('duplicate') ||
+        error?.message?.includes('UNIQUE')
+      ) {
+        throw new ConflictException(
+          `Ya existe un asociado registrado con la cédula "${asociado.cedula}"`,
+        );
+      }
+      throw error;
+    }
   }
 }

@@ -47,7 +47,11 @@ async function bootstrap() {
 
   // Compatibilidad de alias para endpoints sin versión (ej: /api/asociados -> /api/v1/asociados)
   app.use((req: any, _res: any, next: any) => {
-    if (req.url === '/api/asociados' || req.url.startsWith('/api/asociados?')) {
+    if (
+      req.url === '/api/asociados' ||
+      req.url.startsWith('/api/asociados/') ||
+      req.url.startsWith('/api/asociados?')
+    ) {
       req.url = req.url.replace('/api/asociados', '/api/v1/asociados');
     }
     next();

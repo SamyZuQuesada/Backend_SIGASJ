@@ -41,6 +41,17 @@ export async function crearAsociadosTestApp(): Promise<AsociadosTestApp> {
   }).compile();
 
   const app = moduleFixture.createNestApplication<INestApplication<App>>();
+  app.use((req: any, _res: any, next: any) => {
+    if (
+      req.url === '/api/asociados' ||
+      req.url.startsWith('/api/asociados/') ||
+      req.url.startsWith('/api/asociados?')
+    ) {
+      req.url = req.url.replace('/api/asociados', '/api/v1/asociados');
+    }
+    next();
+  });
+
   app.setGlobalPrefix('api/v1');
   app.useGlobalPipes(
     new ValidationPipe({
