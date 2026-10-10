@@ -7,11 +7,13 @@ import {
   Index,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Usuario } from '../../usuarios/entities/usuario.entity';
+import { PermisoColaborador } from './permiso-colaborador.entity';
 
 /**
  * Personal administrado desde Recursos Humanos (fontaneros y personal
@@ -96,6 +98,9 @@ export class Colaborador {
     foreignKeyConstraintName: 'FK_Colaborador_Usuario',
   })
   usuario: Usuario | null;
+
+  @OneToMany(() => PermisoColaborador, (permiso) => permiso.colaborador)
+  permisos: PermisoColaborador[];
 
   @ApiProperty({
     description: 'Fecha y hora de creación del registro',
