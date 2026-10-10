@@ -4,7 +4,10 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Param,
+  ParseIntPipe,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -13,8 +16,9 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { AsociadosService } from './asociados.service';
+import { AsociadosListado, AsociadosService } from './asociados.service';
 import { CreateAsociadoDto } from './dto/create-asociado.dto';
+import { QueryAsociadosDto } from './dto/query-asociados.dto';
 import { Asociado } from './entities/asociado.entity';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -69,10 +73,44 @@ export class AsociadosController {
   @Get()
   @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
   @ApiOperation({
-    summary: 'Listar todos los asociados registrados',
-    description: 'Obtiene el listado completo de asociados.',
+    summary: 'Listar asociados',
+    description:
+      'Listado paginado. Permite buscar por nombre, apellidos o cédula y filtrar por estado. Requiere rol ADMINISTRADORA o SECRETARIA.',
   })
-  async findAll(): Promise<Asociado[]> {
-    return this.asociadosService.findAll();
+  @ApiResponse({
+    status: 200,
+    description:
+      'Página de asociados: { data, total, page, limit, totalPages }.',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Parámetros de consulta inválidos.',
+  })
+  @ApiResponse({ status: 401, description: 'No autenticado.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Sin rol ADMINISTRADORA ni SECRETARIA.',
+  })
+  async findAll(@Query() query: QueryAsociadosDto): Promise<AsociadosListado> {
+    return this.asociadosService.findAll(query);
+  }
+
+  @Get(':id')
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @ApiOperation({
+    summary: 'Detalle de un asociado',
+    description:
+      'Obtiene la información de un asociado. Requiere rol ADMINISTRADORA o SECRETARIA.',
+  })
+  @ApiResponse({ status: 200, type: Asociado })
+  @ApiResponse({ status: 400, description: 'El id no es un número entero.' })
+  @ApiResponse({ status: 401, description: 'No autenticado.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Sin rol ADMINISTRADORA ni SECRETARIA.',
+  })
+  @ApiResponse({ status: 404, description: 'El asociado no existe.' })
+  async findOne(@Param('id', ParseIntPipe) id: number): Promise<Asociado> {
+    return this.asociadosService.findOne(id);
   }
 }

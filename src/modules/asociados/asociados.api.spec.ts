@@ -14,6 +14,7 @@ import jwtConfig from '../../config/jwt.config';
 import { AuthModule } from '../auth/auth.module';
 import { Asociado } from './entities/asociado.entity';
 import { AsociadosModule } from './asociados.module';
+import { AsociadosListado } from './asociados.service';
 
 describe('Endpoint POST /api/v1/asociados y /api/asociados (Registro de Asociados)', () => {
   let app: INestApplication<App>;
@@ -406,8 +407,10 @@ describe('Endpoint POST /api/v1/asociados y /api/asociados (Registro de Asociado
         .set('Authorization', `Bearer ${secretariaToken}`);
 
       expect(response.status).toBe(200);
-      expect(Array.isArray(response.body)).toBe(true);
-      expect(response.body.length).toBe(2);
+      const listado = response.body as AsociadosListado;
+      expect(Array.isArray(listado.data)).toBe(true);
+      expect(listado.data.length).toBe(2);
+      expect(listado.total).toBe(2);
     });
   });
 });
