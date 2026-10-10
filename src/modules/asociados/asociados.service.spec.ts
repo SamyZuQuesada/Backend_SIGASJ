@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -126,7 +126,7 @@ describe('AsociadosService', () => {
     });
   });
 
-  describe('findById(), findByCedula(), findAll()', () => {
+  describe('findById(), findByCedula(), findOne()', () => {
     it('debe buscar por id', async () => {
       const mockAsociado = { id: 1, nombre: 'Juan' } as Asociado;
       repo.findOne.mockResolvedValue(mockAsociado);
@@ -147,12 +147,18 @@ describe('AsociadosService', () => {
       expect(result).toBe(mockAsociado);
     });
 
-    it('debe listar todos los asociados ordenados por id', async () => {
-      repo.find.mockResolvedValue([{ id: 1 }, { id: 2 }] as Asociado[]);
+    it('findOne devuelve el asociado cuando existe', async () => {
+      const mockAsociado = { id: 7, nombre: 'Ana' } as Asociado;
+      repo.findOne.mockResolvedValue(mockAsociado);
 
-      const result = await service.findAll();
-      expect(repo.find).toHaveBeenCalledWith({ order: { id: 'ASC' } });
-      expect(result.length).toBe(2);
+      await expect(service.findOne(7)).resolves.toBe(mockAsociado);
+      expect(repo.findOne).toHaveBeenCalledWith({ where: { id: 7 } });
+    });
+
+    it('findOne lanza NotFoundException cuando el asociado no existe', async () => {
+      repo.findOne.mockResolvedValue(null);
+
+      await expect(service.findOne(99)).rejects.toThrow(NotFoundException);
     });
   });
 });
