@@ -76,6 +76,15 @@ export class Asociado {
   fechaInactivacion: Date | null;
 
   @ApiProperty({
+    example: null,
+    nullable: true,
+    description:
+      'Motivo registrado al inactivar al asociado. Permanece en NULL mientras el asociado esté activo',
+  })
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  motivoInactivacion: string | null;
+
+  @ApiProperty({
     description: 'Fecha y hora de creación del registro en la base de datos',
   })
   @CreateDateColumn()
