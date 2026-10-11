@@ -14,6 +14,7 @@ import { AuthModule } from '../../auth/auth.module';
 import { Rol } from '../../usuarios/entities/rol.entity';
 import { Usuario } from '../../usuarios/entities/usuario.entity';
 import { Colaborador } from '../entities/colaborador.entity';
+import { MovimientoVacaciones } from '../entities/movimiento-vacaciones.entity';
 import { PermisoColaborador } from '../entities/permiso-colaborador.entity';
 import { RecursosHumanosModule } from '../recursos-humanos.module';
 
@@ -37,7 +38,13 @@ export async function crearColaboradoresTestApp(): Promise<ColaboradoresTestApp>
         type: 'sqljs',
         autoSave: false,
         dropSchema: true,
-        entities: [Colaborador, PermisoColaborador, Usuario, Rol],
+        entities: [
+          Colaborador,
+          PermisoColaborador,
+          MovimientoVacaciones,
+          Usuario,
+          Rol,
+        ],
         synchronize: true,
       }),
       AuthModule,
