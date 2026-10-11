@@ -21,6 +21,7 @@ import { AsociadosListado, AsociadosService } from './asociados.service';
 import { CreateAsociadoDto } from './dto/create-asociado.dto';
 import { QueryAsociadosDto } from './dto/query-asociados.dto';
 import { UpdateAsociadoDto } from './dto/update-asociado.dto';
+import { UpdateEstadoAsociadoDto } from './dto/update-estado-asociado.dto';
 import { Asociado } from './entities/asociado.entity';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -149,5 +150,35 @@ export class AsociadosController {
     @Body() updateAsociadoDto: UpdateAsociadoDto,
   ): Promise<Asociado> {
     return this.asociadosService.update(id, updateAsociadoDto);
+  }
+
+  @Patch(':id/estado')
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @ApiOperation({
+    summary: 'Activar o inactivar un asociado',
+    description:
+      'Con activo = false inactiva al asociado y registra la fecha y el motivo (obligatorio). Con activo = true lo reactiva y limpia la fecha y el motivo. Si ya está en ese estado no se modifica. Requiere rol ADMINISTRADORA o SECRETARIA.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Asociado con el estado actualizado.',
+    type: Asociado,
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Estado inválido, falta el motivo al inactivar o el ID no es un número entero.',
+  })
+  @ApiResponse({ status: 401, description: 'No autenticado.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Sin rol ADMINISTRADORA ni SECRETARIA.',
+  })
+  @ApiResponse({ status: 404, description: 'El asociado no existe.' })
+  async cambiarEstado(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateEstadoAsociadoDto,
+  ): Promise<Asociado> {
+    return this.asociadosService.cambiarEstado(id, dto);
   }
 }

@@ -10,6 +10,7 @@ import { Brackets, Repository } from 'typeorm';
 import { Asociado } from './entities/asociado.entity';
 import { CreateAsociadoDto } from './dto/create-asociado.dto';
 import { UpdateAsociadoDto } from './dto/update-asociado.dto';
+import { UpdateEstadoAsociadoDto } from './dto/update-estado-asociado.dto';
 import {
   ASOCIADOS_LIMIT_DEFAULT,
   ASOCIADOS_PAGE_DEFAULT,
@@ -71,6 +72,7 @@ export class AsociadosService {
       activo: true,
       fechaRegistro,
       fechaInactivacion: null,
+      motivoInactivacion: null,
     });
 
     // 3. Persistir en la base de datos controlando posibles condiciones de carrera
@@ -223,5 +225,37 @@ export class AsociadosService {
       }
       throw error;
     }
+  }
+
+  /**
+   * Activa o inactiva un asociado (PBI 5.4).
+   * Al inactivar registra la fecha y el motivo; al reactivar ambos vuelven a NULL.
+   * Si el asociado ya está en el estado pedido no se modifica nada, para no
+   * sobrescribir la fecha ni el motivo de una inactivación anterior.
+   */
+  async cambiarEstado(
+    id: number,
+    dto: UpdateEstadoAsociadoDto,
+  ): Promise<Asociado> {
+    const asociado = await this.findOne(id);
+    if (asociado.activo === dto.activo) {
+      return asociado;
+    }
+
+    if (dto.activo) {
+      asociado.activo = true;
+      asociado.fechaInactivacion = null;
+      asociado.motivoInactivacion = null;
+    } else {
+      asociado.activo = false;
+      asociado.fechaInactivacion = new Date();
+      asociado.motivoInactivacion = dto.motivo?.trim() ?? null;
+    }
+
+    const guardado = await this.asociadoRepository.save(asociado);
+    this.logger.log(
+      `Asociado ${dto.activo ? 'reactivado' : 'inactivado'}: id=${id}`,
+    );
+    return guardado;
   }
 }
