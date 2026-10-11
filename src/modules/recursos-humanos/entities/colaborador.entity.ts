@@ -13,6 +13,7 @@ import {
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Usuario } from '../../usuarios/entities/usuario.entity';
+import { MovimientoVacaciones } from './movimiento-vacaciones.entity';
 import { PermisoColaborador } from './permiso-colaborador.entity';
 
 /**
@@ -101,6 +102,9 @@ export class Colaborador {
 
   @OneToMany(() => PermisoColaborador, (permiso) => permiso.colaborador)
   permisos: PermisoColaborador[];
+
+  @OneToMany(() => MovimientoVacaciones, (movimiento) => movimiento.colaborador)
+  movimientosVacaciones: MovimientoVacaciones[];
 
   @ApiProperty({
     description: 'Fecha y hora de creación del registro',
