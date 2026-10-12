@@ -345,6 +345,74 @@ describe('Endpoint POST /api/v1/asociados y /api/asociados (Registro de Asociado
 
       expect(response.status).toBe(400);
     });
+
+    it('rechaza si el nombre excede 100 caracteres (400 Bad Request)', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/asociados')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          nombre: 'A'.repeat(101),
+          apellidos: 'Pérez',
+          cedula: '1-2345-6789',
+          correoElectronico: 'juan@test.cr',
+        });
+
+      expect(response.status).toBe(400);
+      expect(JSON.stringify(response.body)).toContain(
+        'El nombre no puede exceder 100 caracteres',
+      );
+    });
+
+    it('rechaza si los apellidos exceden 100 caracteres (400 Bad Request)', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/asociados')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          nombre: 'Juan',
+          apellidos: 'B'.repeat(101),
+          cedula: '1-2345-6789',
+          correoElectronico: 'juan@test.cr',
+        });
+
+      expect(response.status).toBe(400);
+      expect(JSON.stringify(response.body)).toContain(
+        'Los apellidos no pueden exceder 100 caracteres',
+      );
+    });
+
+    it('rechaza si la cédula excede 30 caracteres (400 Bad Request)', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/asociados')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          nombre: 'Juan',
+          apellidos: 'Pérez',
+          cedula: '1234567890123456789012345678901',
+          correoElectronico: 'juan@test.cr',
+        });
+
+      expect(response.status).toBe(400);
+      expect(JSON.stringify(response.body)).toContain(
+        'La cédula no puede exceder 30 caracteres',
+      );
+    });
+
+    it('rechaza si el correo excede 150 caracteres (400 Bad Request)', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/asociados')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          nombre: 'Juan',
+          apellidos: 'Pérez',
+          cedula: '1-2345-6789',
+          correoElectronico: `${'a'.repeat(140)}@example.com`,
+        });
+
+      expect(response.status).toBe(400);
+      expect(JSON.stringify(response.body)).toContain(
+        'El correo electrónico no puede exceder 150 caracteres',
+      );
+    });
   });
 
   describe('Verificación de Cédula Duplicada', () => {
@@ -378,6 +446,89 @@ describe('Endpoint POST /api/v1/asociados y /api/asociados (Registro de Asociado
 
       expect(res2.status).toBe(409);
       expect(res2.body.message).toContain('5-0999-0888');
+    });
+
+    it('rechaza con 409 Conflict si se intenta evadir el Frontend enviando la cédula sin guiones', async () => {
+      const primerRegistro = {
+        nombre: 'Original',
+        apellidos: 'Asociado',
+        cedula: '5-0999-0888',
+        correoElectronico: 'original@test.cr',
+      };
+
+      const res1 = await request(app.getHttpServer())
+        .post('/api/v1/asociados')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(primerRegistro);
+
+      expect(res1.status).toBe(201);
+
+      // Evasión de frontend: enviar '509990888' sin guiones
+      const intentoEvasion = {
+        nombre: 'Evasor',
+        apellidos: 'Frontend',
+        cedula: '509990888',
+        correoElectronico: 'evasor@test.cr',
+      };
+
+      const res2 = await request(app.getHttpServer())
+        .post('/api/v1/asociados')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(intentoEvasion);
+
+      expect(res2.status).toBe(409);
+      expect(res2.body.message).toContain('5-0999-0888');
+    });
+
+    it('rechaza con 409 Conflict si se intenta registrar con espacios interiores en la cédula', async () => {
+      const primerRegistro = {
+        nombre: 'Original',
+        apellidos: 'Asociado',
+        cedula: '5-0999-0888',
+        correoElectronico: 'original@test.cr',
+      };
+
+      const res1 = await request(app.getHttpServer())
+        .post('/api/v1/asociados')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(primerRegistro);
+
+      expect(res1.status).toBe(201);
+
+      const intentoConEspacios = {
+        nombre: 'Espaciado',
+        apellidos: 'Intento',
+        cedula: ' 5 0999 0888 ',
+        correoElectronico: 'espacios@test.cr',
+      };
+
+      const res2 = await request(app.getHttpServer())
+        .post('/api/v1/asociados')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(intentoConEspacios);
+
+      expect(res2.status).toBe(409);
+      expect(res2.body.message).toContain('5-0999-0888');
+    });
+
+    it('almacena la cédula en formato canónico estándar aunque se reciba sin guiones', async () => {
+      const registro = {
+        nombre: 'Valeria',
+        apellidos: 'Castro Montero',
+        cedula: '112340567',
+        correoElectronico: 'valeria@test.cr',
+      };
+
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/asociados')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(registro);
+
+      expect(res.status).toBe(201);
+      expect(res.body.cedula).toBe('1-1234-0567');
+
+      const enDb = await asociadoRepository.findOneBy({ id: res.body.id });
+      expect(enDb?.cedula).toBe('1-1234-0567');
     });
   });
 

@@ -28,21 +28,12 @@ const trimAndLowerString = (params: TransformFnParams): unknown => {
   return typeof raw === 'string' ? raw.trim().toLowerCase() : raw;
 };
 
-const CEDULA_NACIONAL = /^([1-9])-?(\d{4})-?(\d{4})$/;
-const CEDULA_DIMEX = /^\d{11,12}$/;
-
-/**
- * Cédula nacional (con o sin guiones) se guarda como `1-1234-0567` para que
- * `112340567` y `1-1234-0567` no se registren como personas distintas.
- */
-export const normalizarCedula = (valor: string): string => {
-  const limpio = valor.trim().replace(/\s+/g, '');
-  const nacional = CEDULA_NACIONAL.exec(limpio);
-  if (nacional) {
-    return `${nacional[1]}-${nacional[2]}-${nacional[3]}`;
-  }
-  return limpio;
-};
+import {
+  CEDULA_DIMEX,
+  CEDULA_NACIONAL,
+  normalizarCedula,
+} from '../../../common/utils/cedula.util';
+export { CEDULA_DIMEX, CEDULA_NACIONAL, normalizarCedula };
 
 const normalizarCedulaTransform = (params: TransformFnParams): unknown => {
   const raw = rawValue(params);

@@ -113,6 +113,31 @@ describe('AsociadosService', () => {
       expect(repo.save).not.toHaveBeenCalled();
     });
 
+    it('debe detectar cédula duplicada aunque se envíe sin guiones o con espacios (evasión de frontend)', async () => {
+      const dtoSinGuiones: CreateAsociadoDto = {
+        nombre: 'Pedro',
+        apellidos: 'Ramírez',
+        cedula: '501230456',
+        correoElectronico: 'pedro@test.cr',
+      };
+
+      const asociadoExistente = {
+        id: 99,
+        cedula: '5-0123-0456',
+        nombre: 'Existente',
+      } as Asociado;
+
+      repo.findOne.mockResolvedValue(asociadoExistente);
+
+      await expect(service.create(dtoSinGuiones)).rejects.toThrow(
+        ConflictException,
+      );
+      expect(repo.findOne).toHaveBeenCalledWith({
+        where: { cedula: '5-0123-0456' },
+      });
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
     it('debe capturar errores de violación de unicidad concurrentes en save() y lanzar ConflictException', async () => {
       repo.findOne.mockResolvedValue(null);
       repo.create.mockReturnValue({} as Asociado);
@@ -123,6 +148,61 @@ describe('AsociadosService', () => {
       });
 
       await expect(service.create(validDto)).rejects.toThrow(ConflictException);
+    });
+
+    it('debe lanzar BadRequestException si falta el nombre o sólo son espacios', async () => {
+      await expect(
+        service.create({ ...validDto, nombre: '   ' }),
+      ).rejects.toThrow('El nombre es obligatorio');
+    });
+
+    it('debe lanzar BadRequestException si el nombre excede 100 caracteres', async () => {
+      await expect(
+        service.create({ ...validDto, nombre: 'A'.repeat(101) }),
+      ).rejects.toThrow('El nombre no puede exceder 100 caracteres');
+    });
+
+    it('debe lanzar BadRequestException si faltan los apellidos o sólo son espacios', async () => {
+      await expect(
+        service.create({ ...validDto, apellidos: '   ' }),
+      ).rejects.toThrow('Los apellidos son obligatorios');
+    });
+
+    it('debe lanzar BadRequestException si los apellidos exceden 100 caracteres', async () => {
+      await expect(
+        service.create({ ...validDto, apellidos: 'B'.repeat(101) }),
+      ).rejects.toThrow('Los apellidos no pueden exceder 100 caracteres');
+    });
+
+    it('debe lanzar BadRequestException si la cédula está vacía o sólo son espacios', async () => {
+      await expect(
+        service.create({ ...validDto, cedula: '   ' }),
+      ).rejects.toThrow('La cédula es obligatoria');
+    });
+
+    it('debe lanzar BadRequestException si la cédula excede 30 caracteres', async () => {
+      await expect(
+        service.create({ ...validDto, cedula: '1234567890123456789012345678901' }),
+      ).rejects.toThrow('La cédula no puede exceder 30 caracteres');
+    });
+
+    it('debe lanzar BadRequestException si el correo está vacío o tiene formato inválido', async () => {
+      await expect(
+        service.create({ ...validDto, correoElectronico: '   ' }),
+      ).rejects.toThrow('El correo electrónico es obligatorio');
+
+      await expect(
+        service.create({ ...validDto, correoElectronico: 'correo-sin-arroba' }),
+      ).rejects.toThrow('El correo electrónico no tiene un formato válido');
+    });
+
+    it('debe lanzar BadRequestException si el correo excede 150 caracteres', async () => {
+      await expect(
+        service.create({
+          ...validDto,
+          correoElectronico: `${'a'.repeat(140)}@example.com`,
+        }),
+      ).rejects.toThrow('El correo electrónico no puede exceder 150 caracteres');
     });
   });
 
@@ -177,6 +257,60 @@ describe('AsociadosService', () => {
       ).rejects.toThrow(NotFoundException);
     });
 
+    it('debe lanzar BadRequestException en update si el nombre es vacío o excede 100 caracteres', async () => {
+      const asociadoMock = { id: 1, nombre: 'Carlos' } as Asociado;
+      repo.findOne.mockResolvedValue(asociadoMock);
+
+      await expect(service.update(1, { nombre: '   ' })).rejects.toThrow(
+        'El nombre es obligatorio',
+      );
+      await expect(
+        service.update(1, { nombre: 'A'.repeat(101) }),
+      ).rejects.toThrow('El nombre no puede exceder 100 caracteres');
+    });
+
+    it('debe lanzar BadRequestException en update si los apellidos son vacíos o exceden 100 caracteres', async () => {
+      const asociadoMock = { id: 1, apellidos: 'Pérez' } as Asociado;
+      repo.findOne.mockResolvedValue(asociadoMock);
+
+      await expect(service.update(1, { apellidos: '   ' })).rejects.toThrow(
+        'Los apellidos son obligatorios',
+      );
+      await expect(
+        service.update(1, { apellidos: 'B'.repeat(101) }),
+      ).rejects.toThrow('Los apellidos no pueden exceder 100 caracteres');
+    });
+
+    it('debe lanzar BadRequestException en update si la cédula es vacía o excede 30 caracteres', async () => {
+      const asociadoMock = { id: 1, cedula: '1-1234-0567' } as Asociado;
+      repo.findOne.mockResolvedValue(asociadoMock);
+
+      await expect(service.update(1, { cedula: '   ' })).rejects.toThrow(
+        'La cédula es obligatoria',
+      );
+      await expect(
+        service.update(1, { cedula: '1234567890123456789012345678901' }),
+      ).rejects.toThrow('La cédula no puede exceder 30 caracteres');
+    });
+
+    it('debe lanzar BadRequestException en update si el correo es vacío, inválido o excede 150 caracteres', async () => {
+      const asociadoMock = {
+        id: 1,
+        correoElectronico: 'carlos@test.cr',
+      } as Asociado;
+      repo.findOne.mockResolvedValue(asociadoMock);
+
+      await expect(service.update(1, { correo: '   ' })).rejects.toThrow(
+        'El correo electrónico no puede estar vacío',
+      );
+      await expect(
+        service.update(1, { correo: 'invalido' }),
+      ).rejects.toThrow('El correo electrónico no tiene un formato válido');
+      await expect(
+        service.update(1, { correo: `${'a'.repeat(140)}@example.com` }),
+      ).rejects.toThrow('El correo electrónico no puede exceder 150 caracteres');
+    });
+
     it('debe actualizar los campos válidos (nombre, apellidos, correoElectronico)', async () => {
       const asociadoExistente: Asociado = {
         id: 1,
@@ -187,6 +321,7 @@ describe('AsociadosService', () => {
         activo: true,
         fechaRegistro: new Date(),
         fechaInactivacion: null,
+        motivoInactivacion: null,
         createdAt: new Date(),
         updatedAt: new Date(),
         asignarValoresPorDefecto: jest.fn(),
@@ -226,6 +361,7 @@ describe('AsociadosService', () => {
         activo: true,
         fechaRegistro: new Date(),
         fechaInactivacion: null,
+        motivoInactivacion: null,
         createdAt: new Date(),
         updatedAt: new Date(),
         asignarValoresPorDefecto: jest.fn(),
@@ -257,6 +393,7 @@ describe('AsociadosService', () => {
         activo: true,
         fechaRegistro: new Date(),
         fechaInactivacion: null,
+        motivoInactivacion: null,
         createdAt: new Date(),
         updatedAt: new Date(),
         asignarValoresPorDefecto: jest.fn(),
@@ -287,6 +424,7 @@ describe('AsociadosService', () => {
         activo: true,
         fechaRegistro: new Date(),
         fechaInactivacion: null,
+        motivoInactivacion: null,
         createdAt: new Date(),
         updatedAt: new Date(),
         asignarValoresPorDefecto: jest.fn(),
@@ -302,6 +440,7 @@ describe('AsociadosService', () => {
         activo: true,
         fechaRegistro: new Date(),
         fechaInactivacion: null,
+        motivoInactivacion: null,
         createdAt: new Date(),
         updatedAt: new Date(),
         asignarValoresPorDefecto: jest.fn(),
@@ -320,6 +459,79 @@ describe('AsociadosService', () => {
       expect(repo.save).not.toHaveBeenCalled();
     });
 
+    it('debe rechazar con ConflictException al actualizar con cédula sin guiones perteneciente a otro asociado', async () => {
+      const asociadoExistente: Asociado = {
+        id: 1,
+        nombre: 'Carlos',
+        apellidos: 'Pérez',
+        cedula: '1-1234-0567',
+        correoElectronico: 'carlos@test.cr',
+        activo: true,
+        fechaRegistro: new Date(),
+        fechaInactivacion: null,
+        motivoInactivacion: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        asignarValoresPorDefecto: jest.fn(),
+        normalizar: jest.fn(),
+      };
+
+      const otroAsociado: Asociado = {
+        id: 2,
+        nombre: 'Mario',
+        apellidos: 'López',
+        cedula: '2-0000-0000',
+        correoElectronico: 'mario@test.cr',
+        activo: true,
+        fechaRegistro: new Date(),
+        fechaInactivacion: null,
+        motivoInactivacion: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        asignarValoresPorDefecto: jest.fn(),
+        normalizar: jest.fn(),
+      };
+
+      repo.findOne
+        .mockResolvedValueOnce(asociadoExistente)
+        .mockResolvedValueOnce(otroAsociado);
+
+      await expect(
+        service.update(1, { cedula: '200000000' }),
+      ).rejects.toThrow(
+        'Ya existe un asociado registrado con la cédula "2-0000-0000"',
+      );
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('no debe lanzar conflicto si la cédula enviada en otro formato pertenece al mismo asociado', async () => {
+      const asociadoExistente: Asociado = {
+        id: 1,
+        nombre: 'Carlos',
+        apellidos: 'Pérez',
+        cedula: '1-1234-0567',
+        correoElectronico: 'carlos@test.cr',
+        activo: true,
+        fechaRegistro: new Date(),
+        fechaInactivacion: null,
+        motivoInactivacion: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        asignarValoresPorDefecto: jest.fn(),
+        normalizar: jest.fn(),
+      };
+
+      repo.findOne.mockResolvedValueOnce(asociadoExistente);
+      repo.save.mockImplementation(async (entity) => entity as Asociado);
+
+      const resultado = await service.update(1, {
+        cedula: '112340567',
+      });
+
+      expect(repo.findOne).toHaveBeenCalledTimes(1);
+      expect(resultado.cedula).toBe('1-1234-0567');
+    });
+
     it('debe manejar violación de unicidad concurrente en save() lanzando ConflictException', async () => {
       const asociadoExistente: Asociado = {
         id: 1,
@@ -330,6 +542,7 @@ describe('AsociadosService', () => {
         activo: true,
         fechaRegistro: new Date(),
         fechaInactivacion: null,
+        motivoInactivacion: null,
         createdAt: new Date(),
         updatedAt: new Date(),
         asignarValoresPorDefecto: jest.fn(),

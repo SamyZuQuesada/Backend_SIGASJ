@@ -41,6 +41,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
       return;
     }
 
+    const dbConflictMapped = this.mapDatabaseConflict(exception);
+    if (dbConflictMapped) {
+      this.logger.warn(
+        `${request.method} ${request.url} ${dbConflictMapped.statusCode} DatabaseConflict`,
+      );
+      response.status(dbConflictMapped.statusCode).json(dbConflictMapped);
+      return;
+    }
+
     const isHttp = exception instanceof HttpException;
     const status = isHttp
       ? exception.getStatus()
@@ -146,6 +155,44 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
   private looksTechnical(text: string): boolean {
     return TECHNICAL_PATTERN.test(text) || text.length > 220;
+  }
+
+  private mapDatabaseConflict(
+    exception: unknown,
+  ): { statusCode: number; message: string } | null {
+    if (exception instanceof HttpException) {
+      return null;
+    }
+    if (!exception || typeof exception !== 'object') {
+      return null;
+    }
+    const err = exception as any;
+    const isUnique =
+      err?.number === 2601 ||
+      err?.number === 2627 ||
+      err?.code === '23505' ||
+      err?.code === 'SQLITE_CONSTRAINT' ||
+      (typeof err?.message === 'string' &&
+        (err.message.includes('UQ_') ||
+          err.message.includes('duplicate key') ||
+          err.message.includes('UNIQUE constraint failed')));
+
+    if (isUnique) {
+      if (
+        typeof err?.message === 'string' &&
+        (err.message.includes('Asociado') || err.message.includes('cedula'))
+      ) {
+        return {
+          statusCode: HttpStatus.CONFLICT,
+          message: 'Ya existe un asociado registrado con esta cédula.',
+        };
+      }
+      return {
+        statusCode: HttpStatus.CONFLICT,
+        message: 'Ya existe un registro con estos datos únicos.',
+      };
+    }
+    return null;
   }
 
   private safeExceptionName(exception: unknown): string {

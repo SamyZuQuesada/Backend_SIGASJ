@@ -8,6 +8,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, Repository } from 'typeorm';
 import { Asociado } from './entities/asociado.entity';
+import { normalizarCedula } from '../../common/utils/cedula.util';
 import { CreateAsociadoDto } from './dto/create-asociado.dto';
 import { UpdateAsociadoDto } from './dto/update-asociado.dto';
 import { UpdateEstadoAsociadoDto } from './dto/update-estado-asociado.dto';
@@ -46,7 +47,60 @@ export class AsociadosService {
    * Valida unicidad de cédula, establece activo = true y asigna fechas correspondientes.
    */
   async create(dto: CreateAsociadoDto): Promise<Asociado> {
-    const cedulaNormalizada = dto.cedula.trim();
+    if (!dto) {
+      throw new BadRequestException('Los datos del asociado son obligatorios');
+    }
+
+    const nombre = dto.nombre?.trim();
+    if (!nombre) {
+      throw new BadRequestException('El nombre es obligatorio');
+    }
+    if (nombre.length > 100) {
+      throw new BadRequestException(
+        'El nombre no puede exceder 100 caracteres',
+      );
+    }
+
+    const apellidos = dto.apellidos?.trim();
+    if (!apellidos) {
+      throw new BadRequestException('Los apellidos son obligatorios');
+    }
+    if (apellidos.length > 100) {
+      throw new BadRequestException(
+        'Los apellidos no pueden exceder 100 caracteres',
+      );
+    }
+
+    const cedulaRaw = dto.cedula?.trim();
+    if (!cedulaRaw) {
+      throw new BadRequestException('La cédula es obligatoria');
+    }
+    const cedulaNormalizada = normalizarCedula(dto.cedula);
+    if (!cedulaNormalizada || cedulaNormalizada.trim() === '') {
+      throw new BadRequestException('La cédula es obligatoria');
+    }
+    if (cedulaNormalizada.length > 30) {
+      throw new BadRequestException(
+        'La cédula no puede exceder 30 caracteres',
+      );
+    }
+
+    const correoRaw = dto.correoElectronico ?? (dto as any).correo;
+    const correoLimpio = correoRaw?.trim().toLowerCase();
+    if (!correoLimpio) {
+      throw new BadRequestException('El correo electrónico es obligatorio');
+    }
+    if (correoLimpio.length > 150) {
+      throw new BadRequestException(
+        'El correo electrónico no puede exceder 150 caracteres',
+      );
+    }
+    const regexEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!regexEmail.test(correoLimpio)) {
+      throw new BadRequestException(
+        'El correo electrónico no tiene un formato válido',
+      );
+    }
 
     // 1. Verificar si ya existe un asociado con la misma cédula
     const asociadoExistente = await this.asociadoRepository.findOne({
@@ -65,10 +119,10 @@ export class AsociadosService {
       : new Date();
 
     const nuevoAsociado = this.asociadoRepository.create({
-      nombre: dto.nombre.trim(),
-      apellidos: dto.apellidos.trim(),
+      nombre,
+      apellidos,
       cedula: cedulaNormalizada,
-      correoElectronico: dto.correoElectronico.trim().toLowerCase(),
+      correoElectronico: correoLimpio,
       activo: true,
       fechaRegistro,
       fechaInactivacion: null,
@@ -87,8 +141,10 @@ export class AsociadosService {
         error?.number === 2601 ||
         error?.number === 2627 ||
         error?.code === '23505' ||
+        error?.code === 'SQLITE_CONSTRAINT' ||
         error?.message?.includes('UQ_') ||
-        error?.message?.includes('duplicate')
+        error?.message?.includes('duplicate') ||
+        error?.message?.includes('UNIQUE')
       ) {
         throw new ConflictException(
           `Ya existe un asociado registrado con la cédula "${cedulaNormalizada}"`,
@@ -103,8 +159,9 @@ export class AsociadosService {
   }
 
   async findByCedula(cedula: string): Promise<Asociado | null> {
+    const cedulaNormalizada = normalizarCedula(cedula);
     return this.asociadoRepository.findOne({
-      where: { cedula: cedula.trim() },
+      where: { cedula: cedulaNormalizada },
     });
   }
 
@@ -175,7 +232,19 @@ export class AsociadosService {
     const asociado = await this.findOne(id);
 
     if (dto.cedula !== undefined) {
-      const cedulaNormalizada = dto.cedula.trim();
+      if (
+        dto.cedula === null ||
+        typeof dto.cedula !== 'string' ||
+        dto.cedula.trim() === ''
+      ) {
+        throw new BadRequestException('La cédula es obligatoria');
+      }
+      const cedulaNormalizada = normalizarCedula(dto.cedula);
+      if (cedulaNormalizada.length > 30) {
+        throw new BadRequestException(
+          'La cédula no puede exceder 30 caracteres',
+        );
+      }
       if (cedulaNormalizada !== asociado.cedula) {
         const asociadoExistente = await this.asociadoRepository.findOne({
           where: { cedula: cedulaNormalizada },
@@ -191,16 +260,61 @@ export class AsociadosService {
     }
 
     if (dto.nombre !== undefined) {
+      if (
+        dto.nombre === null ||
+        typeof dto.nombre !== 'string' ||
+        dto.nombre.trim() === ''
+      ) {
+        throw new BadRequestException('El nombre es obligatorio');
+      }
+      if (dto.nombre.trim().length > 100) {
+        throw new BadRequestException(
+          'El nombre no puede exceder 100 caracteres',
+        );
+      }
       asociado.nombre = dto.nombre.trim();
     }
 
     if (dto.apellidos !== undefined) {
+      if (
+        dto.apellidos === null ||
+        typeof dto.apellidos !== 'string' ||
+        dto.apellidos.trim() === ''
+      ) {
+        throw new BadRequestException('Los apellidos son obligatorios');
+      }
+      if (dto.apellidos.trim().length > 100) {
+        throw new BadRequestException(
+          'Los apellidos no pueden exceder 100 caracteres',
+        );
+      }
       asociado.apellidos = dto.apellidos.trim();
     }
 
     const correo = dto.correoElectronico ?? dto.correo;
     if (correo !== undefined) {
-      asociado.correoElectronico = correo.trim().toLowerCase();
+      if (
+        correo === null ||
+        typeof correo !== 'string' ||
+        correo.trim() === ''
+      ) {
+        throw new BadRequestException(
+          'El correo electrónico no puede estar vacío',
+        );
+      }
+      const correoLimpio = correo.trim().toLowerCase();
+      if (correoLimpio.length > 150) {
+        throw new BadRequestException(
+          'El correo electrónico no puede exceder 150 caracteres',
+        );
+      }
+      const regexEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!regexEmail.test(correoLimpio)) {
+        throw new BadRequestException(
+          'El correo electrónico no tiene un formato válido',
+        );
+      }
+      asociado.correoElectronico = correoLimpio;
     }
 
     asociado.updatedAt = new Date();

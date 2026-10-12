@@ -43,6 +43,15 @@ class ErroresSeguridadController {
   payloadTooLarge() {
     throw new PayloadTooLargeException('File too large');
   }
+
+  @Get('sql-duplicate-cedula')
+  sqlDuplicateCedula() {
+    const error = new Error(
+      'Cannot insert duplicate key row in object Asociado with unique index UQ_Asociado_cedula',
+    );
+    (error as any).number = 2601;
+    throw error;
+  }
 }
 
 describe('HttpExceptionFilter', () => {
@@ -122,5 +131,19 @@ describe('HttpExceptionFilter', () => {
       statusCode: 400,
       message: 'El archivo no puede superar 10 MB.',
     });
+  });
+
+  it('mapea violación de unicidad de base de datos a 409 Conflict controlado sin exponer SQL', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/errores-seguridad/sql-duplicate-cedula')
+      .expect(409);
+
+    expect(response.body).toEqual({
+      statusCode: 409,
+      message: 'Ya existe un asociado registrado con esta cédula.',
+    });
+    expect(JSON.stringify(response.body)).not.toMatch(
+      /2601|UNIQUE|UQ_|constraint/i,
+    );
   });
 });

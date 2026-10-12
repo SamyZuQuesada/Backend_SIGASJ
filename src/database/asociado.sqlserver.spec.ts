@@ -244,4 +244,38 @@ describe('Validación física de tabla Asociado en SQL Server', () => {
       await repo.delete({ id: guardado1.id });
     }
   });
+
+  it('8. Debe rechazar la inserción en SQL Server cuando se intenta evadir con formato sin guiones (normalización a nivel de entidad/BD)', async () => {
+    const repo = dataSource.getRepository(Asociado);
+    // Generamos un número de 9 dígitos para la prueba
+    const randomSuffix = Math.floor(10000000 + Math.random() * 89999999);
+    const cedulaEstandar = `1-${String(randomSuffix).slice(0, 4)}-${String(randomSuffix).slice(4)}`;
+    const cedulaSinGuiones = `1${randomSuffix}`;
+
+    const asociado1 = repo.create({
+      nombre: 'Asociado Original',
+      apellidos: 'Prueba',
+      cedula: cedulaEstandar,
+      correoElectronico: 'original@test.cr',
+      activo: true,
+      fechaInactivacion: null,
+    });
+
+    const guardado1 = await repo.save(asociado1);
+
+    try {
+      const asociado2 = repo.create({
+        nombre: 'Asociado Evasor',
+        apellidos: 'Prueba',
+        cedula: cedulaSinGuiones,
+        correoElectronico: 'evasor@test.cr',
+        activo: true,
+        fechaInactivacion: null,
+      });
+
+      await expect(repo.save(asociado2)).rejects.toThrow();
+    } finally {
+      await repo.delete({ id: guardado1.id });
+    }
+  });
 });

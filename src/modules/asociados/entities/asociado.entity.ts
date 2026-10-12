@@ -4,16 +4,19 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
+import { normalizarCedula } from '../../../common/utils/cedula.util';
 
 /**
  * Entidad que representa a un Asociado dentro de SIGASJ (ASADA San Juan).
  * Almacena los datos de identificación, contacto, estado y fechas de membresía/registro.
  */
 @Entity('Asociado')
+@Index('UQ_Asociado_cedula', ['cedula'], { unique: true })
 export class Asociado {
   @ApiProperty({
     example: 1,
@@ -117,7 +120,7 @@ export class Asociado {
       this.apellidos = this.apellidos.trim();
     }
     if (this.cedula) {
-      this.cedula = this.cedula.trim();
+      this.cedula = normalizarCedula(this.cedula);
     }
     if (this.correoElectronico) {
       this.correoElectronico = this.correoElectronico.trim().toLowerCase();

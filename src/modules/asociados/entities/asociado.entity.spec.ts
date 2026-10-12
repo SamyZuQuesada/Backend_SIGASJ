@@ -101,6 +101,18 @@ describe('Asociado Entity (SIGASJ)', () => {
       expect(asociado.cedula).toBe('5-0123-0456');
       expect(asociado.correoElectronico).toBe('maria.gonzalez@example.com');
     });
+
+    it('debe normalizar cédula nacional sin guiones y con espacios al formato canónico', () => {
+      const asociado1 = new Asociado();
+      asociado1.cedula = '112340567';
+      asociado1.normalizar();
+      expect(asociado1.cedula).toBe('1-1234-0567');
+
+      const asociado2 = new Asociado();
+      asociado2.cedula = '  1 1234 0567  ';
+      asociado2.normalizar();
+      expect(asociado2.cedula).toBe('1-1234-0567');
+    });
   });
 
   describe('Metadatos de TypeORM', () => {
@@ -151,6 +163,15 @@ describe('Asociado Entity (SIGASJ)', () => {
       expect(cedulaCol).toBeDefined();
       expect(cedulaCol?.options.unique).toBe(true);
       expect(cedulaCol?.options.length).toBe(30);
+    });
+
+    it('debe registrar el índice único UQ_Asociado_cedula a nivel de entidad', () => {
+      const index = storage.indices.find(
+        (i) => i.target === Asociado && i.name === 'UQ_Asociado_cedula',
+      );
+      expect(index).toBeDefined();
+      expect(index?.unique).toBe(true);
+      expect(index?.columns).toEqual(['cedula']);
     });
 
     it('debe configurar longitudes adecuadas para nombre, apellidos y correoElectronico', () => {

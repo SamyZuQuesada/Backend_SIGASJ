@@ -1,5 +1,6 @@
 import { QueryRunner, Table, TableIndex } from 'typeorm';
 import { CreateAsociadoTable1724685940000 } from './migrations/1724685940000-CreateAsociadoTable';
+import { EnsureAsociadoCedulaUniqueAndNormalized1724685980000 } from './migrations/1724685980000-EnsureAsociadoCedulaUniqueAndNormalized';
 
 describe('Pruebas de Base de Datos e Integridad: Migración Asociado', () => {
   describe('1. Definición y Estructura de la Migración TypeORM', () => {
@@ -129,6 +130,121 @@ describe('Pruebas de Base de Datos e Integridad: Migración Asociado', () => {
       expect(getTableSpy).toHaveBeenCalledWith('Asociado');
       expect(dropIndexSpy).toHaveBeenCalled();
       expect(dropTableSpy).toHaveBeenCalledWith('Asociado', true);
+    });
+  });
+
+  describe('2. Migración EnsureAsociadoCedulaUniqueAndNormalized', () => {
+    it('debe contar con la migración EnsureAsociadoCedulaUniqueAndNormalized1724685980000 bien nombrada', () => {
+      const migration = new EnsureAsociadoCedulaUniqueAndNormalized1724685980000();
+      expect(migration.name).toBe(
+        'EnsureAsociadoCedulaUniqueAndNormalized1724685980000',
+      );
+      expect(typeof migration.up).toBe('function');
+      expect(typeof migration.down).toBe('function');
+    });
+
+    it('debe normalizar registros existentes y asegurar el índice único UQ_Asociado_cedula en up', async () => {
+      const migration = new EnsureAsociadoCedulaUniqueAndNormalized1724685980000();
+      const querySpy = jest.fn().mockImplementation((queryStr: string) => {
+        if (queryStr.includes('SELECT id, cedula FROM Asociado')) {
+          return Promise.resolve([
+            { id: 1, cedula: '112340567' },
+            { id: 2, cedula: '2-0456-0789' },
+          ]);
+        }
+        return Promise.resolve();
+      });
+
+      let createdIndex: TableIndex | undefined;
+      const createIndexSpy = jest
+        .fn()
+        .mockImplementation(
+          (_tableName: string, index: TableIndex): Promise<void> => {
+            createdIndex = index;
+            return Promise.resolve();
+          },
+        );
+
+      const mockTable = new Table({
+        name: 'Asociado',
+        columns: [{ name: 'id', type: 'int' }, { name: 'cedula', type: 'varchar' }],
+        indices: [], // Simula que no tiene el índice aún
+      });
+
+      const mockQueryRunner = {
+        connection: { options: { type: 'mssql' } },
+        getTable: jest.fn().mockResolvedValue(mockTable),
+        query: querySpy,
+        createIndex: createIndexSpy,
+      } as unknown as QueryRunner;
+
+      await migration.up(mockQueryRunner);
+
+      // Debe haber actualizado el registro no normalizado
+      expect(querySpy).toHaveBeenCalledWith(
+        'UPDATE Asociado SET cedula = @0 WHERE id = @1',
+        ['1-1234-0567', 1],
+      );
+
+      // Debe haber creado el índice único
+      expect(createIndexSpy).toHaveBeenCalled();
+      expect(createdIndex?.name).toBe('UQ_Asociado_cedula');
+      expect(createdIndex?.isUnique).toBe(true);
+      expect(createdIndex?.columnNames).toEqual(['cedula']);
+    });
+
+    it('no debe duplicar el índice si ya existe en up', async () => {
+      const migration = new EnsureAsociadoCedulaUniqueAndNormalized1724685980000();
+      const createIndexSpy = jest.fn();
+
+      const mockTable = new Table({
+        name: 'Asociado',
+        columns: [{ name: 'id', type: 'int' }, { name: 'cedula', type: 'varchar' }],
+        indices: [
+          new TableIndex({
+            name: 'UQ_Asociado_cedula',
+            columnNames: ['cedula'],
+            isUnique: true,
+          }),
+        ],
+      });
+
+      const mockQueryRunner = {
+        connection: { options: { type: 'mssql' } },
+        getTable: jest.fn().mockResolvedValue(mockTable),
+        query: jest.fn().mockResolvedValue([]),
+        createIndex: createIndexSpy,
+      } as unknown as QueryRunner;
+
+      await migration.up(mockQueryRunner);
+
+      expect(createIndexSpy).not.toHaveBeenCalled();
+    });
+
+    it('debe eliminar el índice en down si existe', async () => {
+      const migration = new EnsureAsociadoCedulaUniqueAndNormalized1724685980000();
+      const dropIndexSpy = jest.fn().mockResolvedValue(undefined);
+
+      const existingIndex = new TableIndex({
+        name: 'UQ_Asociado_cedula',
+        columnNames: ['cedula'],
+        isUnique: true,
+      });
+
+      const mockTable = new Table({
+        name: 'Asociado',
+        columns: [],
+        indices: [existingIndex],
+      });
+
+      const mockQueryRunner = {
+        getTable: jest.fn().mockResolvedValue(mockTable),
+        dropIndex: dropIndexSpy,
+      } as unknown as QueryRunner;
+
+      await migration.down(mockQueryRunner);
+
+      expect(dropIndexSpy).toHaveBeenCalledWith('Asociado', existingIndex);
     });
   });
 });
