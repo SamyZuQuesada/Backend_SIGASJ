@@ -182,6 +182,46 @@ describe('PATCH /api/v1/asociados/:id y /api/asociados/:id (Modificación de Aso
       });
       expect(res.status).toBe(400);
     });
+
+    it('debe rechazar con 400 si el nombre excede 100 caracteres', async () => {
+      const res = await patch(`${URL}/${asociado1.id}`, {
+        nombre: 'A'.repeat(101),
+      });
+      expect(res.status).toBe(400);
+      expect(res.body.message).toContain(
+        'El nombre no puede exceder 100 caracteres',
+      );
+    });
+
+    it('debe rechazar con 400 si los apellidos exceden 100 caracteres', async () => {
+      const res = await patch(`${URL}/${asociado1.id}`, {
+        apellidos: 'B'.repeat(101),
+      });
+      expect(res.status).toBe(400);
+      expect(res.body.message).toContain(
+        'Los apellidos no pueden exceder 100 caracteres',
+      );
+    });
+
+    it('debe rechazar con 400 si la cédula excede 30 caracteres', async () => {
+      const res = await patch(`${URL}/${asociado1.id}`, {
+        cedula: '1234567890123456789012345678901',
+      });
+      expect(res.status).toBe(400);
+      expect(res.body.message).toContain(
+        'La cédula no puede exceder 30 caracteres',
+      );
+    });
+
+    it('debe rechazar con 400 si el correo excede 150 caracteres', async () => {
+      const res = await patch(`${URL}/${asociado1.id}`, {
+        correo: `${'a'.repeat(140)}@example.com`,
+      });
+      expect(res.status).toBe(400);
+      expect(res.body.message).toContain(
+        'El correo electrónico no puede exceder 150 caracteres',
+      );
+    });
   });
 
   describe('Actualización Exitosa de Información', () => {
@@ -289,6 +329,26 @@ describe('PATCH /api/v1/asociados/:id y /api/asociados/:id (Modificación de Aso
       // No se crea un nuevo asociado
       const totalDespues = await asociadoRepository.count();
       expect(totalDespues).toBe(totalAntes);
+    });
+
+    it('debe rechazar con 409 si se envía la cédula de otro asociado sin guiones (evasión de frontend)', async () => {
+      const res = await patch(`${URL}/${asociado1.id}`, {
+        cedula: '204560789', // Cédula de asociado2 sin guiones
+      });
+
+      expect(res.status).toBe(409);
+      expect(res.body.message).toContain(
+        'Ya existe un asociado registrado con la cédula "2-0456-0789"',
+      );
+    });
+
+    it('permite enviar la cédula propia sin guiones sin generar conflicto', async () => {
+      const res = await patch(`${URL}/${asociado1.id}`, {
+        cedula: '112340567', // Cédula propia sin guiones
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.body.cedula).toBe('1-1234-0567');
     });
   });
 });

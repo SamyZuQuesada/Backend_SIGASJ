@@ -7,6 +7,7 @@ import {
   IsOptional,
   IsString,
   MaxLength,
+  ValidateIf,
 } from 'class-validator';
 
 const rawValue = ({ value, obj, key }: TransformFnParams): unknown => {
@@ -24,6 +25,14 @@ const trimString = (params: TransformFnParams): unknown => {
 const trimAndLowerString = (params: TransformFnParams): unknown => {
   const raw = rawValue(params);
   return typeof raw === 'string' ? raw.trim().toLowerCase() : raw;
+};
+
+import { normalizarCedula } from '../../../common/utils/cedula.util';
+export { normalizarCedula };
+
+const normalizarCedulaTransform = (params: TransformFnParams): unknown => {
+  const raw = rawValue(params);
+  return typeof raw === 'string' ? normalizarCedula(raw) : raw;
 };
 
 export class CreateAsociadoDto {
@@ -54,11 +63,26 @@ export class CreateAsociadoDto {
     description: 'Cédula de identidad única del asociado',
     maxLength: 30,
   })
-  @Transform(trimString)
+  @Transform(normalizarCedulaTransform)
   @IsString({ message: 'La cédula debe ser una cadena de texto' })
   @IsNotEmpty({ message: 'La cédula es obligatoria' })
   @MaxLength(30, { message: 'La cédula no puede exceder 30 caracteres' })
   cedula: string;
+
+  @ApiPropertyOptional({
+    example: 'juan.perez@example.com',
+    description:
+      'Correo electrónico de contacto del asociado (alias opcional de correoElectronico)',
+    maxLength: 150,
+  })
+  @Transform(trimAndLowerString)
+  @IsOptional()
+  @IsString({ message: 'El correo electrónico debe ser una cadena de texto' })
+  @IsEmail({}, { message: 'El correo electrónico no tiene un formato válido' })
+  @MaxLength(150, {
+    message: 'El correo electrónico no puede exceder 150 caracteres',
+  })
+  correo?: string;
 
   @ApiProperty({
     example: 'juan.perez@example.com',
@@ -66,6 +90,7 @@ export class CreateAsociadoDto {
     maxLength: 150,
   })
   @Transform(trimAndLowerString)
+  @ValidateIf((o) => !o.correo || o.correoElectronico !== undefined)
   @IsString({ message: 'El correo electrónico debe ser una cadena de texto' })
   @IsNotEmpty({ message: 'El correo electrónico es obligatorio' })
   @IsEmail({}, { message: 'El correo electrónico no tiene un formato válido' })
