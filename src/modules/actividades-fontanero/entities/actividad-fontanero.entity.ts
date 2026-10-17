@@ -65,6 +65,13 @@ export class ActividadFontanero {
   })
   estado: EstadoActividadFontanero;
 
+  @Column({
+    type: 'varchar',
+    length: 40,
+    default: 'PENDIENTE',
+  })
+  estadoRevision: string;
+
   @Column({ type: 'text', nullable: true })
   observacionCorreccion: string | null;
 

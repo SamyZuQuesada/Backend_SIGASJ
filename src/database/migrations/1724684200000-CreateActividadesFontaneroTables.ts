@@ -207,6 +207,13 @@ export class CreateActividadesFontaneroTables1724684200000 implements MigrationI
             isNullable: false,
           },
           {
+            name: 'estadoRevision',
+            type: 'varchar',
+            length: '40',
+            default: "'PENDIENTE'",
+            isNullable: false,
+          },
+          {
             name: 'observacionCorreccion',
             type: textType,
             isNullable: true,

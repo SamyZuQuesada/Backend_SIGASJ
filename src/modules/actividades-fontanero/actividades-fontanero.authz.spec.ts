@@ -19,6 +19,7 @@ import { ActividadFontanero } from './entities/actividad-fontanero.entity';
 import { TipoActividadFontanero } from './entities/tipo-actividad-fontanero.entity';
 import { DocumentoActividadFontanero } from './entities/documento-actividad-fontanero.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
+import { Rol } from '../usuarios/entities/rol.entity';
 import {
   buildValidCreateActividadPayload,
   seedTiposActividadFontanero,
@@ -133,6 +134,7 @@ describe('Actividades Fontanero — autenticación y autorización', () => {
             TipoActividadFontanero,
             DocumentoActividadFontanero,
             Usuario,
+            Rol,
           ],
           synchronize: true,
         }),

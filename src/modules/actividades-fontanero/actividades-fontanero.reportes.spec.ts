@@ -14,6 +14,7 @@ import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
 import jwtConfig from '../../config/jwt.config';
 import { AuthModule } from '../auth/auth.module';
 import { Usuario } from '../usuarios/entities/usuario.entity';
+import { Rol } from '../usuarios/entities/rol.entity';
 import { ActividadesFontaneroModule } from './actividades-fontanero.module';
 import type { ReporteActividadesResponse } from './actividades-fontanero.service';
 import { ActividadFontanero } from './entities/actividad-fontanero.entity';
@@ -116,6 +117,7 @@ describe('GET /api/v1/admin/actividades/reportes', () => {
             TipoActividadFontanero,
             DocumentoActividadFontanero,
             Usuario,
+            Rol,
           ],
           synchronize: true,
         }),

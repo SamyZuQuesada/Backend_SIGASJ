@@ -277,11 +277,11 @@ describe('Backlog 4.5: Registro de Salidas de Materiales — Pruebas Funcionales
   // REGLA FUNDAMENTAL 3: Stock 10 -> Salida 10 -> Stock 0 (Permitido)
   // =========================================================================
   describe('Regla Fundamental 3: Salida Exacta hasta Agotar Existencias (Stock Final 0)', () => {
-    it('permite una salida que deje el stock exactamente en 0 y reporta agotamiento total', async () => {
+    it('permite una salida que deje el stock exactamente en 0 cuando stockMinimo es 0 y reporta agotamiento total', async () => {
       const material = await createMaterial({
         nombre: 'Codo PVC 45°',
         stockActual: 10,
-        stockMinimo: 2,
+        stockMinimo: 0,
       });
 
       const token = signAs(Role.FONTANERO, String(fontaneroUser.idUsuario));
@@ -302,6 +302,32 @@ describe('Backlog 4.5: Registro de Salidas de Materiales — Pruebas Funcionales
         where: { id: material.id },
       });
       expect(enDb?.stockActual).toBe(0);
+    });
+
+    it('rechaza con 400 Bad Request cuando la salida dejaría el stock por debajo del stock mínimo (reserva obligatoria)', async () => {
+      const material = await createMaterial({
+        nombre: 'Codo PVC Reserva 45°',
+        stockActual: 10,
+        stockMinimo: 3,
+      });
+
+      const token = signAs(Role.FONTANERO, String(fontaneroUser.idUsuario));
+
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/inventario/salidas')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          idMaterial: material.id,
+          cantidad: 8,
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toContain(
+        'La salida dejaría el material por debajo del stock mínimo.',
+      );
+      expect(res.body.message).toContain(
+        'Puede retirar como máximo 7 unidades.',
+      );
     });
   });
 
@@ -567,7 +593,7 @@ describe('Backlog 4.5: Registro de Salidas de Materiales — Pruebas Funcionales
       await request(app.getHttpServer())
         .post('/api/v1/inventario/salidas')
         .set('Authorization', `Bearer ${token}`)
-        .send({ idMaterial: material.id, cantidad: 3 })
+        .send({ idMaterial: material.id, cantidad: 2 })
         .expect(201);
 
       const alertas = await alertaReposicionRepository.find({
@@ -575,7 +601,7 @@ describe('Backlog 4.5: Registro de Salidas de Materiales — Pruebas Funcionales
       });
       expect(alertas).toHaveLength(1);
       expect(alertas[0].idMaterial).toBe(material.id);
-      expect(alertas[0].stockActual).toBe(9);
+      expect(alertas[0].stockActual).toBe(10);
       expect(alertas[0].stockMinimo).toBe(10);
       expect(alertas[0].estado).toBe(EstadoAlertaReposicion.PENDIENTE);
       expect(alertas[0].fechaGeneracion).toBeInstanceOf(Date);
@@ -588,17 +614,21 @@ describe('Backlog 4.5: Registro de Salidas de Materiales — Pruebas Funcionales
         stockMinimo: 10,
       });
 
+      await alertaReposicionRepository.save(
+        alertaReposicionRepository.create({
+          idMaterial: material.id,
+          stockActual: 10,
+          stockMinimo: 10,
+          estado: EstadoAlertaReposicion.PENDIENTE,
+          fechaGeneracion: new Date(),
+        }),
+      );
+
       const token = signAs(Role.FONTANERO, String(fontaneroUser.idUsuario));
       await request(app.getHttpServer())
         .post('/api/v1/inventario/salidas')
         .set('Authorization', `Bearer ${token}`)
-        .send({ idMaterial: material.id, cantidad: 3 })
-        .expect(201);
-
-      await request(app.getHttpServer())
-        .post('/api/v1/inventario/salidas')
-        .set('Authorization', `Bearer ${token}`)
-        .send({ idMaterial: material.id, cantidad: 1 })
+        .send({ idMaterial: material.id, cantidad: 2 })
         .expect(201);
 
       const alertas = await alertaReposicionRepository.find({
@@ -614,23 +644,21 @@ describe('Backlog 4.5: Registro de Salidas de Materiales — Pruebas Funcionales
         stockMinimo: 10,
       });
 
+      await alertaReposicionRepository.save(
+        alertaReposicionRepository.create({
+          idMaterial: material.id,
+          stockActual: 10,
+          stockMinimo: 10,
+          estado: EstadoAlertaReposicion.RESUELTA,
+          fechaGeneracion: new Date(),
+        }),
+      );
+
       const token = signAs(Role.FONTANERO, String(fontaneroUser.idUsuario));
       await request(app.getHttpServer())
         .post('/api/v1/inventario/salidas')
         .set('Authorization', `Bearer ${token}`)
-        .send({ idMaterial: material.id, cantidad: 3 })
-        .expect(201);
-
-      const [primera] = await alertaReposicionRepository.find({
-        where: { idMaterial: material.id },
-      });
-      primera.estado = EstadoAlertaReposicion.RESUELTA;
-      await alertaReposicionRepository.save(primera);
-
-      await request(app.getHttpServer())
-        .post('/api/v1/inventario/salidas')
-        .set('Authorization', `Bearer ${token}`)
-        .send({ idMaterial: material.id, cantidad: 1 })
+        .send({ idMaterial: material.id, cantidad: 2 })
         .expect(201);
 
       const alertas = await alertaReposicionRepository.find({

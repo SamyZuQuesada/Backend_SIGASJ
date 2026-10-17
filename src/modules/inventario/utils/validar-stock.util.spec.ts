@@ -27,8 +27,12 @@ describe('validar-stock.util — Regla de negocio de existencias disponibles (4.
       expect(res.mensaje).toContain('Salida autorizada');
     });
 
-    it('permite una salida que deje las existencias exactamente en cero (esAgotamientoTotal = true)', () => {
-      const res = validarStockDisponible(baseMaterial, 10);
+    it('permite una salida que deje las existencias exactamente en cero cuando el stock mínimo es cero', () => {
+      const materialSinMinimo: MaterialParaValidacion = {
+        ...baseMaterial,
+        stockMinimo: 0,
+      };
+      const res = validarStockDisponible(materialSinMinimo, 10);
 
       expect(res.esValido).toBe(true);
       expect(res.stockActual).toBe(10);
@@ -39,14 +43,22 @@ describe('validar-stock.util — Regla de negocio de existencias disponibles (4.
       expect(res.mensaje).toContain('agotará totalmente las existencias');
     });
 
-    it('detecta alerta de stock mínimo cuando el stock resultante queda igual o por debajo de stockMinimo (Backlog 4.8)', () => {
-      const res = validarStockDisponible(baseMaterial, 8); // 10 - 8 = 2 <= 3
+    it('permite retirar hasta el stock mínimo (10 - 7 = 3) y detecta que alcanza el nivel mínimo', () => {
+      const res = validarStockDisponible(baseMaterial, 7); // 10 - 7 = 3 === stockMinimo
 
       expect(res.esValido).toBe(true);
-      expect(res.stockFinal).toBe(2);
+      expect(res.stockFinal).toBe(3);
       expect(res.alcanzaStockMinimo).toBe(true);
       expect(res.esAgotamientoTotal).toBe(false);
-      expect(res.mensaje).toContain('estará por debajo del stock mínimo (3)');
+      expect(res.mensaje).toContain('alcanzará o estará por debajo del stock mínimo (3)');
+    });
+
+    it('rechaza cuando la salida dejaría el material por debajo del stock mínimo (reserva obligatoria)', () => {
+      const res = validarStockDisponible(baseMaterial, 8); // 10 - 8 = 2 < 3
+
+      expect(res.esValido).toBe(false);
+      expect(res.mensaje).toContain('La salida dejaría el material por debajo del stock mínimo.');
+      expect(res.mensaje).toContain('Puede retirar como máximo 7 unidades.');
     });
 
     it('rechaza cuando la cantidad solicitada supera el stock disponible y no altera existencias', () => {

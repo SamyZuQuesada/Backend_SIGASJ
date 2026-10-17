@@ -15,6 +15,7 @@ import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
 import jwtConfig from '../../config/jwt.config';
 import { AuthModule } from '../auth/auth.module';
 import { Usuario } from '../usuarios/entities/usuario.entity';
+import { Rol } from '../usuarios/entities/rol.entity';
 import { ActividadesFontaneroModule } from './actividades-fontanero.module';
 import type {
   ActividadFontaneroAdminResponse,
@@ -23,7 +24,10 @@ import type {
 import { ActividadFontanero } from './entities/actividad-fontanero.entity';
 import { TipoActividadFontanero } from './entities/tipo-actividad-fontanero.entity';
 import { DocumentoActividadFontanero } from './entities/documento-actividad-fontanero.entity';
-import { seedTiposActividadFontanero } from './testing/actividades-fontanero.test-helpers';
+import {
+  buildValidCreateActividadPayload,
+  seedTiposActividadFontanero,
+} from './testing/actividades-fontanero.test-helpers';
 
 type ErrorResponseBody = { statusCode: number; message: string | string[] };
 
@@ -104,6 +108,7 @@ describe('QA Backlog 7.8 — Flujo Integral de Revisión Administrativa de Activ
             TipoActividadFontanero,
             DocumentoActividadFontanero,
             Usuario,
+            Rol,
           ],
           synchronize: true,
         }),
@@ -561,6 +566,93 @@ describe('QA Backlog 7.8 — Flujo Integral de Revisión Administrativa de Activ
 
       const err = asError(repeticion.body);
       expect(String(err.message)).toMatch(/ya (fue|ha sido) revisada/i);
+    });
+
+    it('ciclo completo: POST fontanero -> REPORTADA/PENDIENTE -> GET admin -> PATCH revisar -> REVISADA/REVISADA -> Segundo PATCH -> 400', async () => {
+      const fontaneroToken = signAs(Role.FONTANERO, 'fontanero-ciclo');
+      const adminToken = signAs(Role.ADMINISTRADORA, 'admin-supervisora-ciclo');
+
+      // 1. Registro de la actividad vía POST /fontanero/actividades
+      const postRes = await request(app.getHttpServer())
+        .post('/api/v1/fontanero/actividades')
+        .set('Authorization', `Bearer ${fontaneroToken}`)
+        .send(
+          buildValidCreateActividadPayload(tipoFugas.id, {
+            titulo: 'Mantenimiento de tubería sector oeste',
+            fechaActividad: '2026-08-27',
+            descripcion: 'Trabajo rutinario',
+          }),
+        )
+        .expect(201);
+
+      const nuevaActividadId = postRes.body.id;
+
+      // Comprobación decisiva: la respuesta del POST no debe devolver REVISADA
+      expect(postRes.body.estado).toBe(EstadoActividadFontanero.REPORTADA);
+      expect(postRes.body.estadoRevision).toBe('PENDIENTE');
+      expect(postRes.body.fechaRevision).toBeNull();
+      expect(postRes.body.revisadoPorId).toBeUndefined();
+
+      // 2. Consulta administrativa GET /admin/actividades/:id
+      const getDetalleAdmin = await authGet(
+        `/admin/actividades-fontanero/${nuevaActividadId}`,
+        adminToken,
+      ).expect(200);
+
+      expect(getDetalleAdmin.body.estado).toBe(EstadoActividadFontanero.REPORTADA);
+      expect(getDetalleAdmin.body.estadoRevision).toBe('PENDIENTE');
+      expect(getDetalleAdmin.body.fechaRevision).toBeNull();
+      expect(getDetalleAdmin.body.revisadoPorId).toBeNull();
+
+      // Consulta en listado administrativo GET /admin/actividades
+      const getListaAdmin = await authGet(
+        `/admin/actividades?fontaneroId=fontanero-ciclo`,
+        adminToken,
+      ).expect(200);
+
+      const itemEnLista = getListaAdmin.body.data.find(
+        (a: any) => a.id === nuevaActividadId,
+      );
+      expect(itemEnLista).toBeDefined();
+      expect(itemEnLista.estado).toBe(EstadoActividadFontanero.REPORTADA);
+      expect(itemEnLista.estadoRevision).toBe('PENDIENTE');
+      expect(itemEnLista.fechaRevision).toBeNull();
+      expect(itemEnLista.revisadoPorId).toBeNull();
+
+      // 3. Endpoint de revisión administrativa PATCH /admin/actividades-fontanero/:id/revisar
+      const patchRevisar = await authPatch(
+        `/admin/actividades-fontanero/${nuevaActividadId}/revisar`,
+        { observacion: 'Revisión técnica satisfactoria' },
+        adminToken,
+      ).expect(200);
+
+      expect(patchRevisar.body.estado).toBe(EstadoActividadFontanero.REVISADA);
+      expect(patchRevisar.body.estadoRevision).toBe('REVISADA');
+      expect(patchRevisar.body.fechaRevision).toBeDefined();
+      expect(patchRevisar.body.fechaRevision).not.toBeNull();
+      expect(patchRevisar.body.revisadoPorId).toBe('admin-supervisora-ciclo');
+
+      const fechaPrimeraRevision = patchRevisar.body.fechaRevision;
+
+      // 4. Segundo PATCH revisar -> no duplica ni altera nuevamente la revisión (400 Bad Request)
+      const segundoPatch = await authPatch(
+        `/admin/actividades-fontanero/${nuevaActividadId}/revisar`,
+        { observacion: 'Segundo intento redundante' },
+        adminToken,
+      ).expect(400);
+
+      expect(String(segundoPatch.body.message)).toMatch(/ya (fue|ha sido) revisada/i);
+
+      // Verificar en BD que los datos de la revisión se preservaron intactos
+      const verificacionFinal = await authGet(
+        `/admin/actividades-fontanero/${nuevaActividadId}`,
+        adminToken,
+      ).expect(200);
+
+      expect(verificacionFinal.body.estado).toBe(EstadoActividadFontanero.REVISADA);
+      expect(verificacionFinal.body.estadoRevision).toBe('REVISADA');
+      expect(verificacionFinal.body.revisadoPorId).toBe('admin-supervisora-ciclo');
+      expect(verificacionFinal.body.fechaRevision).toBe(fechaPrimeraRevision);
     });
   });
 

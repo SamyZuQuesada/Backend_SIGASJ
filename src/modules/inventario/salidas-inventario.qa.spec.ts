@@ -303,11 +303,11 @@ describe('Salidas de Inventario — QA Integral, Validación Funcional y Transac
   // PILAR 2: Regla Centralizada de Existencias Disponibles (4.5.2)
   // =========================================================================
   describe('2. Validación de Existencias Disponibles y Prevención de Stock Negativo', () => {
-    it('permite una salida que deje las existencias exactamente en cero', async () => {
+    it('permite una salida que deje las existencias exactamente en cero cuando stockMinimo es 0', async () => {
       const material = await createMaterial({
         nombre: 'Codo PVC 90° 1/2"',
         stockActual: 5,
-        stockMinimo: 1,
+        stockMinimo: 0,
         activo: true,
       });
 
@@ -328,6 +328,33 @@ describe('Salidas de Inventario — QA Integral, Validación Funcional y Transac
         where: { id: material.id },
       });
       expect(updated?.stockActual).toBe(0);
+    });
+
+    it('rechaza con 400 Bad Request cuando la cantidad solicitada dejaría el stock por debajo del stock mínimo (reserva obligatoria)', async () => {
+      const material = await createMaterial({
+        nombre: 'Codo PVC Reserva 90°',
+        stockActual: 5,
+        stockMinimo: 2,
+        activo: true,
+      });
+
+      const token = signAs(Role.FONTANERO, String(fontaneroUser.idUsuario));
+
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/inventario/salidas')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          idMaterial: material.id,
+          cantidad: 4,
+        });
+
+      expect(res.status).toBe(HttpStatus.BAD_REQUEST);
+      expect(res.body.message).toContain(
+        'La salida dejaría el material por debajo del stock mínimo',
+      );
+      expect(res.body.message).toContain(
+        'Puede retirar como máximo 3 unidades.',
+      );
     });
 
     it('rechaza con 400 Bad Request cuando la cantidad solicitada supera el stock disponible (nunca negativo)', async () => {

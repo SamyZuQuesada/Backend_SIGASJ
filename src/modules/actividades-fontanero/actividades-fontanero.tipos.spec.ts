@@ -16,6 +16,7 @@ import { AuthModule } from '../auth/auth.module';
 import { ActividadesFontaneroModule } from './actividades-fontanero.module';
 import type { ListadoTiposActividadResponse } from './actividades-fontanero.service';
 import { Usuario } from '../usuarios/entities/usuario.entity';
+import { Rol } from '../usuarios/entities/rol.entity';
 import { ActividadFontanero } from './entities/actividad-fontanero.entity';
 import { TipoActividadFontanero } from './entities/tipo-actividad-fontanero.entity';
 import { DocumentoActividadFontanero } from './entities/documento-actividad-fontanero.entity';
@@ -53,6 +54,7 @@ describe('Catálogo de tipos de actividad del fontanero', () => {
             TipoActividadFontanero,
             DocumentoActividadFontanero,
             Usuario,
+            Rol,
           ],
           synchronize: true,
         }),
