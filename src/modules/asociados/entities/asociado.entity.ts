@@ -17,6 +17,9 @@ import { normalizarCedula } from '../../../common/utils/cedula.util';
  */
 @Entity('Asociado')
 @Index('UQ_Asociado_cedula', ['cedula'], { unique: true })
+@Index('IDX_Asociado_activo', ['activo'])
+@Index('IDX_Asociado_fechaRegistro', ['fechaRegistro'])
+@Index('IDX_Asociado_fechaInactivacion', ['fechaInactivacion'])
 export class Asociado {
   @ApiProperty({
     example: 1,

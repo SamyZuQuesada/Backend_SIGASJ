@@ -20,6 +20,8 @@ import {
 import { AsociadosListado, AsociadosService } from './asociados.service';
 import { CreateAsociadoDto } from './dto/create-asociado.dto';
 import { QueryAsociadosDto } from './dto/query-asociados.dto';
+import { HistorialAsociadosResponseDto } from './dto/historial-asociado.dto';
+import { QueryHistorialAsociadosDto } from './dto/query-historial-asociados.dto';
 import { UpdateAsociadoDto } from './dto/update-asociado.dto';
 import { UpdateEstadoAsociadoDto } from './dto/update-estado-asociado.dto';
 import { Asociado } from './entities/asociado.entity';
@@ -96,6 +98,33 @@ export class AsociadosController {
   })
   async findAll(@Query() query: QueryAsociadosDto): Promise<AsociadosListado> {
     return this.asociadosService.findAll(query);
+  }
+
+  @Get('historial')
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @ApiOperation({
+    summary: 'Historial administrativo de asociados',
+    description:
+      'Endpoint administrativo de solo consulta para recuperar el historial de asociados activos e inactivos con datos de contacto, estado y fechas de registro e inactivación. Requiere rol ADMINISTRADORA o SECRETARIA.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Historial de asociados obtenido exitosamente.',
+    type: HistorialAsociadosResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Parámetros de consulta inválidos.',
+  })
+  @ApiResponse({ status: 401, description: 'No autenticado.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Sin rol ADMINISTRADORA ni SECRETARIA.',
+  })
+  async getHistorial(
+    @Query() query: QueryHistorialAsociadosDto,
+  ): Promise<HistorialAsociadosResponseDto> {
+    return this.asociadosService.getHistorial(query);
   }
 
   @Get(':id')
