@@ -5,10 +5,13 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  Matches,
   Max,
   MaxLength,
   Min,
 } from 'class-validator';
+
+const FECHA_ISO = /^\d{4}-\d{2}-\d{2}$/;
 
 const rawValue = ({ value, obj, key }: TransformFnParams): unknown => {
   if (obj && typeof obj === 'object' && key in obj) {
@@ -83,6 +86,80 @@ export class QueryAsociadosDto {
   @IsOptional()
   @IsBoolean({ message: 'El filtro activo debe ser true o false' })
   activo?: boolean;
+
+  @ApiPropertyOptional({
+    example: '2026-01-01',
+    description:
+      'Filtro histórico general / inicio de rango de fecha de registro (YYYY-MM-DD)',
+  })
+  @Transform(trimOptionalString)
+  @IsOptional()
+  @IsString({ message: 'fechaDesde debe ser una cadena de texto' })
+  @Matches(FECHA_ISO, { message: 'fechaDesde debe tener formato YYYY-MM-DD' })
+  fechaDesde?: string;
+
+  @ApiPropertyOptional({
+    example: '2026-12-31',
+    description:
+      'Filtro histórico general / fin de rango de fecha de registro (YYYY-MM-DD)',
+  })
+  @Transform(trimOptionalString)
+  @IsOptional()
+  @IsString({ message: 'fechaHasta debe ser una cadena de texto' })
+  @Matches(FECHA_ISO, { message: 'fechaHasta debe tener formato YYYY-MM-DD' })
+  fechaHasta?: string;
+
+  @ApiPropertyOptional({
+    example: '2026-01-01',
+    description:
+      'Fecha mínima de registro formal del asociado (YYYY-MM-DD)',
+  })
+  @Transform(trimOptionalString)
+  @IsOptional()
+  @IsString({ message: 'fechaRegistroDesde debe ser una cadena de texto' })
+  @Matches(FECHA_ISO, {
+    message: 'fechaRegistroDesde debe tener formato YYYY-MM-DD',
+  })
+  fechaRegistroDesde?: string;
+
+  @ApiPropertyOptional({
+    example: '2026-12-31',
+    description:
+      'Fecha máxima de registro formal del asociado (YYYY-MM-DD)',
+  })
+  @Transform(trimOptionalString)
+  @IsOptional()
+  @IsString({ message: 'fechaRegistroHasta debe ser una cadena de texto' })
+  @Matches(FECHA_ISO, {
+    message: 'fechaRegistroHasta debe tener formato YYYY-MM-DD',
+  })
+  fechaRegistroHasta?: string;
+
+  @ApiPropertyOptional({
+    example: '2026-01-01',
+    description:
+      'Fecha mínima de inactivación del asociado (YYYY-MM-DD)',
+  })
+  @Transform(trimOptionalString)
+  @IsOptional()
+  @IsString({ message: 'fechaInactivacionDesde debe ser una cadena de texto' })
+  @Matches(FECHA_ISO, {
+    message: 'fechaInactivacionDesde debe tener formato YYYY-MM-DD',
+  })
+  fechaInactivacionDesde?: string;
+
+  @ApiPropertyOptional({
+    example: '2026-12-31',
+    description:
+      'Fecha máxima de inactivación del asociado (YYYY-MM-DD)',
+  })
+  @Transform(trimOptionalString)
+  @IsOptional()
+  @IsString({ message: 'fechaInactivacionHasta debe ser una cadena de texto' })
+  @Matches(FECHA_ISO, {
+    message: 'fechaInactivacionHasta debe tener formato YYYY-MM-DD',
+  })
+  fechaInactivacionHasta?: string;
 
   @ApiPropertyOptional({
     minimum: 1,

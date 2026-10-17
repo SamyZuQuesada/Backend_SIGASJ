@@ -17,6 +17,16 @@ import {
   ASOCIADOS_PAGE_DEFAULT,
   QueryAsociadosDto,
 } from './dto/query-asociados.dto';
+import {
+  HistorialAsociadoItemDto,
+  HistorialAsociadosResponseDto,
+} from './dto/historial-asociado.dto';
+import {
+  HISTORIAL_ASOCIADOS_LIMIT_DEFAULT,
+  HISTORIAL_ASOCIADOS_PAGE_DEFAULT,
+  OrdenHistorial,
+  QueryHistorialAsociadosDto,
+} from './dto/query-historial-asociados.dto';
 
 export type AsociadosListado = {
   data: Asociado[];
@@ -196,6 +206,32 @@ export class AsociadosService {
       qb.andWhere('a.activo = :activo', { activo: query.activo });
     }
 
+    const fechaRegDesde = query.fechaRegistroDesde ?? query.fechaDesde;
+    if (fechaRegDesde) {
+      qb.andWhere('a.fechaRegistro >= :fechaRegDesde', {
+        fechaRegDesde: new Date(`${fechaRegDesde}T00:00:00.000Z`),
+      });
+    }
+
+    const fechaRegHasta = query.fechaRegistroHasta ?? query.fechaHasta;
+    if (fechaRegHasta) {
+      qb.andWhere('a.fechaRegistro <= :fechaRegHasta', {
+        fechaRegHasta: new Date(`${fechaRegHasta}T23:59:59.999Z`),
+      });
+    }
+
+    if (query.fechaInactivacionDesde) {
+      qb.andWhere('a.fechaInactivacion >= :fechaInactDesde', {
+        fechaInactDesde: new Date(`${query.fechaInactivacionDesde}T00:00:00.000Z`),
+      });
+    }
+
+    if (query.fechaInactivacionHasta) {
+      qb.andWhere('a.fechaInactivacion <= :fechaInactHasta', {
+        fechaInactHasta: new Date(`${query.fechaInactivacionHasta}T23:59:59.999Z`),
+      });
+    }
+
     qb.orderBy('a.apellidos', 'ASC')
       .addOrderBy('a.nombre', 'ASC')
       .addOrderBy('a.id', 'ASC')
@@ -371,5 +407,143 @@ export class AsociadosService {
       `Asociado ${dto.activo ? 'reactivado' : 'inactivado'}: id=${id}`,
     );
     return guardado;
+  }
+
+  /**
+   * Endpoint administrativo de solo consulta para recuperar el historial de asociados.
+   * Incluye tanto asociados activos como inactivos (anteriores), con datos de contacto,
+   * estado y fechas de registro e inactivación.
+   * Consulta directa y de solo lectura sobre la tabla Asociado en SQL Server.
+   */
+  async getHistorial(
+    query: QueryHistorialAsociadosDto = {},
+  ): Promise<HistorialAsociadosResponseDto> {
+    const page = query.page ?? HISTORIAL_ASOCIADOS_PAGE_DEFAULT;
+    const limit = query.limit ?? HISTORIAL_ASOCIADOS_LIMIT_DEFAULT;
+    const direccion = query.orden === OrdenHistorial.DESC ? 'DESC' : 'ASC';
+
+    const qb = this.asociadoRepository
+      .createQueryBuilder('a')
+      .setParameter('likeEscape', '\\');
+
+    if (query.search) {
+      qb.andWhere(
+        new Brackets((inner) => {
+          inner
+            .where('a.nombre LIKE :search ESCAPE :likeEscape')
+            .orWhere('a.apellidos LIKE :search ESCAPE :likeEscape')
+            .orWhere(
+              "REPLACE(REPLACE(a.cedula, '-', ''), ' ', '') LIKE :searchCedula ESCAPE :likeEscape",
+            );
+        }),
+      )
+        .setParameter('search', patronLike(query.search))
+        .setParameter('searchCedula', patronLike(sinGuiones(query.search)));
+    }
+
+    if (query.nombre) {
+      qb.andWhere('a.nombre LIKE :nombreFiltro ESCAPE :likeEscape', {
+        nombreFiltro: patronLike(query.nombre),
+      });
+    }
+
+    if (query.apellidos) {
+      qb.andWhere('a.apellidos LIKE :apellidosFiltro ESCAPE :likeEscape', {
+        apellidosFiltro: patronLike(query.apellidos),
+      });
+    }
+
+    if (query.cedula) {
+      qb.andWhere(
+        "REPLACE(REPLACE(a.cedula, '-', ''), ' ', '') LIKE :cedulaFiltro ESCAPE :likeEscape",
+        {
+          cedulaFiltro: patronLike(sinGuiones(query.cedula)),
+        },
+      );
+    }
+
+    const estadoFiltro =
+      query.activo !== undefined ? query.activo : query.estado;
+    if (estadoFiltro !== undefined) {
+      qb.andWhere('a.activo = :activo', { activo: estadoFiltro });
+    }
+
+    if (query.fechaRegistro) {
+      qb.andWhere(
+        'a.fechaRegistro >= :fRegExactaInicio AND a.fechaRegistro <= :fRegExactaFin',
+        {
+          fRegExactaInicio: new Date(`${query.fechaRegistro}T00:00:00.000Z`),
+          fRegExactaFin: new Date(`${query.fechaRegistro}T23:59:59.999Z`),
+        },
+      );
+    }
+
+    const fRegDesde = query.fechaRegistroDesde ?? query.fechaDesde;
+    if (fRegDesde) {
+      qb.andWhere('a.fechaRegistro >= :fRegDesde', {
+        fRegDesde: new Date(`${fRegDesde}T00:00:00.000Z`),
+      });
+    }
+
+    const fRegHasta = query.fechaRegistroHasta ?? query.fechaHasta;
+    if (fRegHasta) {
+      qb.andWhere('a.fechaRegistro <= :fRegHasta', {
+        fRegHasta: new Date(`${fRegHasta}T23:59:59.999Z`),
+      });
+    }
+
+    if (query.fechaInactivacion) {
+      qb.andWhere(
+        'a.fechaInactivacion >= :fInactExactaInicio AND a.fechaInactivacion <= :fInactExactaFin',
+        {
+          fInactExactaInicio: new Date(
+            `${query.fechaInactivacion}T00:00:00.000Z`,
+          ),
+          fInactExactaFin: new Date(`${query.fechaInactivacion}T23:59:59.999Z`),
+        },
+      );
+    }
+
+    if (query.fechaInactivacionDesde) {
+      qb.andWhere('a.fechaInactivacion >= :fInactDesde', {
+        fInactDesde: new Date(`${query.fechaInactivacionDesde}T00:00:00.000Z`),
+      });
+    }
+
+    if (query.fechaInactivacionHasta) {
+      qb.andWhere('a.fechaInactivacion <= :fInactHasta', {
+        fInactHasta: new Date(`${query.fechaInactivacionHasta}T23:59:59.999Z`),
+      });
+    }
+
+    qb.orderBy('a.apellidos', direccion)
+      .addOrderBy('a.nombre', direccion)
+      .addOrderBy('a.id', 'ASC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    const [data, total] = await qb.getManyAndCount();
+
+    const items: HistorialAsociadoItemDto[] = data.map((a) => ({
+      id: a.id,
+      nombre: a.nombre,
+      apellidos: a.apellidos,
+      cedula: a.cedula,
+      correo: a.correoElectronico,
+      correoElectronico: a.correoElectronico,
+      activo: a.activo,
+      estado: a.activo ? 'Activo' : 'Inactivo',
+      fechaRegistro: a.fechaRegistro,
+      fechaInactivacion: a.fechaInactivacion,
+      motivoInactivacion: a.motivoInactivacion,
+    }));
+
+    return {
+      data: items,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 0,
+    };
   }
 }

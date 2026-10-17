@@ -174,6 +174,27 @@ describe('Asociado Entity (SIGASJ)', () => {
       expect(index?.columns).toEqual(['cedula']);
     });
 
+    it('debe registrar los índices para optimizar consultas históricas (activo, fechaRegistro, fechaInactivacion)', () => {
+      const indexActivo = storage.indices.find(
+        (i) => i.target === Asociado && i.name === 'IDX_Asociado_activo',
+      );
+      expect(indexActivo).toBeDefined();
+      expect(indexActivo?.columns).toEqual(['activo']);
+
+      const indexFechaReg = storage.indices.find(
+        (i) => i.target === Asociado && i.name === 'IDX_Asociado_fechaRegistro',
+      );
+      expect(indexFechaReg).toBeDefined();
+      expect(indexFechaReg?.columns).toEqual(['fechaRegistro']);
+
+      const indexFechaInact = storage.indices.find(
+        (i) =>
+          i.target === Asociado && i.name === 'IDX_Asociado_fechaInactivacion',
+      );
+      expect(indexFechaInact).toBeDefined();
+      expect(indexFechaInact?.columns).toEqual(['fechaInactivacion']);
+    });
+
     it('debe configurar longitudes adecuadas para nombre, apellidos y correoElectronico', () => {
       const nombreCol = storage.columns.find(
         (c) => c.target === Asociado && c.propertyName === 'nombre',

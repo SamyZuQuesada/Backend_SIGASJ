@@ -195,6 +195,26 @@ describe('GET /api/v1/asociados (consulta y búsqueda)', () => {
         '1-1234-0567',
       ]);
     });
+
+    it('filtra por rango histórico de fecha de registro (fechaDesde / fechaHasta)', async () => {
+      const enRango = await listar('?fechaDesde=2026-01-01&fechaHasta=2026-01-31');
+      expect(enRango.total).toBe(5);
+
+      const fueraDeRango = await listar('?fechaDesde=2027-01-01&fechaHasta=2027-12-31');
+      expect(fueraDeRango.total).toBe(0);
+    });
+
+    it('filtra por rango histórico de fecha de inactivación', async () => {
+      const inactivosMayo = await listar(
+        '?fechaInactivacionDesde=2026-05-01&fechaInactivacionHasta=2026-05-31',
+      );
+      expect(cedulas(inactivosMayo)).toEqual(['3-0111-0222']);
+
+      const inactivosJunio = await listar(
+        '?fechaInactivacionDesde=2026-06-01&fechaInactivacionHasta=2026-06-30',
+      );
+      expect(inactivosJunio.total).toBe(0);
+    });
   });
 
   describe('Paginación (5.2.3)', () => {
