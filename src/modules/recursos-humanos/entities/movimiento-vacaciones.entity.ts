@@ -78,7 +78,8 @@ export class MovimientoVacaciones {
     example: '2026-10-12',
     description: 'Fecha en que aplica el movimiento (YYYY-MM-DD)',
   })
-  @Column({ type: 'date' })
+  // varchar(10) como en PermisoColaborador: evita desfase de un día con mssql/DATE.
+  @Column({ type: 'varchar', length: 10 })
   fecha: string;
 
   @ApiPropertyOptional({

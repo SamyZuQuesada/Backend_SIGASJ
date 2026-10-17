@@ -7,6 +7,7 @@ import { Colaborador } from './entities/colaborador.entity';
 import { Incapacidad } from './entities/incapacidad.entity';
 import { MovimientoVacaciones } from './entities/movimiento-vacaciones.entity';
 import { PermisoColaborador } from './entities/permiso-colaborador.entity';
+import { HistorialColaboradorService } from './historial-colaborador.service';
 import { IncapacidadesController } from './incapacidades.controller';
 import { IncapacidadesService } from './incapacidades.service';
 import { PermisosColaboradorController } from './permisos-colaborador.controller';
@@ -32,12 +33,14 @@ import { VacacionesService } from './vacaciones.service';
   ],
   providers: [
     ColaboradoresService,
+    HistorialColaboradorService,
     PermisosColaboradorService,
     VacacionesService,
     IncapacidadesService,
   ],
   exports: [
     ColaboradoresService,
+    HistorialColaboradorService,
     PermisosColaboradorService,
     VacacionesService,
     IncapacidadesService,

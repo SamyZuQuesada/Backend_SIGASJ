@@ -26,10 +26,13 @@ import {
   ColaboradoresService,
 } from './colaboradores.service';
 import { CreateColaboradorDto } from './dto/create-colaborador.dto';
+import { HistorialColaboradorResponseDto } from './dto/historial-colaborador.dto';
 import { QueryColaboradoresDto } from './dto/query-colaboradores.dto';
+import { QueryHistorialColaboradorDto } from './dto/query-historial-colaborador.dto';
 import { UpdateColaboradorDto } from './dto/update-colaborador.dto';
 import { UpdateEstadoColaboradorDto } from './dto/update-estado-colaborador.dto';
 import { Colaborador } from './entities/colaborador.entity';
+import { HistorialColaboradorService } from './historial-colaborador.service';
 
 @ApiTags('Recursos Humanos - Colaboradores')
 @ApiBearerAuth()
@@ -37,7 +40,10 @@ import { Colaborador } from './entities/colaborador.entity';
 @Roles(Role.ADMINISTRADORA)
 @Controller('rrhh/colaboradores')
 export class ColaboradoresController {
-  constructor(private readonly colaboradoresService: ColaboradoresService) {}
+  constructor(
+    private readonly colaboradoresService: ColaboradoresService,
+    private readonly historialColaboradorService: HistorialColaboradorService,
+  ) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -88,6 +94,35 @@ export class ColaboradoresController {
     @Query() query: QueryColaboradoresDto,
   ): Promise<ColaboradoresListado> {
     return this.colaboradoresService.findAll(query);
+  }
+
+  @Get(':id/historial')
+  @ApiOperation({
+    summary: 'Historial administrativo del colaborador',
+    description:
+      'Consulta de solo lectura que unifica permisos, movimientos de vacaciones e incapacidades. Permite filtrar por tipo y rango de fechas, y paginar. Orden: más reciente primero. Requiere rol ADMINISTRADORA.',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Historial consolidado paginado: { colaborador, historial, total, page, limit, totalPages }.',
+    type: HistorialColaboradorResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Id inválido o parámetros de filtro/paginación inválidos.',
+  })
+  @ApiResponse({ status: 401, description: 'No autenticado.' })
+  @ApiResponse({ status: 403, description: 'Sin rol ADMINISTRADORA.' })
+  @ApiResponse({
+    status: 404,
+    description: 'No se encontró el colaborador solicitado.',
+  })
+  getHistorial(
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: QueryHistorialColaboradorDto,
+  ): Promise<HistorialColaboradorResponseDto> {
+    return this.historialColaboradorService.getHistorialColaborador(id, query);
   }
 
   @Get(':id')

@@ -176,7 +176,8 @@ describe('MovimientoVacaciones Entity (SIGASJ)', () => {
     it('debe registrar createdAt automático y observaciones opcionales', () => {
       expect(columna('createdAt')?.mode).toBe('createDate');
       expect(columna('observaciones')?.options.nullable).toBe(true);
-      expect(columna('fecha')?.options.type).toBe('date');
+      expect(columna('fecha')?.options.type).toBe('varchar');
+      expect(columna('fecha')?.options.length).toBe(10);
       expect(columna('cantidadDias')?.options.type).toBe('int');
     });
   });
