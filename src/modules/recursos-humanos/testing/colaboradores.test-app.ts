@@ -14,6 +14,7 @@ import { AuthModule } from '../../auth/auth.module';
 import { Rol } from '../../usuarios/entities/rol.entity';
 import { Usuario } from '../../usuarios/entities/usuario.entity';
 import { Colaborador } from '../entities/colaborador.entity';
+import { Incapacidad } from '../entities/incapacidad.entity';
 import { MovimientoVacaciones } from '../entities/movimiento-vacaciones.entity';
 import { PermisoColaborador } from '../entities/permiso-colaborador.entity';
 import { RecursosHumanosModule } from '../recursos-humanos.module';
@@ -42,6 +43,7 @@ export async function crearColaboradoresTestApp(): Promise<ColaboradoresTestApp>
           Colaborador,
           PermisoColaborador,
           MovimientoVacaciones,
+          Incapacidad,
           Usuario,
           Rol,
         ],
