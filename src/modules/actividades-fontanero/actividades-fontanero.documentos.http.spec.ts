@@ -14,6 +14,7 @@ import { MAX_ACTIVIDAD_DOCUMENT_BYTES } from '../../common/media/public-media';
 import jwtConfig from '../../config/jwt.config';
 import { AuthModule } from '../auth/auth.module';
 import { Usuario } from '../usuarios/entities/usuario.entity';
+import { Rol } from '../usuarios/entities/rol.entity';
 import { ActividadesFontaneroModule } from './actividades-fontanero.module';
 import { ActividadFontanero } from './entities/actividad-fontanero.entity';
 import { DocumentoActividadFontanero } from './entities/documento-actividad-fontanero.entity';
@@ -58,6 +59,7 @@ describe('HTTP documentos — tamaño y adjunto (actividades fontanero)', () => 
             TipoActividadFontanero,
             DocumentoActividadFontanero,
             Usuario,
+            Rol,
           ],
           synchronize: true,
         }),

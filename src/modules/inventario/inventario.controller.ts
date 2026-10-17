@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   HttpCode,
   HttpStatus,
   Param,
@@ -103,6 +104,9 @@ export class InventarioController {
 
   @Get('materiales')
   @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  @Header('Pragma', 'no-cache')
+  @Header('Expires', '0')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMINISTRADORA, Role.SECRETARIA, Role.FONTANERO)
   @ApiOperation({
@@ -128,6 +132,9 @@ export class InventarioController {
 
   @Get('materiales/:id')
   @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  @Header('Pragma', 'no-cache')
+  @Header('Expires', '0')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMINISTRADORA, Role.SECRETARIA, Role.FONTANERO)
   @ApiOperation({
@@ -162,6 +169,9 @@ export class InventarioController {
 
   @Get('materiales/:id/disponibilidad')
   @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  @Header('Pragma', 'no-cache')
+  @Header('Expires', '0')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMINISTRADORA, Role.SECRETARIA, Role.FONTANERO)
   @ApiOperation({

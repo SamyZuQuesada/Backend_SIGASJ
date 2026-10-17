@@ -13,6 +13,7 @@ import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
 import jwtConfig from '../../config/jwt.config';
 import { AuthModule } from '../auth/auth.module';
 import { Usuario } from '../usuarios/entities/usuario.entity';
+import { Rol } from '../usuarios/entities/rol.entity';
 import { ActividadesFontaneroModule } from './actividades-fontanero.module';
 import { ActividadFontanero } from './entities/actividad-fontanero.entity';
 import { TipoActividadFontanero } from './entities/tipo-actividad-fontanero.entity';
@@ -64,6 +65,7 @@ describe('QA #933 — registro y validación de actividades Fontanero', () => {
             TipoActividadFontanero,
             DocumentoActividadFontanero,
             Usuario,
+            Rol,
           ],
           synchronize: true,
         }),
@@ -115,6 +117,9 @@ describe('QA #933 — registro y validación de actividades Fontanero', () => {
       titulo: payload.titulo,
       tipoActividadId: validTipoActividadId,
       fechaActividad: payload.fechaActividad,
+      estado: 'REPORTADA',
+      estadoRevision: 'PENDIENTE',
+      fechaRevision: null,
     });
 
     expect(await actividades.count()).toBe(1);
@@ -126,6 +131,10 @@ describe('QA #933 — registro y validación de actividades Fontanero', () => {
     expect(saved?.fontaneroId).toBe('fontanero-qa-1');
     expect(saved?.tipoActividad?.id).toBe(validTipoActividadId);
     expect(saved?.fechaActividad).toBe('2026-09-07');
+    expect(saved?.estado).toBe('REPORTADA');
+    expect(saved?.estadoRevision).toBe('PENDIENTE');
+    expect(saved?.fechaRevision).toBeNull();
+    expect(saved?.revisadoPorId).toBeNull();
   });
 
   it('intentos inválidos no generan registros y tras corregir se registra correctamente', async () => {

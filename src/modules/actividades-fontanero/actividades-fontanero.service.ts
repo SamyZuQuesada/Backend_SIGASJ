@@ -47,7 +47,7 @@ export type ActividadFontaneroResponse = {
   observaciones: string | null;
   datosEspecificos?: Record<string, unknown> | null;
   estado: EstadoActividadFontanero;
-  estadoRevision?: string;
+  estadoRevision: string;
   observacionCorreccion: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -209,6 +209,8 @@ export class ActividadesFontaneroService {
       tipoActividad,
       fontanero: idUsuario ? { idUsuario } : null,
       estado: EstadoActividadFontanero.REPORTADA,
+      estadoRevision: 'PENDIENTE',
+      fechaRevision: null,
       fontaneroId: user.userId,
       observacionCorreccion: null,
       revisadoPorId: null,
@@ -791,11 +793,15 @@ export class ActividadesFontaneroService {
     return withDbRetry(async () => {
       const actividad = await this.requireActividad(id);
 
-      if (actividad.estado === EstadoActividadFontanero.REVISADA) {
+      if (
+        actividad.estado === EstadoActividadFontanero.REVISADA ||
+        actividad.estadoRevision === 'REVISADA'
+      ) {
         throw new BadRequestException(ACTIVIDADES_MSG.yaRevisada);
       }
 
       actividad.estado = dto.estado ?? EstadoActividadFontanero.REVISADA;
+      actividad.estadoRevision = 'REVISADA';
       actividad.revisadoPorId = user.userId;
       actividad.fechaRevision = new Date();
       if (dto.observacion !== undefined) {
@@ -893,10 +899,11 @@ export class ActividadesFontaneroService {
   ): ActividadFontaneroResponse {
     const tipo = tipoActividad ?? actividad.tipoActividad;
     const estadoRevision =
-      actividad.fechaRevision !== null ||
-      actividad.estado === EstadoActividadFontanero.REVISADA
+      actividad.estadoRevision ??
+      (actividad.estado === EstadoActividadFontanero.REVISADA ||
+      Boolean(actividad.fechaRevision)
         ? 'REVISADA'
-        : 'PENDIENTE';
+        : 'PENDIENTE');
 
     return {
       id: actividad.id,
@@ -932,10 +939,11 @@ export class ActividadesFontaneroService {
     actividad: ActividadFontanero,
   ): ActividadFontaneroAdminResponse {
     const estadoRevision =
-      actividad.fechaRevision !== null ||
-      actividad.estado === EstadoActividadFontanero.REVISADA
+      actividad.estadoRevision ??
+      (actividad.estado === EstadoActividadFontanero.REVISADA ||
+      Boolean(actividad.fechaRevision)
         ? 'REVISADA'
-        : 'PENDIENTE';
+        : 'PENDIENTE');
 
     const fontanero = actividad.fontanero as
       Record<string, unknown> | null | undefined;

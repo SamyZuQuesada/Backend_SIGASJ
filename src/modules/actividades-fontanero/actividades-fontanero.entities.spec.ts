@@ -1,4 +1,5 @@
 import { DataSource } from 'typeorm';
+import { Rol } from '../usuarios/entities/rol.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { ActividadFontanero } from './entities/actividad-fontanero.entity';
 import { TipoActividadFontanero } from './entities/tipo-actividad-fontanero.entity';
@@ -16,6 +17,7 @@ describe('Entidades Actividades Fontanero (#386)', () => {
         TipoActividadFontanero,
         DocumentoActividadFontanero,
         Usuario,
+        Rol,
       ],
       synchronize: true,
     });
@@ -50,7 +52,7 @@ describe('Entidades Actividades Fontanero (#386)', () => {
     expect(relation!.joinColumns[0]?.databaseName).toBe('idUsuario');
   });
 
-  it('ActividadFontanero incluye fechaActividad y observaciones generales', () => {
+  it('ActividadFontanero incluye fechaActividad, observaciones, estado y estadoRevision con defaults correctos', () => {
     const metadata = dataSource.getMetadata(ActividadFontanero);
     const columnNames = metadata.columns.map((column) => column.propertyName);
 
@@ -59,8 +61,16 @@ describe('Entidades Actividades Fontanero (#386)', () => {
         'fechaActividad',
         'observaciones',
         'datosEspecificos',
+        'estado',
+        'estadoRevision',
       ]),
     );
+
+    const colEstado = metadata.findColumnWithPropertyName('estado');
+    expect(colEstado?.default).toBe('REPORTADA');
+
+    const colEstadoRevision = metadata.findColumnWithPropertyName('estadoRevision');
+    expect(colEstadoRevision?.default).toBe('PENDIENTE');
   });
 
   it('TipoActividadFontanero expone relación OneToMany con ActividadFontanero', () => {

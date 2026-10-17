@@ -73,6 +73,28 @@ export class RegistrarSalidaDto {
   @Min(1, { message: 'El identificador del material debe ser mayor a cero' })
   materialId?: number;
 
+  @ApiPropertyOptional({
+    example: 1,
+    description:
+      'Alias id para compatibilidad con clientes frontend (opcional)',
+  })
+  @Transform(toOptionalInt)
+  @IsOptional()
+  @IsInt({ message: 'El identificador del material debe ser un número entero' })
+  @Min(1, { message: 'El identificador del material debe ser mayor a cero' })
+  id?: number;
+
+  @ApiPropertyOptional({
+    example: 1,
+    description:
+      'Alias material para compatibilidad con clientes frontend (opcional)',
+  })
+  @Transform(toOptionalInt)
+  @IsOptional()
+  @IsInt({ message: 'El identificador del material debe ser un número entero' })
+  @Min(1, { message: 'El identificador del material debe ser mayor a cero' })
+  material?: number;
+
   @ApiProperty({
     example: 5,
     minimum: 1,

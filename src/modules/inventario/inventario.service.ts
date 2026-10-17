@@ -104,6 +104,7 @@ export type ConfirmacionEntradaInventario = {
   stockAnterior: number;
   stockActual: number;
   mensaje: string;
+  message?: string;
 };
 
 export type ConfirmacionSalidaInventario = {
@@ -111,7 +112,11 @@ export type ConfirmacionSalidaInventario = {
   material: Material;
   stockAnterior: number;
   stockActual: number;
+  diferencia?: number;
+  agotadoTotal?: boolean;
+  bajoStockMinimo?: boolean;
   mensaje: string;
+  message?: string;
 };
 
 @Injectable()
@@ -1059,11 +1064,25 @@ export class InventarioService {
               }
             }
 
-            const stockAnterior = material.stockActual;
-            const stockActual = stockAnterior + dto.cantidad;
+            const stockAnterior = Number(material.stockActual);
+            const cantidadEntrada = Number(dto.cantidad);
+            const stockActual = stockAnterior + cantidadEntrada;
 
             material.stockActual = stockActual;
             await materialRepo.save(material);
+            if (typeof materialRepo.update === 'function') {
+              await materialRepo.update(material.id, {
+                stockActual,
+              });
+            }
+
+            const materialPersistido = await materialRepo.findOne({
+              where: { id: material.id },
+            });
+            const stockRealmentePersistido =
+              materialPersistido?.stockActual !== undefined
+                ? Number(materialPersistido.stockActual)
+                : stockActual;
 
             const movimiento = movimientoRepo.create({
               tipo: TipoMovimientoInventario.ENTRADA,
@@ -1078,15 +1097,18 @@ export class InventarioService {
             const movimientoGuardado = await movimientoRepo.save(movimiento);
 
             this.logger.log(
-              `Entrada registrada con éxito: Material "${material.nombre}" (ID: ${material.id}), +${dto.cantidad} unidades (Stock: ${stockAnterior} -> ${stockActual}), Movimiento ID: ${movimientoGuardado.id}, Usuario ID: ${idUsuario}`,
+              `Entrada registrada con éxito: Material "${material.nombre}" (ID: ${material.id}), +${dto.cantidad} unidades (Stock: ${stockAnterior} -> ${stockRealmentePersistido}), Movimiento ID: ${movimientoGuardado.id}, Usuario ID: ${idUsuario}`,
             );
+
+            const mensaje = `Entrada física registrada exitosamente. Se ingresaron ${dto.cantidad} unidades de "${material.nombre}". Stock actualizado de ${stockAnterior} a ${stockRealmentePersistido}.`;
 
             return {
               movimiento: movimientoGuardado,
-              material,
+              material: materialPersistido ?? material,
               stockAnterior,
-              stockActual,
-              mensaje: `Entrada física registrada exitosamente. Se ingresaron ${dto.cantidad} unidades de "${material.nombre}". Stock actualizado de ${stockAnterior} a ${stockActual}.`,
+              stockActual: stockRealmentePersistido,
+              mensaje,
+              message: mensaje,
             };
           },
         );
@@ -1123,7 +1145,12 @@ export class InventarioService {
     dto: RegistrarSalidaDto,
     user: AuthenticatedUser,
   ): Promise<ConfirmacionSalidaInventario> {
-    const idMaterial = dto.idMaterial ?? dto.materialId;
+    const dtoAny = dto as unknown as Record<string, unknown>;
+    const idMaterial =
+      dto.idMaterial ??
+      dto.materialId ??
+      (dtoAny?.id ? Number(dtoAny.id) : undefined) ??
+      (dtoAny?.material ? Number(dtoAny.material) : undefined);
     if (!idMaterial) {
       throw new BadRequestException(
         'Debe especificar el identificador del material (idMaterial)',
@@ -1231,11 +1258,26 @@ export class InventarioService {
               }
             }
 
-            const stockAnterior = material.stockActual;
-            const stockActual = validacionStock.stockFinal;
+            const stockAnterior = Number(material.stockActual);
+            const cantidadSalida = Number(dto.cantidad);
+            const stockActual = stockAnterior - cantidadSalida;
 
             material.stockActual = stockActual;
             await materialRepo.save(material);
+            if (typeof materialRepo.update === 'function') {
+              await materialRepo.update(material.id, {
+                stockActual,
+              });
+            }
+
+            // Reconsultar directamente desde la base de datos dentro de la transacción para devolver el stock realmente persistido
+            const materialPersistido = await materialRepo.findOne({
+              where: { id: material.id },
+            });
+            const stockRealmentePersistido =
+              materialPersistido?.stockActual !== undefined
+                ? Number(materialPersistido.stockActual)
+                : stockActual;
 
             const movimiento = movimientoRepo.create({
               tipo: TipoMovimientoInventario.SALIDA,
@@ -1261,18 +1303,28 @@ export class InventarioService {
               });
             }
 
-            await this.evaluarYGenerarAlertaReposicion(material, manager);
+            await this.evaluarYGenerarAlertaReposicion(
+              materialPersistido ?? material,
+              manager,
+            );
 
             this.logger.log(
-              `Salida registrada con éxito: Material "${material.nombre}" (ID: ${material.id}), -${dto.cantidad} unidades (Stock: ${stockAnterior} -> ${stockActual}), Movimiento ID: ${movimientoGuardado.id}, Usuario ID: ${idUsuario}`,
+              `Salida registrada con éxito: Material "${material.nombre}" (ID: ${material.id}), -${dto.cantidad} unidades (Stock: ${stockAnterior} -> ${stockRealmentePersistido}), Movimiento ID: ${movimientoGuardado.id}, Usuario ID: ${idUsuario}`,
             );
+
+            const mensaje = `Salida física registrada exitosamente. Se retiraron ${dto.cantidad} unidades de "${material.nombre}". Stock actualizado de ${stockAnterior} a ${stockRealmentePersistido}.`;
 
             return {
               movimiento: movimientoGuardado,
-              material,
+              material: materialPersistido ?? material,
               stockAnterior,
-              stockActual,
-              mensaje: `Salida física registrada exitosamente. Se retiraron ${dto.cantidad} unidades de "${material.nombre}". Stock actualizado de ${stockAnterior} a ${stockActual}.`,
+              stockActual: stockRealmentePersistido,
+              diferencia: Number(dto.cantidad),
+              agotadoTotal: stockRealmentePersistido === 0,
+              bajoStockMinimo:
+                stockRealmentePersistido <= (material.stockMinimo ?? 0),
+              mensaje,
+              message: mensaje,
             };
           },
         );
@@ -2391,6 +2443,11 @@ export class InventarioService {
     return {
       ...validacion,
       material,
+      idMaterial: validacion.materialId,
+      nombreMaterial: validacion.materialNombre,
+      stockResultante: validacion.stockFinal,
+      esBajoMinimo: validacion.alcanzaStockMinimo,
+      disponible: validacion.esValido,
     };
   }
 

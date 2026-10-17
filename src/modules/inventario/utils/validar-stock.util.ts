@@ -55,6 +55,13 @@ export interface ResultadoValidacionStock {
    * Mensaje descriptivo del resultado de la verificación.
    */
   mensaje: string;
+
+  /** Alias para compatibilidad con el frontend */
+  idMaterial?: number;
+  nombreMaterial?: string;
+  stockResultante?: number;
+  esBajoMinimo?: boolean;
+  disponible?: boolean;
 }
 
 export type MaterialParaValidacion = Pick<
@@ -88,13 +95,18 @@ export function validarStockDisponible(
   ) {
     return {
       esValido: false,
+      disponible: false,
       materialId: material.id,
+      idMaterial: material.id,
       materialNombre: material.nombre,
+      nombreMaterial: material.nombre,
       stockActual,
       cantidadSolicitada: cantidad,
       stockFinal: stockActual,
+      stockResultante: stockActual,
       stockMinimo,
       alcanzaStockMinimo: stockActual <= stockMinimo,
+      esBajoMinimo: stockActual <= stockMinimo,
       esAgotamientoTotal: stockActual === 0,
       mensaje: 'La cantidad a retirar debe ser un número entero mayor a cero',
     };
@@ -103,13 +115,18 @@ export function validarStockDisponible(
   if (!material.activo) {
     return {
       esValido: false,
+      disponible: false,
       materialId: material.id,
+      idMaterial: material.id,
       materialNombre: material.nombre,
+      nombreMaterial: material.nombre,
       stockActual,
       cantidadSolicitada: cantidad,
       stockFinal: stockActual,
+      stockResultante: stockActual,
       stockMinimo,
       alcanzaStockMinimo: stockActual <= stockMinimo,
+      esBajoMinimo: stockActual <= stockMinimo,
       esAgotamientoTotal: stockActual === 0,
       mensaje: `No se pueden registrar salidas para el material "${material.nombre}" porque se encuentra inactivo`,
     };
@@ -118,19 +135,46 @@ export function validarStockDisponible(
   if (cantidad > stockActual) {
     return {
       esValido: false,
+      disponible: false,
       materialId: material.id,
+      idMaterial: material.id,
       materialNombre: material.nombre,
+      nombreMaterial: material.nombre,
       stockActual,
       cantidadSolicitada: cantidad,
       stockFinal: stockActual,
+      stockResultante: stockActual,
       stockMinimo,
       alcanzaStockMinimo: stockActual <= stockMinimo,
+      esBajoMinimo: stockActual <= stockMinimo,
       esAgotamientoTotal: stockActual === 0,
       mensaje: `Stock insuficiente para realizar la salida. Existencias disponibles: ${stockActual}, cantidad solicitada: ${cantidad}`,
     };
   }
 
   const stockFinal = stockActual - cantidad;
+
+  if (stockFinal < stockMinimo) {
+    const retiroMaximo = Math.max(0, stockActual - stockMinimo);
+    return {
+      esValido: false,
+      disponible: false,
+      materialId: material.id,
+      idMaterial: material.id,
+      materialNombre: material.nombre,
+      nombreMaterial: material.nombre,
+      stockActual,
+      cantidadSolicitada: cantidad,
+      stockFinal: stockActual,
+      stockResultante: stockActual,
+      stockMinimo,
+      alcanzaStockMinimo: true,
+      esBajoMinimo: true,
+      esAgotamientoTotal: false,
+      mensaje: `La salida dejaría el material por debajo del stock mínimo. Puede retirar como máximo ${retiroMaximo} unidades.`,
+    };
+  }
+
   const alcanzaStockMinimo = stockFinal <= stockMinimo;
   const esAgotamientoTotal = stockFinal === 0;
 
@@ -144,13 +188,18 @@ export function validarStockDisponible(
 
   return {
     esValido: true,
+    disponible: true,
     materialId: material.id,
+    idMaterial: material.id,
     materialNombre: material.nombre,
+    nombreMaterial: material.nombre,
     stockActual,
     cantidadSolicitada: cantidad,
     stockFinal,
+    stockResultante: stockFinal,
     stockMinimo,
     alcanzaStockMinimo,
+    esBajoMinimo: alcanzaStockMinimo,
     esAgotamientoTotal,
     mensaje,
   };

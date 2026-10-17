@@ -2237,7 +2237,7 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
       expect(alertaRepoSaveSpy).not.toHaveBeenCalled();
     });
 
-    it('genera alerta PENDIENTE al quedar el stock igual o por debajo del mínimo (12 - 3 = 9, mínimo 10)', async () => {
+    it('genera alerta PENDIENTE al quedar el stock igual al mínimo (12 - 2 = 10, mínimo 10)', async () => {
       const materialMock: Partial<Material> = {
         id: 1,
         nombre: 'Tubo PVC',
@@ -2248,7 +2248,7 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
       repoFindOneSpy.mockResolvedValueOnce(materialMock);
 
       await service.registrarSalida(
-        { idMaterial: 1, cantidad: 3 },
+        { idMaterial: 1, cantidad: 2 },
         fontaneroUser,
       );
 
@@ -2256,7 +2256,7 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
       expect(alertaRepoCreateSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           idMaterial: 1,
-          stockActual: 9,
+          stockActual: 10,
           stockMinimo: 10,
           estado: EstadoAlertaReposicion.PENDIENTE,
           idUsuarioGestiona: null,
@@ -2269,7 +2269,7 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
       const materialMock: Partial<Material> = {
         id: 1,
         nombre: 'Tubo PVC',
-        stockActual: 8,
+        stockActual: 12,
         stockMinimo: 10,
         activo: true,
       };
@@ -2292,7 +2292,7 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
       const materialMock: Partial<Material> = {
         id: 1,
         nombre: 'Tubo PVC',
-        stockActual: 9,
+        stockActual: 11,
         stockMinimo: 10,
         activo: true,
       };
@@ -2307,6 +2307,8 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
       expect(alertaRepoCreateSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           idMaterial: 1,
+          stockActual: 10,
+          stockMinimo: 10,
           estado: EstadoAlertaReposicion.PENDIENTE,
         }),
       );
@@ -2317,7 +2319,7 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
       const materialMock: Partial<Material> = {
         id: 1,
         nombre: 'Tubo PVC',
-        stockActual: 5,
+        stockActual: 11,
         stockMinimo: 10,
         activo: true,
       };
@@ -2329,7 +2331,7 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
         fontaneroUser,
       );
 
-      expect(result.stockActual).toBe(4);
+      expect(result.stockActual).toBe(10);
       expect(movRepoSaveSpy).toHaveBeenCalled();
     });
   });
@@ -2356,12 +2358,12 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
       expect(res.material.id).toBe(1);
     });
 
-    it('debe permitir salida exacta que deje el stock en cero', async () => {
+    it('debe permitir salida exacta que deje el stock en cero cuando stockMinimo es cero', async () => {
       const materialMock: Partial<Material> = {
         id: 2,
         nombre: 'Codo PVC 90°',
         stockActual: 5,
-        stockMinimo: 1,
+        stockMinimo: 0,
         activo: true,
       };
       repoFindOneSpy.mockResolvedValueOnce(materialMock);
@@ -2384,12 +2386,27 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
       };
       repoFindOneSpy.mockResolvedValueOnce(materialMock);
 
-      const res = await service.validarDisponibilidadStock(3, 5); // 8 - 5 = 3 <= 4
+      const res = await service.validarDisponibilidadStock(3, 4); // 8 - 4 = 4 === stockMinimo
 
       expect(res.esValido).toBe(true);
-      expect(res.stockFinal).toBe(3);
+      expect(res.stockFinal).toBe(4);
       expect(res.alcanzaStockMinimo).toBe(true);
       expect(res.esAgotamientoTotal).toBe(false);
+    });
+
+    it('debe lanzar BadRequestException si la salida dejaría el material por debajo del stock mínimo', async () => {
+      const materialMock: Partial<Material> = {
+        id: 3,
+        nombre: 'Válvula de retención',
+        stockActual: 8,
+        stockMinimo: 4,
+        activo: true,
+      };
+      repoFindOneSpy.mockResolvedValueOnce(materialMock);
+
+      await expect(service.validarDisponibilidadStock(3, 5)).rejects.toThrow(
+        'La salida dejaría el material por debajo del stock mínimo. Puede retirar como máximo 4 unidades.',
+      );
     });
 
     it('debe lanzar BadRequestException si la cantidad supera el stock disponible', async () => {
