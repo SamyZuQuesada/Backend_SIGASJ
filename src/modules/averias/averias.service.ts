@@ -2050,6 +2050,11 @@ export class AveriasService {
           isCodigoSeguimientoUniqueViolation(error) &&
           attempt < CODIGO_SEGUIMIENTO_MAX_RETRIES
         ) {
+          // Espera aleatoria corta para desincronizar altas simultáneas que
+          // compiten por el mismo consecutivo.
+          await new Promise((resolve) =>
+            setTimeout(resolve, Math.floor(Math.random() * 40 * attempt)),
+          );
           const suggested = await this.suggestNextConsecutive(year);
           consecutive = Math.max(consecutive + 1, suggested);
           continue;
