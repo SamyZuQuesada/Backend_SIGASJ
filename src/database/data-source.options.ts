@@ -52,6 +52,8 @@ export function buildMigrationDataSourceOptions(): DataSourceOptions {
     database,
     entities: [join(__dirname, '..', '**', '*.entity{.ts,.js}')],
     migrations: [join(__dirname, 'migrations', '*.{ts,js}')],
+    // Mismas fechas de auditoría que el API (UTC real escrito desde la aplicación).
+    subscribers: [join(__dirname, 'subscribers', '*.subscriber.{ts,js}')],
     migrationsTableName: 'typeorm_migrations',
     synchronize: false,
     logging: process.env.NODE_ENV === 'development',

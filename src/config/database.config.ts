@@ -85,6 +85,8 @@ export default registerAs('database', (): TypeOrmModuleOptions => {
     synchronize: false,
     migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
     migrationsRun: false,
+    // Fechas de auditoría desde la app en UTC real (ver el suscriptor).
+    subscribers: [__dirname + '/../database/subscribers/*.subscriber{.ts,.js}'],
     logging: process.env.NODE_ENV === 'development',
     retryAttempts: 8,
     retryDelay: 2000,
