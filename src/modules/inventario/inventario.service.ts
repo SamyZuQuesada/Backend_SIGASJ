@@ -12,6 +12,10 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, In, Repository } from 'typeorm';
 import { EstadoAlertaReposicion } from '../../common/enums/estado-alerta-reposicion.enum';
+import {
+  finDiaEnAsada,
+  inicioDiaEnAsada,
+} from '../../common/time/reloj-asada';
 import { EstadoReposicionMaterial } from '../../common/enums/estado-reposicion-material.enum';
 import {
   esTransicionEstadoReposicionValida,
@@ -3682,14 +3686,14 @@ export class InventarioService {
     );
   }
 
+  /** Inicio del día en Costa Rica (06:00 UTC); no el de UTC. */
   private inicioDiaMovimiento(value: string): Date {
-    const [year, month, day] = value.split('-').map(Number);
-    return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+    return inicioDiaEnAsada(value);
   }
 
+  /** Último milisegundo del día en Costa Rica. */
   private finDiaMovimiento(value: string): Date {
-    const [year, month, day] = value.split('-').map(Number);
-    return new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
+    return finDiaEnAsada(value);
   }
 
   private mapMovimientoInventarioAdmin(
