@@ -2,6 +2,7 @@ import { config as loadEnv } from 'dotenv';
 import { DataSource } from 'typeorm';
 import { EstadoAveria } from '../common/enums/estado-averia.enum';
 import { buildMigrationDataSourceOptions } from './data-source.options';
+import { borrarAveriasDePrueba } from './averias-test-cleanup';
 
 loadEnv();
 
@@ -47,10 +48,7 @@ describe('E2E vivo POST /api/v1/public/averias → SQL Server', () => {
       if (options.type === 'mssql') {
         dataSource = new DataSource(options);
         await dataSource.initialize();
-        await dataSource.query(
-          `DELETE FROM Averia WHERE nombreReportante LIKE @0`,
-          ['Prueba Avería E2E%'],
-        );
+        await borrarAveriasDePrueba(dataSource, 'nombreReportante LIKE @0', ['Prueba Avería E2E%']);
       }
     } catch {
       dataSource = null;
@@ -60,10 +58,7 @@ describe('E2E vivo POST /api/v1/public/averias → SQL Server', () => {
   afterAll(async () => {
     if (dataSource?.isInitialized) {
       for (const codigo of createdCodes) {
-        await dataSource.query(
-          `DELETE FROM Averia WHERE codigoSeguimiento = @0`,
-          [codigo],
-        );
+        await borrarAveriasDePrueba(dataSource, 'codigoSeguimiento = @0', [codigo]);
       }
       await dataSource.destroy();
     }

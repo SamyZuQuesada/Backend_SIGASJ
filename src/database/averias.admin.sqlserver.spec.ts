@@ -5,6 +5,7 @@ import { AveriasService } from '../modules/averias/averias.service';
 import { Averia } from '../modules/averias/entities/averia.entity';
 import { Usuario } from '../modules/usuarios/entities/usuario.entity';
 import { buildMigrationDataSourceOptions } from './data-source.options';
+import { borrarAveriasDePrueba } from './averias-test-cleanup';
 
 loadEnv();
 
@@ -38,10 +39,7 @@ describe('Listado administrativo de Averia en SQL Server', () => {
   afterAll(async () => {
     if (dataSource?.isInitialized) {
       for (const codigo of createdCodes) {
-        await dataSource.query(
-          `DELETE FROM Averia WHERE codigoSeguimiento = @0`,
-          [codigo],
-        );
+        await borrarAveriasDePrueba(dataSource, 'codigoSeguimiento = @0', [codigo]);
       }
       if (createdUsuarioId != null) {
         await dataSource.query(`DELETE FROM Usuario WHERE idUsuario = @0`, [
@@ -64,7 +62,20 @@ describe('Listado administrativo de Averia en SQL Server', () => {
     const usuarioRepo = ds.getRepository(Usuario);
     const service = new AveriasService(averiaRepo);
 
-    const fontanero = await usuarioRepo.save(usuarioRepo.create({}));
+    const fontanero = await (async () => {
+      const [rolFontanero] = (await ds.query(
+        `SELECT idRol FROM Rol WHERE nombre = 'FONTANERO'`,
+      )) as Array<{ idRol: number }>;
+      return usuarioRepo.save(
+        usuarioRepo.create({
+          nombre: 'QA Fontanero Spec',
+          correo: `qa.spec.${Date.now()}@asadasanjuan.cr`,
+          passwordHash: 'qa-spec-hash',
+          activo: true,
+          idRol: rolFontanero.idRol,
+        }),
+      );
+    })();
     createdUsuarioId = fontanero.idUsuario;
 
     const seeds: Array<Partial<Averia> & { codigoSeguimiento: string }> = [
@@ -144,7 +155,10 @@ describe('Listado administrativo de Averia en SQL Server', () => {
       (item) => item.codigoSeguimiento === 'AV-QA-ADM-0002',
     );
     expect(assigned?.prioridad).toBe('ALTA');
-    expect(assigned?.fontanero).toEqual({ id: fontanero.idUsuario });
+    expect(assigned?.fontanero).toEqual({
+      id: fontanero.idUsuario,
+      nombre: 'QA Fontanero Spec',
+    });
 
     const byCode = await service.findAllAdmin({
       page: 1,

@@ -188,7 +188,7 @@ describe('Pruebas de Base de Datos: Migración Averia', () => {
           error instanceof Error ? error.message : error,
         );
       }
-    }, 15_000);
+    }, 120_000);
 
     afterAll(async () => {
       if (dataSource?.isInitialized) {

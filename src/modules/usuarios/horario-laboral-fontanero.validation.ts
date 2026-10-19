@@ -13,10 +13,13 @@ export const MENSAJE_HORA_INICIO_NO_ANTERIOR =
  */
 export function normalizarHoraLaboral(valor: unknown): string | null {
   if (valor instanceof Date && !Number.isNaN(valor.getTime())) {
+    // El driver (useUTC: true) entrega la columna `time` como una fecha cuyos
+    // componentes UTC son la hora guardada (1970-01-01T08:00:00Z = 08:00:00).
+    // Leerla con getHours() la corría 6 horas en un servidor de Costa Rica.
     return formatearHora(
-      valor.getHours(),
-      valor.getMinutes(),
-      valor.getSeconds(),
+      valor.getUTCHours(),
+      valor.getUTCMinutes(),
+      valor.getUTCSeconds(),
     );
   }
 

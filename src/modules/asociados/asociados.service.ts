@@ -1,3 +1,4 @@
+import { finDiaEnAsada, inicioDiaEnAsada } from '../../common/time/reloj-asada';
 import {
   BadRequestException,
   ConflictException,
@@ -209,26 +210,26 @@ export class AsociadosService {
     const fechaRegDesde = query.fechaRegistroDesde ?? query.fechaDesde;
     if (fechaRegDesde) {
       qb.andWhere('a.fechaRegistro >= :fechaRegDesde', {
-        fechaRegDesde: new Date(`${fechaRegDesde}T00:00:00.000Z`),
+        fechaRegDesde: inicioDiaEnAsada(fechaRegDesde),
       });
     }
 
     const fechaRegHasta = query.fechaRegistroHasta ?? query.fechaHasta;
     if (fechaRegHasta) {
       qb.andWhere('a.fechaRegistro <= :fechaRegHasta', {
-        fechaRegHasta: new Date(`${fechaRegHasta}T23:59:59.999Z`),
+        fechaRegHasta: finDiaEnAsada(fechaRegHasta),
       });
     }
 
     if (query.fechaInactivacionDesde) {
       qb.andWhere('a.fechaInactivacion >= :fechaInactDesde', {
-        fechaInactDesde: new Date(`${query.fechaInactivacionDesde}T00:00:00.000Z`),
+        fechaInactDesde: inicioDiaEnAsada(query.fechaInactivacionDesde),
       });
     }
 
     if (query.fechaInactivacionHasta) {
       qb.andWhere('a.fechaInactivacion <= :fechaInactHasta', {
-        fechaInactHasta: new Date(`${query.fechaInactivacionHasta}T23:59:59.999Z`),
+        fechaInactHasta: finDiaEnAsada(query.fechaInactivacionHasta),
       });
     }
 
@@ -472,8 +473,8 @@ export class AsociadosService {
       qb.andWhere(
         'a.fechaRegistro >= :fRegExactaInicio AND a.fechaRegistro <= :fRegExactaFin',
         {
-          fRegExactaInicio: new Date(`${query.fechaRegistro}T00:00:00.000Z`),
-          fRegExactaFin: new Date(`${query.fechaRegistro}T23:59:59.999Z`),
+          fRegExactaInicio: inicioDiaEnAsada(query.fechaRegistro),
+          fRegExactaFin: finDiaEnAsada(query.fechaRegistro),
         },
       );
     }
@@ -481,14 +482,14 @@ export class AsociadosService {
     const fRegDesde = query.fechaRegistroDesde ?? query.fechaDesde;
     if (fRegDesde) {
       qb.andWhere('a.fechaRegistro >= :fRegDesde', {
-        fRegDesde: new Date(`${fRegDesde}T00:00:00.000Z`),
+        fRegDesde: inicioDiaEnAsada(fRegDesde),
       });
     }
 
     const fRegHasta = query.fechaRegistroHasta ?? query.fechaHasta;
     if (fRegHasta) {
       qb.andWhere('a.fechaRegistro <= :fRegHasta', {
-        fRegHasta: new Date(`${fRegHasta}T23:59:59.999Z`),
+        fRegHasta: finDiaEnAsada(fRegHasta),
       });
     }
 
@@ -496,23 +497,21 @@ export class AsociadosService {
       qb.andWhere(
         'a.fechaInactivacion >= :fInactExactaInicio AND a.fechaInactivacion <= :fInactExactaFin',
         {
-          fInactExactaInicio: new Date(
-            `${query.fechaInactivacion}T00:00:00.000Z`,
-          ),
-          fInactExactaFin: new Date(`${query.fechaInactivacion}T23:59:59.999Z`),
+          fInactExactaInicio: inicioDiaEnAsada(query.fechaInactivacion),
+          fInactExactaFin: finDiaEnAsada(query.fechaInactivacion),
         },
       );
     }
 
     if (query.fechaInactivacionDesde) {
       qb.andWhere('a.fechaInactivacion >= :fInactDesde', {
-        fInactDesde: new Date(`${query.fechaInactivacionDesde}T00:00:00.000Z`),
+        fInactDesde: inicioDiaEnAsada(query.fechaInactivacionDesde),
       });
     }
 
     if (query.fechaInactivacionHasta) {
       qb.andWhere('a.fechaInactivacion <= :fInactHasta', {
-        fInactHasta: new Date(`${query.fechaInactivacionHasta}T23:59:59.999Z`),
+        fInactHasta: finDiaEnAsada(query.fechaInactivacionHasta),
       });
     }
 

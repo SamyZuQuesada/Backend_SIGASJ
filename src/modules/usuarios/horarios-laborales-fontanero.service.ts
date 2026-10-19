@@ -7,10 +7,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
   DiaSemana,
-  diaSemanaDesdeFecha,
   isDiaSemanaValido,
 } from '../../common/enums/dia-semana.enum';
 import { Role } from '../../common/enums/role.enum';
+import { partesLaboralesEnAsada } from '../../common/time/reloj-asada';
 import { HorarioLaboralFontanero } from './entities/horario-laboral-fontanero.entity';
 import { Usuario } from './entities/usuario.entity';
 import {
@@ -18,7 +18,6 @@ import {
   MENSAJE_HORA_INICIO_NO_ANTERIOR,
   esHoraInicioAnteriorAFin,
   horaLaboralASegundos,
-  segundosDesdeMedianoche,
   normalizarHoraLaboral,
 } from './horario-laboral-fontanero.validation';
 
@@ -120,12 +119,13 @@ export class HorariosLaboralesFontaneroService {
     idFontanero: number,
     momento: Date = new Date(),
   ): Promise<boolean> {
-    const diaSemana = diaSemanaDesdeFecha(momento);
+    // Día y hora de Costa Rica, no los del huso horario del servidor.
+    const partes = partesLaboralesEnAsada(momento);
     const horarios = await this.listarActivosPorFontaneroYDia(
       idFontanero,
-      diaSemana,
+      partes.diaSemana as DiaSemana,
     );
-    const instante = segundosDesdeMedianoche(momento);
+    const instante = partes.segundosDesdeMedianoche;
     return horarios.some((horario) => {
       const inicio = horaLaboralASegundos(horario.horaInicio);
       const fin = horaLaboralASegundos(horario.horaFin);

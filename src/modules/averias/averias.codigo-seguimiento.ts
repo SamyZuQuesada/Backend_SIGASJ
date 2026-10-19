@@ -1,6 +1,6 @@
 import { QueryFailedError } from 'typeorm';
 
-export const CODIGO_SEGUIMIENTO_MAX_RETRIES = 5;
+export const CODIGO_SEGUIMIENTO_MAX_RETRIES = 15;
 
 export function buildCodigoSeguimiento(
   year: number,

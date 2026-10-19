@@ -210,12 +210,14 @@ describe('GET /api/v1/admin/averias — listado administrativo', () => {
     });
     await persist({
       codigoSeguimiento: 'AV-2026-0005',
-      fechaReporte: new Date('2026-09-13T00:00:00.000Z'),
+      // 13/09 00:00 en Costa Rica: primer instante del día siguiente al rango.
+      fechaReporte: new Date('2026-09-13T06:00:00.000Z'),
       nombreReportante: 'Lucía Brenes',
     });
     await persist({
       codigoSeguimiento: 'AV-2026-0006',
-      fechaReporte: new Date('2026-09-01T00:00:00.000Z'),
+      // 01/09 00:00 en Costa Rica: primer instante del rango.
+      fechaReporte: new Date('2026-09-01T06:00:00.000Z'),
       nombreReportante: 'Pedro Solís',
     });
     for (let index = 7; index <= 12; index += 1) {

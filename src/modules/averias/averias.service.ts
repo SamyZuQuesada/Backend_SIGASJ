@@ -23,7 +23,12 @@ import {
 import { Role } from '../../common/enums/role.enum';
 import { TipoEventoAveria } from '../../common/enums/tipo-evento-averia.enum';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
-import { ahoraDelSistema } from '../../common/time/reloj-asada';
+import {
+  ahoraDelSistema,
+  anioEnAsada,
+  inicioDiaEnAsada,
+  inicioDiaSiguienteEnAsada,
+} from '../../common/time/reloj-asada';
 import { withDbRetry } from '../../common/persistence/with-db-retry';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { ValidacionHorarioLaboralFontaneroService } from '../usuarios/validacion-horario-laboral-fontanero.service';
@@ -432,19 +437,24 @@ export function isValidIsoDateOnly(value: string): boolean {
   );
 }
 
-export function toStartOfUtcDay(isoDate: string): Date {
-  const match = ISO_DATE_ONLY.exec(isoDate);
-  if (!match) {
+/**
+ * Inicio (instante UTC) del día calendario `YYYY-MM-DD` en Costa Rica.
+ * Los filtros por día usan el día de la ASADA, no el de UTC: una avería de las
+ * 20:35 del 17 en Costa Rica (02:35Z del 18) pertenece al día 17.
+ */
+export function toStartOfAsadaDay(isoDate: string): Date {
+  if (!isValidIsoDateOnly(isoDate)) {
     throw new BadRequestException(FECHA_CALENDARIO_INVALIDA);
   }
-  return new Date(
-    Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])),
-  );
+  return inicioDiaEnAsada(isoDate);
 }
 
-export function toStartOfNextUtcDay(isoDate: string): Date {
-  const start = toStartOfUtcDay(isoDate);
-  return new Date(start.getTime() + 24 * 60 * 60 * 1000);
+/** Límite superior exclusivo del día calendario en Costa Rica. */
+export function toStartOfNextAsadaDay(isoDate: string): Date {
+  if (!isValidIsoDateOnly(isoDate)) {
+    throw new BadRequestException(FECHA_CALENDARIO_INVALIDA);
+  }
+  return inicioDiaSiguienteEnAsada(isoDate);
 }
 
 export function escapeLikePattern(value: string): string {
@@ -891,13 +901,13 @@ export class AveriasService {
 
         if (query.fechaDesde) {
           qb.andWhere('averia.fechaReporte >= :fechaDesde', {
-            fechaDesde: toStartOfUtcDay(query.fechaDesde),
+            fechaDesde: toStartOfAsadaDay(query.fechaDesde),
           });
         }
 
         if (query.fechaHasta) {
           qb.andWhere('averia.fechaReporte < :fechaHastaExclusiva', {
-            fechaHastaExclusiva: toStartOfNextUtcDay(query.fechaHasta),
+            fechaHastaExclusiva: toStartOfNextAsadaDay(query.fechaHasta),
           });
         }
 
@@ -993,13 +1003,13 @@ export class AveriasService {
 
         if (query.fechaDesde) {
           qb.andWhere('averia.fechaReporte >= :fechaDesde', {
-            fechaDesde: toStartOfUtcDay(query.fechaDesde),
+            fechaDesde: toStartOfAsadaDay(query.fechaDesde),
           });
         }
 
         if (query.fechaHasta) {
           qb.andWhere('averia.fechaReporte < :fechaHastaExclusiva', {
-            fechaHastaExclusiva: toStartOfNextUtcDay(query.fechaHasta),
+            fechaHastaExclusiva: toStartOfNextAsadaDay(query.fechaHasta),
           });
         }
 
@@ -1117,13 +1127,13 @@ export class AveriasService {
 
         if (query.fechaDesde) {
           qb.andWhere('averia.fechaReporte >= :fechaDesde', {
-            fechaDesde: toStartOfUtcDay(query.fechaDesde),
+            fechaDesde: toStartOfAsadaDay(query.fechaDesde),
           });
         }
 
         if (query.fechaHasta) {
           qb.andWhere('averia.fechaReporte < :fechaHastaExclusiva', {
-            fechaHastaExclusiva: toStartOfNextUtcDay(query.fechaHasta),
+            fechaHastaExclusiva: toStartOfNextAsadaDay(query.fechaHasta),
           });
         }
 
@@ -2003,7 +2013,7 @@ export class AveriasService {
     dto: CreatePublicAveriaDto,
     now: Date = new Date(),
   ): Promise<RegistroPublicoAveriaResponseDto> {
-    const year = now.getFullYear();
+    const year = anioEnAsada(now);
     let consecutive = await this.suggestNextConsecutive(year);
 
     for (
@@ -2050,6 +2060,11 @@ export class AveriasService {
           isCodigoSeguimientoUniqueViolation(error) &&
           attempt < CODIGO_SEGUIMIENTO_MAX_RETRIES
         ) {
+          // Espera aleatoria corta para desincronizar altas simultáneas que
+          // compiten por el mismo consecutivo.
+          await new Promise((resolve) =>
+            setTimeout(resolve, Math.floor(Math.random() * 40 * attempt)),
+          );
           const suggested = await this.suggestNextConsecutive(year);
           consecutive = Math.max(consecutive + 1, suggested);
           continue;

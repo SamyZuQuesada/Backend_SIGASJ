@@ -1,8 +1,8 @@
 import {
   escapeLikePattern,
   isValidIsoDateOnly,
-  toStartOfNextUtcDay,
-  toStartOfUtcDay,
+  toStartOfAsadaDay,
+  toStartOfNextAsadaDay,
 } from './averias.service';
 
 describe('helpers de consulta administrativa de averías', () => {
@@ -13,13 +13,24 @@ describe('helpers de consulta administrativa de averías', () => {
     expect(isValidIsoDateOnly('01/02/2026')).toBe(false);
   });
 
-  it('calcula el día siguiente exclusivo en UTC para incluir todo fechaHasta', () => {
-    expect(toStartOfUtcDay('2026-09-12').toISOString()).toBe(
-      '2026-09-12T00:00:00.000Z',
+  it('el día del filtro es el de Costa Rica (empieza a las 06:00 UTC) e incluye todo fechaHasta', () => {
+    expect(toStartOfAsadaDay('2026-09-12').toISOString()).toBe(
+      '2026-09-12T06:00:00.000Z',
     );
-    expect(toStartOfNextUtcDay('2026-09-12').toISOString()).toBe(
-      '2026-09-13T00:00:00.000Z',
+    expect(toStartOfNextAsadaDay('2026-09-12').toISOString()).toBe(
+      '2026-09-13T06:00:00.000Z',
     );
+  });
+
+  it('una avería de las 20:35 del 17 en Costa Rica cae dentro del día 17', () => {
+    const reporte = new Date('2026-10-18T02:35:47.000Z').getTime();
+    expect(reporte).toBeGreaterThanOrEqual(toStartOfAsadaDay('2026-10-17').getTime());
+    expect(reporte).toBeLessThan(toStartOfNextAsadaDay('2026-10-17').getTime());
+  });
+
+  it('rechaza fechas que no son de calendario', () => {
+    expect(() => toStartOfAsadaDay('2026-02-30')).toThrow();
+    expect(() => toStartOfNextAsadaDay('12/09/2026')).toThrow();
   });
 
   it('escapa comodines de LIKE', () => {

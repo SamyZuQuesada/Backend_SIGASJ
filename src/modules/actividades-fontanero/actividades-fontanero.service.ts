@@ -451,7 +451,8 @@ export class ActividadesFontaneroService {
 
       const qb = this.actividadRepository
         .createQueryBuilder('actividad')
-        .leftJoinAndSelect('actividad.tipoActividad', 'tipo');
+        .leftJoinAndSelect('actividad.tipoActividad', 'tipo')
+        .leftJoinAndSelect('actividad.fontanero', 'fontanero');
 
       if (query.estado) {
         qb.andWhere('actividad.estado = :estado', { estado: query.estado });

@@ -3,6 +3,7 @@ import {
   type ValidationArguments,
   type ValidationOptions,
 } from 'class-validator';
+import { fechaCalendarioEnAsada } from '../time/reloj-asada';
 
 const FECHA_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 
@@ -54,7 +55,11 @@ export const getFechaActividadValidationError = (
     return 'calendario';
   }
 
-  const todayUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  // "Hoy" es el día de Costa Rica, no el del huso horario del servidor.
+  const hoyAsada = parseFechaActividad(fechaCalendarioEnAsada(now));
+  const todayUtc = hoyAsada
+    ? Date.UTC(hoyAsada.year, hoyAsada.month - 1, hoyAsada.day)
+    : Number.POSITIVE_INFINITY;
   const valueUtc = Date.UTC(parsed.year, parsed.month - 1, parsed.day);
   if (valueUtc > todayUtc) {
     return 'futura';

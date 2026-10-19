@@ -205,9 +205,10 @@ describe('Horarios laborales del Fontanero', () => {
       horaInicio: '07:00',
       horaFin: '16:00',
     });
-    const lunesManana = new Date(2026, 8, 21, 10, 0, 0);
-    const lunesTarde = new Date(2026, 8, 21, 16, 0, 0);
-    const martesManana = new Date(2026, 8, 22, 10, 0, 0);
+    // Instantes UTC que corresponden a la hora de Costa Rica (UTC-6), sin depender del huso del servidor.
+    const lunesManana = new Date('2026-09-21T16:00:00.000Z'); // lunes 10:00 en CR
+    const lunesTarde = new Date('2026-09-21T22:00:00.000Z'); // lunes 16:00 en CR
+    const martesManana = new Date('2026-09-22T16:00:00.000Z'); // martes 10:00 en CR
 
     expect(await service.estaDentroDeHorarioLaboral(fontanero.idUsuario, lunesManana)).toBe(
       true,
