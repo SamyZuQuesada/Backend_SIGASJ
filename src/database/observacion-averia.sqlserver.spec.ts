@@ -96,7 +96,11 @@ describeSqlServer('Persistencia ObservacionAveria en SQL Server', () => {
 
     try {
       const usuarioInsert = await db.query<{ idUsuario: number }[]>(
-        `INSERT INTO Usuario OUTPUT INSERTED.idUsuario DEFAULT VALUES`,
+        `INSERT INTO Usuario (nombre, correo, passwordHash, activo, idRol)
+         OUTPUT INSERTED.idUsuario
+         SELECT 'QA Autor Observación', @0, 'qa-spec-hash', 1, idRol
+         FROM Rol WHERE nombre = 'FONTANERO'`,
+        [`qa.obs.${suffix}@asadasanjuan.cr`],
       );
       autorId =
         usuarioInsert[0]?.idUsuario != null

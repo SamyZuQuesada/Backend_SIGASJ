@@ -9,6 +9,7 @@ import {
 import { Averia } from '../modules/averias/entities/averia.entity';
 import { Usuario } from '../modules/usuarios/entities/usuario.entity';
 import { buildMigrationDataSourceOptions } from './data-source.options';
+import { borrarAveriasDePrueba } from './averias-test-cleanup';
 
 loadEnv();
 
@@ -42,10 +43,7 @@ describe('Detalle administrativo de Averia en SQL Server', () => {
   afterAll(async () => {
     if (dataSource?.isInitialized) {
       for (const codigo of createdCodes) {
-        await dataSource.query(
-          `DELETE FROM Averia WHERE codigoSeguimiento = @0`,
-          [codigo],
-        );
+        await borrarAveriasDePrueba(dataSource, 'codigoSeguimiento = @0', [codigo]);
       }
       if (createdUsuarioId != null) {
         await dataSource.query(`DELETE FROM Usuario WHERE idUsuario = @0`, [
@@ -69,7 +67,20 @@ describe('Detalle administrativo de Averia en SQL Server', () => {
     const usuarioRepo = ds.getRepository(Usuario);
     const service = new AveriasService(averiaRepo);
 
-    const fontanero = await usuarioRepo.save(usuarioRepo.create({}));
+    const fontanero = await (async () => {
+      const [rolFontanero] = (await ds.query(
+        `SELECT idRol FROM Rol WHERE nombre = 'FONTANERO'`,
+      )) as Array<{ idRol: number }>;
+      return usuarioRepo.save(
+        usuarioRepo.create({
+          nombre: 'QA Fontanero Spec',
+          correo: `qa.spec.${Date.now()}@asadasanjuan.cr`,
+          passwordHash: 'qa-spec-hash',
+          activo: true,
+          idRol: rolFontanero.idRol,
+        }),
+      );
+    })();
     createdUsuarioId = fontanero.idUsuario;
 
     const received = await averiaRepo.save(
@@ -163,7 +174,10 @@ describe('Detalle administrativo de Averia en SQL Server', () => {
     expect(complete.observacionesAtencion).toBe(
       persisted[0]?.observacionesAtencion,
     );
-    expect(complete.fontanero).toEqual({ id: fontanero.idUsuario });
+    expect(complete.fontanero).toEqual({
+      id: fontanero.idUsuario,
+      nombre: 'QA Fontanero Spec',
+    });
     expect(complete.tipoAveria).toBe('TUBERIA');
     expect(complete.prioridad).toBe('ALTA');
 

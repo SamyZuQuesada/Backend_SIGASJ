@@ -69,6 +69,8 @@ describe('POST /api/v1/public/averias — registro público', () => {
       }),
     );
     await app.init();
+    // Servidor escuchando: supertest no abre/cierra uno por petición (evita ECONNRESET en altas simultáneas).
+    await app.listen(0);
 
     averias = moduleFixture.get(getRepositoryToken(Averia));
     service = moduleFixture.get(AveriasService);
