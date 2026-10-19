@@ -36,7 +36,9 @@ describe('ReposicionMaterial Entity (Inventario ASADA)', () => {
           OrigenReposicionMaterial.ALERTA_STOCK_MINIMO
         ],
       ).toBe('Alerta de stock mínimo');
-      expect(isOrigenReposicionMaterialValido('ALERTA_STOCK_MINIMO')).toBe(true);
+      expect(isOrigenReposicionMaterialValido('ALERTA_STOCK_MINIMO')).toBe(
+        true,
+      );
       expect(isOrigenReposicionMaterialValido('OTRO')).toBe(false);
     });
   });
@@ -163,7 +165,9 @@ describe('ReposicionMaterial Entity (Inventario ASADA)', () => {
 
       reposicion.estado = EstadoReposicionMaterial.PENDIENTE;
       reposicion.origen = 'OTRO' as unknown as OrigenReposicionMaterial;
-      expect(() => reposicion.validar()).toThrow('Origen de reposición no válido');
+      expect(() => reposicion.validar()).toThrow(
+        'Origen de reposición no válido',
+      );
     });
 
     it('exige cantidad entera mayor a cero en el detalle', () => {
@@ -226,7 +230,8 @@ describe('ReposicionMaterial Entity (Inventario ASADA)', () => {
     it('relaciona alerta y solicitud de forma opcional', () => {
       const alerta = storage.relations.find(
         (r) =>
-          r.target === ReposicionMaterial && r.propertyName === 'alertaReposicion',
+          r.target === ReposicionMaterial &&
+          r.propertyName === 'alertaReposicion',
       );
       const solicitud = storage.relations.find(
         (r) =>
@@ -244,7 +249,8 @@ describe('ReposicionMaterial Entity (Inventario ASADA)', () => {
           r.propertyName === 'usuarioResponsable',
       );
       const proveedor = storage.relations.find(
-        (r) => r.target === ReposicionMaterial && r.propertyName === 'proveedor',
+        (r) =>
+          r.target === ReposicionMaterial && r.propertyName === 'proveedor',
       );
       expect(responsable?.options.nullable).toBe(false);
       expect(proveedor?.options.nullable).toBe(true);
@@ -265,13 +271,15 @@ describe('ReposicionMaterial Entity (Inventario ASADA)', () => {
 
       const material = storage.relations.find(
         (r) =>
-          r.target === DetalleReposicionMaterial && r.propertyName === 'material',
+          r.target === DetalleReposicionMaterial &&
+          r.propertyName === 'material',
       );
       expect(material?.options.nullable).toBe(false);
 
       const cantidad = storage.columns.find(
         (c) =>
-          c.target === DetalleReposicionMaterial && c.propertyName === 'cantidad',
+          c.target === DetalleReposicionMaterial &&
+          c.propertyName === 'cantidad',
       );
       expect(cantidad).toBeDefined();
     });

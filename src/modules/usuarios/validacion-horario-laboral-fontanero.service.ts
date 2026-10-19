@@ -50,7 +50,7 @@ export class ValidacionHorarioLaboralFontaneroService {
     momento: Date,
   ): Promise<EvaluacionHorarioLaboral> {
     const partes = partesLaboralesEnAsada(momento);
-    const diaSemana = partes.diaSemana as DiaSemana;
+    const diaSemana = partes.diaSemana;
     const base = {
       idFontanero:
         Number.isInteger(idFontanero) && idFontanero > 0 ? idFontanero : null,
@@ -149,8 +149,10 @@ export class ValidacionHorarioLaboralFontaneroService {
     return {
       id: fila.id,
       diaSemana: fila.diaSemana,
-      horaInicio: normalizarHoraLaboral(fila.horaInicio) ?? String(fila.horaInicio ?? ''),
-      horaFin: normalizarHoraLaboral(fila.horaFin) ?? String(fila.horaFin ?? ''),
+      horaInicio:
+        normalizarHoraLaboral(fila.horaInicio) ?? String(fila.horaInicio ?? ''),
+      horaFin:
+        normalizarHoraLaboral(fila.horaFin) ?? String(fila.horaFin ?? ''),
       activo: fila.activo,
     };
   }

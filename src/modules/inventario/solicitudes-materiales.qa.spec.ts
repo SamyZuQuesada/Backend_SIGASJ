@@ -239,9 +239,12 @@ describe('Solicitudes de Materiales por Fontanero (Backlog 4.6) — QA y Pruebas
           }),
           getMany: jest.fn().mockImplementation(() => {
             const list = getFiltered();
-              const mapped = list.map((sol) => ({
+            const mapped = list.map((sol) => ({
               ...sol,
-              fontanero: { idUsuario: sol.idFontanero, nombre: `Fontanero ${sol.idFontanero}` },
+              fontanero: {
+                idUsuario: sol.idFontanero,
+                nombre: `Fontanero ${sol.idFontanero}`,
+              },
               detalles: (sol.detalles || []).map((det: any) => ({
                 ...det,
                 material: materialesDb.get(det.idMaterial),
@@ -998,7 +1001,9 @@ describe('Solicitudes de Materiales por Fontanero (Backlog 4.6) — QA y Pruebas
 
       expect(resAprobadas.body).toHaveLength(1);
       expect(resAprobadas.body[0].id).toBe(sol2.body.id);
-      expect(resAprobadas.body[0].estado).toBe(EstadoSolicitudMaterial.APROBADA);
+      expect(resAprobadas.body[0].estado).toBe(
+        EstadoSolicitudMaterial.APROBADA,
+      );
     });
 
     it('filtra correctamente las solicitudes por idAveria o averiaId', async () => {
@@ -1136,9 +1141,10 @@ describe('Solicitudes de Materiales por Fontanero (Backlog 4.6) — QA y Pruebas
       solicitudesDb.get(aprobada.body.id)!.estado =
         EstadoSolicitudMaterial.APROBADA;
 
-      const res = await adminGet('?estado=Pendiente', signAs(Role.ADMINISTRADORA, '1')).expect(
-        HttpStatus.OK,
-      );
+      const res = await adminGet(
+        '?estado=Pendiente',
+        signAs(Role.ADMINISTRADORA, '1'),
+      ).expect(HttpStatus.OK);
 
       expect(res.body.total).toBe(2);
       expect(res.body.data).toHaveLength(2);
@@ -1162,9 +1168,9 @@ describe('Solicitudes de Materiales por Fontanero (Backlog 4.6) — QA y Pruebas
       expect(conAveria.averia.codigoSeguimiento).toBe('AVR-2026-0010');
       expect(sinAveria.fontanero.id).toBe(8);
       expect(sinAveria.averia).toBeNull();
-      expect(res.body.data.map((item: { id: number }) => item.id)).not.toContain(
-        aprobada.body.id,
-      );
+      expect(
+        res.body.data.map((item: { id: number }) => item.id),
+      ).not.toContain(aprobada.body.id);
     });
 
     it('ordena de más reciente a más antigua y pagina', async () => {
@@ -1314,9 +1320,9 @@ describe('Solicitudes de Materiales por Fontanero (Backlog 4.6) — QA y Pruebas
         .set('Authorization', `Bearer ${signAs(Role.ADMINISTRADORA, '1')}`)
         .expect(HttpStatus.OK);
 
-      expect(pendientes.body.data.map((item: { id: number }) => item.id)).not.toContain(
-        creada.body.id,
-      );
+      expect(
+        pendientes.body.data.map((item: { id: number }) => item.id),
+      ).not.toContain(creada.body.id);
     });
 
     it('no permite aprobar dos veces ni una solicitud RECHAZADA', async () => {
@@ -1554,7 +1560,9 @@ describe('Solicitudes de Materiales por Fontanero (Backlog 4.6) — QA y Pruebas
         .expect(HttpStatus.FORBIDDEN);
 
       await request(app.getHttpServer())
-        .patch(`/api/v1/admin/solicitudes-materiales/${creada.body.id}/rechazar`)
+        .patch(
+          `/api/v1/admin/solicitudes-materiales/${creada.body.id}/rechazar`,
+        )
         .set('Authorization', `Bearer ${signAs(Role.FONTANERO, '7')}`)
         .expect(HttpStatus.FORBIDDEN);
     });

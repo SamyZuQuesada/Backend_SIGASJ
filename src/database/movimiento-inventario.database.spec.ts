@@ -84,6 +84,7 @@ describe('Pruebas de Base de Datos e Integridad: Migración MovimientoInventario
             type: 'mssql',
           },
         },
+        hasTable: jest.fn().mockResolvedValue(false),
         createTable: createTableSpy,
         createForeignKey: createForeignKeySpy,
         createIndex: createIndexSpy,

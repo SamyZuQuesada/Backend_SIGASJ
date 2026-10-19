@@ -163,8 +163,7 @@ export class AveriasFontaneroController {
   })
   @ApiResponse({
     status: HttpStatus.BAD_REQUEST,
-    description:
-      'Transición de estado no permitida.',
+    description: 'Transición de estado no permitida.',
   })
   @ApiResponse({
     status: HttpStatus.UNAUTHORIZED,

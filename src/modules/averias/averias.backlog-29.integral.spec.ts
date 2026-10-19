@@ -224,7 +224,9 @@ describe('Backlog 2.9 — historial, reporte y trazabilidad', () => {
     expect(fila?.fechaReporte).toBeTruthy();
     expect(fila?.fechaInicioAtencion).toBeTruthy();
     expect(fila?.fechaResolucion).toBeTruthy();
-    expect(JSON.stringify(fila)).not.toMatch(/8888-4242|1-1111-1111|maria\.reporte/);
+    expect(JSON.stringify(fila)).not.toMatch(
+      /8888-4242|1-1111-1111|maria\.reporte/,
+    );
 
     const porEstado = (
       await request(app.getHttpServer())
@@ -391,7 +393,9 @@ describe('Backlog 2.9 — historial, reporte y trazabilidad', () => {
 
     const idsAntes = linea.data.map((evento) => evento.id);
     const descripcionRegistro = registro?.descripcion;
-    const totalAntes = await historial.count({ where: { idAveria: averia.id } });
+    const totalAntes = await historial.count({
+      where: { idAveria: averia.id },
+    });
     expect(totalAntes).toBe(linea.data.length);
     expect(new Set(idsAntes).size).toBe(idsAntes.length);
 

@@ -73,7 +73,8 @@ export class ItemCompraReposicionDto {
 
   @ApiPropertyOptional({
     example: 4,
-    description: 'Alias de idMaterial para compatibilidad con clientes frontend',
+    description:
+      'Alias de idMaterial para compatibilidad con clientes frontend',
   })
   @Transform(toOptionalInt)
   @IsOptional()
@@ -110,17 +111,22 @@ export class RegistrarCompraReposicionDto {
   })
   @Transform(toOptionalInt)
   @IsOptional()
-  @IsInt({ message: 'El identificador del proveedor debe ser un número entero' })
+  @IsInt({
+    message: 'El identificador del proveedor debe ser un número entero',
+  })
   @Min(1, { message: 'El identificador del proveedor debe ser mayor a cero' })
   idProveedor?: number;
 
   @ApiPropertyOptional({
     example: 2,
-    description: 'Alias de idProveedor para compatibilidad con clientes frontend',
+    description:
+      'Alias de idProveedor para compatibilidad con clientes frontend',
   })
   @Transform(toOptionalInt)
   @IsOptional()
-  @IsInt({ message: 'El identificador del proveedor debe ser un número entero' })
+  @IsInt({
+    message: 'El identificador del proveedor debe ser un número entero',
+  })
   @Min(1, { message: 'El identificador del proveedor debe ser mayor a cero' })
   proveedorId?: number;
 

@@ -40,7 +40,11 @@ async function main(): Promise<void> {
        WHERE r.nombre = 'SECRETARIA' AND n.idAveria IN (${ids.length ? ids.join(',') : '0'})`,
     );
     console.log(
-      JSON.stringify({ averias, notifs, sms, secretariaInbox: secretaria }, null, 2),
+      JSON.stringify(
+        { averias, notifs, sms, secretariaInbox: secretaria },
+        null,
+        2,
+      ),
     );
   } finally {
     await ds.destroy();

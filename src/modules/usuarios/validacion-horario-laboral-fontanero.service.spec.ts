@@ -85,7 +85,9 @@ describe('ValidacionHorarioLaboralFontaneroService', () => {
       fontanero.idUsuario,
       fechaEnAsada(2026, 8, 21, 10, 0, 0),
     );
-    expect(evaluacion.resultado).toBe(ResultadoHorarioLaboral.DENTRO_DE_HORARIO);
+    expect(evaluacion.resultado).toBe(
+      ResultadoHorarioLaboral.DENTRO_DE_HORARIO,
+    );
     expect(evaluacion.puedeIniciarAtencion).toBe(true);
     expect(evaluacion.motivo).toBe(MOTIVO_DENTRO_DE_HORARIO);
     expect(evaluacion.diaSemana).toBe(DiaSemana.LUNES);
@@ -99,7 +101,9 @@ describe('ValidacionHorarioLaboralFontaneroService', () => {
       fontanero.idUsuario,
       fechaEnAsada(2026, 8, 21, 6, 59, 0),
     );
-    expect(antesDelInicio.resultado).toBe(ResultadoHorarioLaboral.FUERA_DE_HORARIO);
+    expect(antesDelInicio.resultado).toBe(
+      ResultadoHorarioLaboral.FUERA_DE_HORARIO,
+    );
     expect(antesDelInicio.puedeIniciarAtencion).toBe(false);
     expect(antesDelInicio.motivo).toBe(MOTIVO_FUERA_DE_HORARIO);
 
@@ -115,7 +119,9 @@ describe('ValidacionHorarioLaboralFontaneroService', () => {
       fontanero.idUsuario,
       fechaEnAsada(2026, 8, 22, 10, 0, 0),
     );
-    expect(martes.resultado).toBe(ResultadoHorarioLaboral.SIN_HORARIO_CONFIGURADO);
+    expect(martes.resultado).toBe(
+      ResultadoHorarioLaboral.SIN_HORARIO_CONFIGURADO,
+    );
     expect(martes.puedeIniciarAtencion).toBe(false);
     expect(martes.motivo).toBe(MOTIVO_SIN_HORARIO);
   });
@@ -125,7 +131,9 @@ describe('ValidacionHorarioLaboralFontaneroService', () => {
       fontanero.idUsuario,
       fechaEnAsada(2026, 8, 21, 10, 0, 0),
     );
-    expect(sinFila.resultado).toBe(ResultadoHorarioLaboral.SIN_HORARIO_CONFIGURADO);
+    expect(sinFila.resultado).toBe(
+      ResultadoHorarioLaboral.SIN_HORARIO_CONFIGURADO,
+    );
     expect(sinFila.puedeIniciarAtencion).toBe(false);
 
     await horarios.save(
@@ -191,7 +199,9 @@ describe('ValidacionHorarioLaboralFontaneroService', () => {
       fontanero.idUsuario,
       fechaEnAsada(2026, 8, 21, 10, 0, 0),
     );
-    expect(evaluacion.resultado).toBe(ResultadoHorarioLaboral.HORARIO_INCOMPLETO);
+    expect(evaluacion.resultado).toBe(
+      ResultadoHorarioLaboral.HORARIO_INCOMPLETO,
+    );
     expect(evaluacion.puedeIniciarAtencion).toBe(false);
     expect(evaluacion.motivo).toBe(MOTIVO_HORARIO_INCOMPLETO);
   });

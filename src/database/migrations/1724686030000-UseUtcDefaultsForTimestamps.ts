@@ -18,9 +18,7 @@ type RestriccionFecha = {
  * datetime y SYSUTCDATETIME() para datetime2). No modifica datos ya guardados.
  * Es idempotente: solo toca restricciones que todavía usan hora local.
  */
-export class UseUtcDefaultsForTimestamps1724686030000
-  implements MigrationInterface
-{
+export class UseUtcDefaultsForTimestamps1724686030000 implements MigrationInterface {
   name = 'UseUtcDefaultsForTimestamps1724686030000';
 
   private async listar(

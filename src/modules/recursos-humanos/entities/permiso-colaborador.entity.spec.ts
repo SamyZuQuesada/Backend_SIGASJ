@@ -58,7 +58,8 @@ describe('PermisoColaborador Entity (SIGASJ)', () => {
     const storage = getMetadataArgsStorage();
     const columna = (propertyName: string) =>
       storage.columns.find(
-        (c) => c.target === PermisoColaborador && c.propertyName === propertyName,
+        (c) =>
+          c.target === PermisoColaborador && c.propertyName === propertyName,
       );
 
     it('debe estar registrada como entidad "PermisoColaborador"', () => {

@@ -69,7 +69,8 @@ describe('Entidades Actividades Fontanero (#386)', () => {
     const colEstado = metadata.findColumnWithPropertyName('estado');
     expect(colEstado?.default).toBe('REPORTADA');
 
-    const colEstadoRevision = metadata.findColumnWithPropertyName('estadoRevision');
+    const colEstadoRevision =
+      metadata.findColumnWithPropertyName('estadoRevision');
     expect(colEstadoRevision?.default).toBe('PENDIENTE');
   });
 

@@ -119,7 +119,9 @@ describe('3.11 Historial de movimientos de inventario', () => {
 
     jwtService = moduleRef.get(JwtService);
     materialRepository = moduleRef.get(getRepositoryToken(Material));
-    movimientoRepository = moduleRef.get(getRepositoryToken(MovimientoInventario));
+    movimientoRepository = moduleRef.get(
+      getRepositoryToken(MovimientoInventario),
+    );
     usuarioRepository = moduleRef.get(getRepositoryToken(Usuario));
     rolRepository = moduleRef.get(getRepositoryToken(Rol));
 
@@ -262,7 +264,10 @@ describe('3.11 Historial de movimientos de inventario', () => {
       }),
     );
 
-    const res = await adminGetMovimiento(movimiento.id, signAs(Role.ADMINISTRADORA));
+    const res = await adminGetMovimiento(
+      movimiento.id,
+      signAs(Role.ADMINISTRADORA),
+    );
 
     expect(res.status).toBe(HttpStatus.OK);
     expect(res.body.id).toBe(movimiento.id);
@@ -273,7 +278,9 @@ describe('3.11 Historial de movimientos de inventario', () => {
 
   it('rechaza consultas sin autenticación o con rol no autorizado', async () => {
     await adminGetMovimientos('').expect(HttpStatus.UNAUTHORIZED);
-    await adminGetMovimientos('', signAs(Role.FONTANERO)).expect(HttpStatus.FORBIDDEN);
+    await adminGetMovimientos('', signAs(Role.FONTANERO)).expect(
+      HttpStatus.FORBIDDEN,
+    );
   });
 
   it('devuelve 404 para un movimiento inexistente', async () => {

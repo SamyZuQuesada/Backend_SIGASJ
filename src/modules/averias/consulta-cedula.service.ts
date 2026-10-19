@@ -77,9 +77,9 @@ export class ConsultaCedulaService {
       );
     }
 
-    const body = (await response.json().catch(() => null)) as
-      | HaciendaIdentificacion
-      | null;
+    const body = (await response
+      .json()
+      .catch(() => null)) as HaciendaIdentificacion | null;
     const nombre = typeof body?.nombre === 'string' ? body.nombre.trim() : '';
     if (!nombre) {
       return this.noEncontrada(digitos);

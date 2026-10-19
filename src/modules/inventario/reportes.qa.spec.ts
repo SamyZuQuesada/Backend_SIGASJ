@@ -109,7 +109,9 @@ describe('3.12 Reportes de inventario', () => {
     jwtService = moduleRef.get(JwtService);
     materialRepository = moduleRef.get(getRepositoryToken(Material));
     categoriaRepository = moduleRef.get(getRepositoryToken(CategoriaMaterial));
-    movimientoRepository = moduleRef.get(getRepositoryToken(MovimientoInventario));
+    movimientoRepository = moduleRef.get(
+      getRepositoryToken(MovimientoInventario),
+    );
     usuarioRepository = moduleRef.get(getRepositoryToken(Usuario));
 
     const roles = await seedRolesBase(moduleRef.get(getRepositoryToken(Rol)));
@@ -227,7 +229,9 @@ describe('3.12 Reportes de inventario', () => {
 
   it('rechaza consultas sin autenticación o con rol no autorizado', async () => {
     await adminGetReporte('').expect(HttpStatus.UNAUTHORIZED);
-    await adminGetReporte('', signAs(Role.FONTANERO)).expect(HttpStatus.FORBIDDEN);
+    await adminGetReporte('', signAs(Role.FONTANERO)).expect(
+      HttpStatus.FORBIDDEN,
+    );
   });
 
   it('rechaza rangos de fechas inválidos', async () => {

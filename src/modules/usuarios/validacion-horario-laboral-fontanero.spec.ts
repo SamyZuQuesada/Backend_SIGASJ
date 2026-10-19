@@ -1,6 +1,9 @@
 import { BadRequestException } from '@nestjs/common';
 import { DiaSemana } from '../../common/enums/dia-semana.enum';
-import { fechaEnAsada, partesLaboralesEnAsada } from '../../common/time/reloj-asada';
+import {
+  fechaEnAsada,
+  partesLaboralesEnAsada,
+} from '../../common/time/reloj-asada';
 import {
   assertPuedeIniciarAtencionPorHorario,
   compararInstanteConHorario,
@@ -13,8 +16,12 @@ describe('compararInstanteConHorario', () => {
   it('detecta dentro, fuera e incompleto', () => {
     const diez = 10 * 3600;
     expect(compararInstanteConHorario('07:00', '16:00', diez)).toBe('dentro');
-    expect(compararInstanteConHorario('07:00', '16:00', 16 * 3600)).toBe('fuera');
-    expect(compararInstanteConHorario('07:00', '07:00', diez)).toBe('incompleto');
+    expect(compararInstanteConHorario('07:00', '16:00', 16 * 3600)).toBe(
+      'fuera',
+    );
+    expect(compararInstanteConHorario('07:00', '07:00', diez)).toBe(
+      'incompleto',
+    );
     expect(compararInstanteConHorario('', '16:00', diez)).toBe('incompleto');
   });
 });

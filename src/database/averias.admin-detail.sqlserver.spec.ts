@@ -43,7 +43,9 @@ describe('Detalle administrativo de Averia en SQL Server', () => {
   afterAll(async () => {
     if (dataSource?.isInitialized) {
       for (const codigo of createdCodes) {
-        await borrarAveriasDePrueba(dataSource, 'codigoSeguimiento = @0', [codigo]);
+        await borrarAveriasDePrueba(dataSource, 'codigoSeguimiento = @0', [
+          codigo,
+        ]);
       }
       if (createdUsuarioId != null) {
         await dataSource.query(`DELETE FROM Usuario WHERE idUsuario = @0`, [
@@ -68,9 +70,9 @@ describe('Detalle administrativo de Averia en SQL Server', () => {
     const service = new AveriasService(averiaRepo);
 
     const fontanero = await (async () => {
-      const [rolFontanero] = (await ds.query(
+      const [rolFontanero] = await ds.query(
         `SELECT idRol FROM Rol WHERE nombre = 'FONTANERO'`,
-      )) as Array<{ idRol: number }>;
+      );
       return usuarioRepo.save(
         usuarioRepo.create({
           nombre: 'QA Fontanero Spec',

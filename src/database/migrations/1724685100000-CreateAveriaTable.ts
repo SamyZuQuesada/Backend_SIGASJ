@@ -9,6 +9,10 @@ export class CreateAveriaTable1724685100000 implements MigrationInterface {
   name = 'CreateAveriaTable1724685100000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (await queryRunner.hasTable('Averia')) {
+      return;
+    }
+
     const isMssql = queryRunner.connection.options.type === 'mssql';
     const dateTimeType = isMssql ? 'datetime2' : 'datetime';
     const textType = isMssql ? 'nvarchar(max)' : 'text';

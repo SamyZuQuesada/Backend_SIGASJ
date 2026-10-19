@@ -10,6 +10,13 @@ export class CreateSolicitudMaterialAndDetalleTables1724685200000 implements Mig
   name = 'CreateSolicitudMaterialAndDetalleTables1724685200000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (
+      (await queryRunner.hasTable('SolicitudMaterial')) &&
+      (await queryRunner.hasTable('DetalleSolicitudMaterial'))
+    ) {
+      return;
+    }
+
     const isMssql = queryRunner.connection.options.type === 'mssql';
     const dateTimeType = isMssql ? 'datetime2' : 'datetime';
     const textType = isMssql ? 'nvarchar(max)' : 'text';

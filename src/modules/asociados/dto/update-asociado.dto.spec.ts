@@ -115,9 +115,9 @@ describe('UpdateAsociadoDto - Validaciones y Reglas de Negocio', () => {
 
     it('rechaza si "correoElectronico" está vacío o tiene formato inválido', async () => {
       const errorsVacio = await validateUpdate({ correoElectronico: '   ' });
-      expect(
-        errorsVacio.some((e) => e.property === 'correoElectronico'),
-      ).toBe(true);
+      expect(errorsVacio.some((e) => e.property === 'correoElectronico')).toBe(
+        true,
+      );
 
       const errorsInvalido = await validateUpdate({
         correoElectronico: 'invalido',

@@ -33,7 +33,9 @@ export function averiaCalificadaParaAtencion(
 ): boolean {
   const prioridad = averia.prioridad?.trim().toUpperCase() ?? '';
   const tipo = averia.tipoAveria?.trim().toUpperCase() ?? '';
-  return PRIORIDADES_PARA_ATENDER.has(prioridad) && TIPOS_PARA_ATENDER.has(tipo);
+  return (
+    PRIORIDADES_PARA_ATENDER.has(prioridad) && TIPOS_PARA_ATENDER.has(tipo)
+  );
 }
 
 export function assertCalificacionPermiteIniciarAtencion(
@@ -58,7 +60,10 @@ export function assertHorarioPermiteIniciarAtencion(
 }
 
 /** Solo después de una transición exitosa a EN_ATENCION. */
-export function registrarInicioAtencionExitoso(averia: Averia, momento = ahoraDelSistema()): void {
+export function registrarInicioAtencionExitoso(
+  averia: Averia,
+  momento = ahoraDelSistema(),
+): void {
   averia.estado = EstadoAveria.EN_ATENCION;
   averia.fechaInicioAtencion = momento;
 }

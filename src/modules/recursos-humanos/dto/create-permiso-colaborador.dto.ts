@@ -41,7 +41,9 @@ export class CreatePermisoColaboradorDto {
     example: 3,
     description: 'Identificador del colaborador al que se registra el permiso',
   })
-  @IsInt({ message: 'El colaborador debe ser un identificador numérico entero' })
+  @IsInt({
+    message: 'El colaborador debe ser un identificador numérico entero',
+  })
   @Min(1, { message: 'El colaborador debe ser un identificador válido' })
   colaboradorId: number;
 

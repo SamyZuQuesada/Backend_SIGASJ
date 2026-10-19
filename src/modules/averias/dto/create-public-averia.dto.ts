@@ -20,20 +20,6 @@ const trimString = (params: TransformFnParams): unknown => {
   return typeof raw === 'string' ? raw.trim() : raw;
 };
 
-const trimOptionalString = (params: TransformFnParams): unknown => {
-  const raw = rawValue(params);
-  if (raw === undefined || raw === null) {
-    return undefined;
-  }
-
-  if (typeof raw !== 'string') {
-    return raw;
-  }
-
-  const trimmed = raw.trim();
-  return trimmed === '' ? undefined : trimmed;
-};
-
 const trimOptionalEmail = (params: TransformFnParams): unknown => {
   const raw = rawValue(params);
   if (raw === undefined || raw === null) {
@@ -68,19 +54,19 @@ export class CreatePublicAveriaDto {
   })
   nombreReportante: string;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     example: '1-2345-6789',
     maxLength: 50,
     description:
-      'Identificación o cédula del reportante. Opcional; no impide el registro.',
+      'Identificación o cédula del reportante. Obligatoria para el registro público.',
   })
-  @Transform(trimOptionalString)
-  @IsOptional()
+  @Transform(trimString)
   @IsString({ message: 'La identificación debe ser una cadena de texto' })
+  @IsNotEmpty({ message: 'La identificación o cédula es obligatoria' })
   @MaxLength(50, {
     message: 'La identificación no puede exceder 50 caracteres',
   })
-  identificacionReportante?: string | null;
+  identificacionReportante!: string;
 
   @ApiProperty({
     example: '8888-8888',

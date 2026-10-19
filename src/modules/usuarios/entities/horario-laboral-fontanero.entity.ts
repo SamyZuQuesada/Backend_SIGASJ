@@ -28,9 +28,13 @@ const horaLaboralTransformer = {
  * desactivar un día sin borrar la fila.
  */
 @Entity('HorarioLaboralFontanero')
-@Index('UQ_HorarioLaboralFontanero_Fontanero_Dia', ['idFontanero', 'diaSemana'], {
-  unique: true,
-})
+@Index(
+  'UQ_HorarioLaboralFontanero_Fontanero_Dia',
+  ['idFontanero', 'diaSemana'],
+  {
+    unique: true,
+  },
+)
 export class HorarioLaboralFontanero {
   @PrimaryGeneratedColumn()
   id: number;

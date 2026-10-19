@@ -60,7 +60,9 @@ describe('Pruebas de Base de Datos e Integridad: Migración Proveedor', () => {
           },
         },
         createTable: createTableSpy,
+        hasColumn: jest.fn().mockResolvedValue(false),
         addColumn: addColumnSpy,
+        getTable: jest.fn().mockResolvedValue({ foreignKeys: [] }),
         createForeignKey: createForeignKeySpy,
       } as unknown as QueryRunner;
 

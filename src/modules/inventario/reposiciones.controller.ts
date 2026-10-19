@@ -69,7 +69,10 @@ export class ReposicionesController {
     summary: 'Consultar detalle de una reposición (Administradora)',
   })
   @ApiParam({ name: 'id', description: 'ID de la reposición', type: Number })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Detalle de la reposición' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Detalle de la reposición',
+  })
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'No encontrada' })
   obtener(@Param('id', ParseIntPipe) id: number) {
     return this.inventarioService.obtenerReposicionAdmin(id);

@@ -104,7 +104,10 @@ export class InventarioController {
 
   @Get('materiales')
   @HttpCode(HttpStatus.OK)
-  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  @Header(
+    'Cache-Control',
+    'no-store, no-cache, must-revalidate, proxy-revalidate',
+  )
   @Header('Pragma', 'no-cache')
   @Header('Expires', '0')
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -132,7 +135,10 @@ export class InventarioController {
 
   @Get('materiales/:id')
   @HttpCode(HttpStatus.OK)
-  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  @Header(
+    'Cache-Control',
+    'no-store, no-cache, must-revalidate, proxy-revalidate',
+  )
   @Header('Pragma', 'no-cache')
   @Header('Expires', '0')
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -169,7 +175,10 @@ export class InventarioController {
 
   @Get('materiales/:id/disponibilidad')
   @HttpCode(HttpStatus.OK)
-  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  @Header(
+    'Cache-Control',
+    'no-store, no-cache, must-revalidate, proxy-revalidate',
+  )
   @Header('Pragma', 'no-cache')
   @Header('Expires', '0')
   @UseGuards(JwtAuthGuard, RolesGuard)

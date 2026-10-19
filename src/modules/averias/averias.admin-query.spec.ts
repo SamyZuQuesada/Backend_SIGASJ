@@ -24,7 +24,9 @@ describe('helpers de consulta administrativa de averías', () => {
 
   it('una avería de las 20:35 del 17 en Costa Rica cae dentro del día 17', () => {
     const reporte = new Date('2026-10-18T02:35:47.000Z').getTime();
-    expect(reporte).toBeGreaterThanOrEqual(toStartOfAsadaDay('2026-10-17').getTime());
+    expect(reporte).toBeGreaterThanOrEqual(
+      toStartOfAsadaDay('2026-10-17').getTime(),
+    );
     expect(reporte).toBeLessThan(toStartOfNextAsadaDay('2026-10-17').getTime());
   });
 

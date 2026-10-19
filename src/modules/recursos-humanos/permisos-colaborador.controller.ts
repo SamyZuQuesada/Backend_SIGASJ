@@ -33,7 +33,7 @@ import {
 @ApiTags('Recursos Humanos - Permisos')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMINISTRADORA)
+@Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
 @Controller('rrhh/permisos')
 export class PermisosColaboradorController {
   constructor(

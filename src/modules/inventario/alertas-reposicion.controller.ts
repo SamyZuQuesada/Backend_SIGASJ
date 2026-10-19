@@ -87,7 +87,8 @@ export class AlertasReposicionController {
   @HttpCode(HttpStatus.OK)
   @Roles(Role.ADMINISTRADORA)
   @ApiOperation({
-    summary: 'Actualizar el estado de una alerta de reposición (Administradora)',
+    summary:
+      'Actualizar el estado de una alerta de reposición (Administradora)',
     description:
       'Permite pasar una alerta de Pendiente a En gestión y de En gestión a Resuelta. ' +
       'Registra a la administradora responsable y la fecha de actualización. No modifica el stock.',
@@ -133,7 +134,8 @@ export class AlertasReposicionController {
   @HttpCode(HttpStatus.CREATED)
   @Roles(Role.ADMINISTRADORA)
   @ApiOperation({
-    summary: 'Generar reposición desde una alerta de stock mínimo (Administradora)',
+    summary:
+      'Generar reposición desde una alerta de stock mínimo (Administradora)',
     description:
       'Crea una reposición PENDIENTE vinculada a la alerta. No modifica las existencias del material. ' +
       'Rechaza alertas resueltas o reposiciones activas duplicadas.',
@@ -168,6 +170,10 @@ export class AlertasReposicionController {
     @Body() dto: CreateReposicionDesdeAlertaDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.inventarioService.generarReposicionDesdeAlertaAdmin(id, user, dto);
+    return this.inventarioService.generarReposicionDesdeAlertaAdmin(
+      id,
+      user,
+      dto,
+    );
   }
 }

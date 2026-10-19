@@ -80,7 +80,7 @@ describe('GET /api/v1/rrhh/permisos', () => {
       expect(res.status).toBe(401);
     });
 
-    it.each([Role.SECRETARIA, Role.FONTANERO, Role.ABONADO, Role.AYUDANTE])(
+    it.each([Role.FONTANERO, Role.ABONADO, Role.AYUDANTE])(
       'rechaza al rol %s en listado y detalle (403)',
       async (role) => {
         const token = signAs(role);
@@ -115,7 +115,9 @@ describe('GET /api/v1/rrhh/permisos', () => {
     });
 
     it('filtra por periodo de fechas (traslape)', async () => {
-      const listado = await listar('?fechaInicio=2026-10-13&fechaFin=2026-10-20');
+      const listado = await listar(
+        '?fechaInicio=2026-10-13&fechaFin=2026-10-20',
+      );
       expect(listado.data.map((p) => p.motivo).sort()).toEqual([
         'Asunto personal',
         'Cita médica',
@@ -134,7 +136,9 @@ describe('GET /api/v1/rrhh/permisos', () => {
     });
 
     it('devuelve listado vacío cuando no hay coincidencias', async () => {
-      const listado = await listar(`?colaboradorId=${carlos.id}&fechaInicio=2027-01-01`);
+      const listado = await listar(
+        `?colaboradorId=${carlos.id}&fechaInicio=2027-01-01`,
+      );
       expect(listado.total).toBe(0);
       expect(listado.data).toEqual([]);
       expect(listado.totalPages).toBe(0);

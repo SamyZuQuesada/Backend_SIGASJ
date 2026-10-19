@@ -210,14 +210,20 @@ describe('Horarios laborales del Fontanero', () => {
     const lunesTarde = new Date('2026-09-21T22:00:00.000Z'); // lunes 16:00 en CR
     const martesManana = new Date('2026-09-22T16:00:00.000Z'); // martes 10:00 en CR
 
-    expect(await service.estaDentroDeHorarioLaboral(fontanero.idUsuario, lunesManana)).toBe(
-      true,
-    );
-    expect(await service.estaDentroDeHorarioLaboral(fontanero.idUsuario, lunesTarde)).toBe(
-      false,
-    );
     expect(
-      await service.estaDentroDeHorarioLaboral(fontanero.idUsuario, martesManana),
+      await service.estaDentroDeHorarioLaboral(
+        fontanero.idUsuario,
+        lunesManana,
+      ),
+    ).toBe(true);
+    expect(
+      await service.estaDentroDeHorarioLaboral(fontanero.idUsuario, lunesTarde),
+    ).toBe(false);
+    expect(
+      await service.estaDentroDeHorarioLaboral(
+        fontanero.idUsuario,
+        martesManana,
+      ),
     ).toBe(false);
   });
 });

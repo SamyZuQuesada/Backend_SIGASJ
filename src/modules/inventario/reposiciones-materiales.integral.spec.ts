@@ -103,12 +103,18 @@ describe('Backlog 3.9: Reposición y compra de materiales — Pruebas integrales
     materialRepository = moduleRef.get(getRepositoryToken(Material));
     proveedorRepository = moduleRef.get(getRepositoryToken(Proveedor));
     alertaRepository = moduleRef.get(getRepositoryToken(AlertaReposicion));
-    reposicionRepository = moduleRef.get(getRepositoryToken(ReposicionMaterial));
-    movimientoRepository = moduleRef.get(getRepositoryToken(MovimientoInventario));
+    reposicionRepository = moduleRef.get(
+      getRepositoryToken(ReposicionMaterial),
+    );
+    movimientoRepository = moduleRef.get(
+      getRepositoryToken(MovimientoInventario),
+    );
     const usuarioRepository = moduleRef.get<Repository<Usuario>>(
       getRepositoryToken(Usuario),
     );
-    const rolRepository = moduleRef.get<Repository<Rol>>(getRepositoryToken(Rol));
+    const rolRepository = moduleRef.get<Repository<Rol>>(
+      getRepositoryToken(Rol),
+    );
     const roles = await seedRolesBase(rolRepository);
 
     administradora = await crearUsuarioPrueba(usuarioRepository, roles, {
@@ -143,7 +149,10 @@ describe('Backlog 3.9: Reposición y compra de materiales — Pruebas integrales
       }),
     );
     const proveedor = await proveedorRepository.save(
-      proveedorRepository.create({ nombre: 'Ferretería Integral', activo: true }),
+      proveedorRepository.create({
+        nombre: 'Ferretería Integral',
+        activo: true,
+      }),
     );
     const alerta = await alertaRepository.save(
       alertaRepository.create({
@@ -156,13 +165,12 @@ describe('Backlog 3.9: Reposición y compra de materiales — Pruebas integrales
       }),
     );
 
-    const token = signAs(
-      Role.ADMINISTRADORA,
-      String(administradora.idUsuario),
-    );
+    const token = signAs(Role.ADMINISTRADORA, String(administradora.idUsuario));
 
     const reposicionRes = await request(app.getHttpServer())
-      .post(`/api/v1/admin/inventario/alertas-reposicion/${alerta.id}/reposicion`)
+      .post(
+        `/api/v1/admin/inventario/alertas-reposicion/${alerta.id}/reposicion`,
+      )
       .set('Authorization', `Bearer ${token}`)
       .send({ cantidad: 12 })
       .expect(HttpStatus.CREATED);
@@ -180,7 +188,9 @@ describe('Backlog 3.9: Reposición y compra de materiales — Pruebas integrales
     expect(stockTrasReposicion?.stockActual).toBe(8);
 
     await request(app.getHttpServer())
-      .post(`/api/v1/admin/inventario/alertas-reposicion/${alerta.id}/reposicion`)
+      .post(
+        `/api/v1/admin/inventario/alertas-reposicion/${alerta.id}/reposicion`,
+      )
       .set('Authorization', `Bearer ${token}`)
       .send({})
       .expect(HttpStatus.CONFLICT);

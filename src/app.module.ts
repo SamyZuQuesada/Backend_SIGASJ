@@ -10,6 +10,8 @@ import jwtConfig from './config/jwt.config';
 import authConfig from './config/auth.config';
 import acueductosCrConfig from './config/acueductos-cr.config';
 import smsConfig from './config/sms.config';
+import jotformConfig from './config/jotform.config';
+import mailConfig from './config/mail.config';
 
 import { AuthModule } from './modules/auth/auth.module';
 import { UsuariosModule } from './modules/usuarios/usuarios.module';
@@ -26,6 +28,7 @@ import { RecibosModule } from './modules/recibos/recibos.module';
 import { NotificacionesModule } from './modules/notificaciones/notificaciones.module';
 import { AsociadosModule } from './modules/asociados/asociados.module';
 import { RecursosHumanosModule } from './modules/recursos-humanos/recursos-humanos.module';
+import { SolicitudesAusenciaModule } from './modules/solicitudes-ausencia/solicitudes-ausencia.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -40,6 +43,8 @@ import { AppService } from './app.service';
         authConfig,
         acueductosCrConfig,
         smsConfig,
+        jotformConfig,
+        mailConfig,
       ],
     }),
     TypeOrmModule.forRootAsync({
@@ -62,6 +67,7 @@ import { AppService } from './app.service';
     NotificacionesModule,
     AsociadosModule,
     RecursosHumanosModule,
+    SolicitudesAusenciaModule,
   ],
 
   controllers: [AppController],

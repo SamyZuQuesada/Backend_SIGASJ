@@ -55,6 +55,13 @@ export class CreateActividadesFontaneroTables1724684200000 implements MigrationI
   name = 'CreateActividadesFontaneroTables1724684200000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (
+      (await queryRunner.hasTable('TipoActividadFontanero')) &&
+      (await queryRunner.hasTable('ActividadFontanero'))
+    ) {
+      return;
+    }
+
     const isMssql = queryRunner.connection.options.type === 'mssql';
     const dateTimeType = isMssql ? 'datetime2' : 'datetime';
     const textType = isMssql ? 'nvarchar(max)' : 'text';

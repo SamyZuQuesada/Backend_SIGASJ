@@ -104,7 +104,9 @@ describe('Pruebas de Base de Datos y Backend: Historial de Asociados sin Duplica
         motivoInactivacion: null,
       };
 
-      const saveMock = jest.fn().mockImplementation((entity) => Promise.resolve(entity));
+      const saveMock = jest
+        .fn()
+        .mockImplementation((entity) => Promise.resolve(entity));
       const repoMock = {
         findOne: jest.fn().mockResolvedValue(mockAsociado),
         save: saveMock,
@@ -155,16 +157,23 @@ describe('Pruebas de Base de Datos y Backend: Historial de Asociados sin Duplica
 
       // Consulta 1: Solo asociados actuales
       await service.findAll({ activo: true });
-      expect(andWhereMock).toHaveBeenCalledWith('a.activo = :activo', { activo: true });
+      expect(andWhereMock).toHaveBeenCalledWith('a.activo = :activo', {
+        activo: true,
+      });
 
       // Consulta 2: Solo asociados anteriores / inactivos
       await service.findAll({ activo: false });
-      expect(andWhereMock).toHaveBeenCalledWith('a.activo = :activo', { activo: false });
+      expect(andWhereMock).toHaveBeenCalledWith('a.activo = :activo', {
+        activo: false,
+      });
 
       // Consulta 3: Historial consolidado completo (sin filtro de activo)
       andWhereMock.mockClear();
       await service.findAll({});
-      expect(andWhereMock).not.toHaveBeenCalledWith('a.activo = :activo', expect.anything());
+      expect(andWhereMock).not.toHaveBeenCalledWith(
+        'a.activo = :activo',
+        expect.anything(),
+      );
     });
 
     it('debe aplicar filtros por rango de fechas de registro y de inactivación en consultas históricas', async () => {
@@ -214,7 +223,9 @@ describe('Pruebas de Base de Datos y Backend: Historial de Asociados sin Duplica
   describe('5. Migración de Índices para Consultas Históricas', () => {
     it('debe contar con la migración AddHistoricalQueryIndexesToAsociado1724686010000', () => {
       const migration = new AddHistoricalQueryIndexesToAsociado1724686010000();
-      expect(migration.name).toBe('AddHistoricalQueryIndexesToAsociado1724686010000');
+      expect(migration.name).toBe(
+        'AddHistoricalQueryIndexesToAsociado1724686010000',
+      );
     });
 
     it('debe crear los índices para activo, fechaRegistro y fechaInactivacion en up', async () => {
@@ -249,9 +260,18 @@ describe('Pruebas de Base de Datos y Backend: Historial de Asociados sin Duplica
       const droppedIndexNames: string[] = [];
 
       const mockIndices = [
-        new TableIndex({ name: 'IDX_Asociado_activo', columnNames: ['activo'] }),
-        new TableIndex({ name: 'IDX_Asociado_fechaRegistro', columnNames: ['fechaRegistro'] }),
-        new TableIndex({ name: 'IDX_Asociado_fechaInactivacion', columnNames: ['fechaInactivacion'] }),
+        new TableIndex({
+          name: 'IDX_Asociado_activo',
+          columnNames: ['activo'],
+        }),
+        new TableIndex({
+          name: 'IDX_Asociado_fechaRegistro',
+          columnNames: ['fechaRegistro'],
+        }),
+        new TableIndex({
+          name: 'IDX_Asociado_fechaInactivacion',
+          columnNames: ['fechaInactivacion'],
+        }),
       ];
 
       const mockTable = new Table({

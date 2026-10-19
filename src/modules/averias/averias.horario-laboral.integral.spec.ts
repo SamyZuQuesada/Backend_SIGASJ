@@ -428,7 +428,9 @@ describe('PBI 3.6 — horario laboral integral', () => {
     });
 
     const response = await patchIniciar(averia.id, tokenA).expect(400);
-    expect(response.body.message).toBe(MENSAJE_INICIO_ATENCION_FUERA_DE_HORARIO);
+    expect(response.body.message).toBe(
+      MENSAJE_INICIO_ATENCION_FUERA_DE_HORARIO,
+    );
     expect(JSON.stringify(response.body)).not.toMatch(
       /TypeORM|SQL Server|stack/i,
     );

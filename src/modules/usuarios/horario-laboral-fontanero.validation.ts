@@ -1,5 +1,4 @@
-const HORA_LABORAL_PATTERN =
-  /^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/;
+const HORA_LABORAL_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/;
 
 export const MENSAJE_HORA_FORMATO_INVALIDO =
   'La hora debe tener el formato HH:mm o HH:mm:ss (00:00 a 23:59).';
@@ -66,12 +65,14 @@ export function esHoraInicioAnteriorAFin(
 }
 
 export function segundosDesdeMedianoche(fecha: Date): number {
-  return (
-    fecha.getHours() * 3600 + fecha.getMinutes() * 60 + fecha.getSeconds()
-  );
+  return fecha.getHours() * 3600 + fecha.getMinutes() * 60 + fecha.getSeconds();
 }
 
-function formatearHora(horas: number, minutos: number, segundos: number): string {
+function formatearHora(
+  horas: number,
+  minutos: number,
+  segundos: number,
+): string {
   return `${pad(horas)}:${pad(minutos)}:${pad(segundos)}`;
 }
 

@@ -30,7 +30,10 @@ import {
   vaciarNotificacionesAveriaPrueba,
 } from './averias.test-entities';
 import { mensajeTransicionEstadoAveriaInvalida } from './averias.estado-transiciones';
-import { MENSAJE_INICIO_ATENCION_FUERA_DE_HORARIO, MENSAJE_INICIO_ATENCION_SIN_CALIFICACION } from './averias.inicio-atencion';
+import {
+  MENSAJE_INICIO_ATENCION_FUERA_DE_HORARIO,
+  MENSAJE_INICIO_ATENCION_SIN_CALIFICACION,
+} from './averias.inicio-atencion';
 import {
   AVERIA_ADMIN_NOT_FOUND,
   AVERIA_FONTANERO_FORBIDDEN,
@@ -253,7 +256,9 @@ describe('PATCH /api/v1/fontanero/averias/:id/iniciar-atencion', () => {
     });
 
     const response = await patchIniciar(averia.id, tokenA).expect(400);
-    expect(response.body.message).toBe(MENSAJE_INICIO_ATENCION_FUERA_DE_HORARIO);
+    expect(response.body.message).toBe(
+      MENSAJE_INICIO_ATENCION_FUERA_DE_HORARIO,
+    );
 
     const persistida = await averias.findOneBy({ id: averia.id });
     expect(persistida?.estado).toBe(EstadoAveria.PENDIENTE);
@@ -267,7 +272,9 @@ describe('PATCH /api/v1/fontanero/averias/:id/iniciar-atencion', () => {
       estado: EstadoAveria.PENDIENTE,
     });
     const response = await patchIniciar(averia.id, tokenA).expect(400);
-    expect(response.body.message).toBe(MENSAJE_INICIO_ATENCION_FUERA_DE_HORARIO);
+    expect(response.body.message).toBe(
+      MENSAJE_INICIO_ATENCION_FUERA_DE_HORARIO,
+    );
     const persistida = await averias.findOneBy({ id: averia.id });
     expect(persistida?.estado).toBe(EstadoAveria.PENDIENTE);
     expect(persistida?.fechaInicioAtencion).toBeNull();
@@ -282,7 +289,9 @@ describe('PATCH /api/v1/fontanero/averias/:id/iniciar-atencion', () => {
       tipoAveria: null,
     });
     const response = await patchIniciar(averia.id, tokenA).expect(400);
-    expect(response.body.message).toBe(MENSAJE_INICIO_ATENCION_SIN_CALIFICACION);
+    expect(response.body.message).toBe(
+      MENSAJE_INICIO_ATENCION_SIN_CALIFICACION,
+    );
     const persistida = await averias.findOneBy({ id: averia.id });
     expect(persistida?.estado).toBe(EstadoAveria.ASIGNADA);
   });

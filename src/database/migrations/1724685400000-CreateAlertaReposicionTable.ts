@@ -10,6 +10,10 @@ export class CreateAlertaReposicionTable1724685400000 implements MigrationInterf
   name = 'CreateAlertaReposicionTable1724685400000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (await queryRunner.hasTable('AlertaReposicion')) {
+      return;
+    }
+
     const isMssql = queryRunner.connection.options.type === 'mssql';
     const dateTimeType = isMssql ? 'datetime2' : 'datetime';
     const defaultDate = isMssql ? 'GETDATE()' : 'CURRENT_TIMESTAMP';

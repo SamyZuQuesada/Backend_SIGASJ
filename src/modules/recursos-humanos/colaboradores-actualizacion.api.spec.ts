@@ -62,7 +62,7 @@ describe('PATCH /api/v1/rrhh/colaboradores/:id y /:id/estado', () => {
       expect(res.status).toBe(401);
     });
 
-    it.each([Role.SECRETARIA, Role.FONTANERO, Role.ABONADO, Role.AYUDANTE])(
+    it.each([Role.FONTANERO, Role.ABONADO, Role.AYUDANTE])(
       'rechaza al rol %s (403) y no modifica nada',
       async (role) => {
         const token = ctx.signAs(role);

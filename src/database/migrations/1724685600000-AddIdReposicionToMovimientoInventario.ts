@@ -14,38 +14,44 @@ export class AddIdReposicionToMovimientoInventario1724685600000 implements Migra
       'MovimientoInventario',
       'idReposicion',
     );
-    if (hasColumn) {
-      return;
+    if (!hasColumn) {
+      await queryRunner.addColumn(
+        'MovimientoInventario',
+        new TableColumn({
+          name: 'idReposicion',
+          type: 'int',
+          isNullable: true,
+        }),
+      );
     }
 
-    await queryRunner.addColumn(
-      'MovimientoInventario',
-      new TableColumn({
-        name: 'idReposicion',
-        type: 'int',
-        isNullable: true,
-      }),
-    );
+    const table = await queryRunner.getTable('MovimientoInventario');
+    const usaIdReposicion = (columnNames: string[]) =>
+      columnNames.length === 1 && columnNames[0] === 'idReposicion';
 
-    await queryRunner.createForeignKey(
-      'MovimientoInventario',
-      new TableForeignKey({
-        name: 'FK_MovimientoInventario_ReposicionMaterial',
-        columnNames: ['idReposicion'],
-        referencedTableName: 'ReposicionMaterial',
-        referencedColumnNames: ['id'],
-        onDelete: 'SET NULL',
-        onUpdate: 'NO ACTION',
-      }),
-    );
+    if (!table?.foreignKeys.some((fk) => usaIdReposicion(fk.columnNames))) {
+      await queryRunner.createForeignKey(
+        'MovimientoInventario',
+        new TableForeignKey({
+          name: 'FK_MovimientoInventario_ReposicionMaterial',
+          columnNames: ['idReposicion'],
+          referencedTableName: 'ReposicionMaterial',
+          referencedColumnNames: ['id'],
+          onDelete: 'SET NULL',
+          onUpdate: 'NO ACTION',
+        }),
+      );
+    }
 
-    await queryRunner.createIndex(
-      'MovimientoInventario',
-      new TableIndex({
-        name: 'IX_MovimientoInventario_idReposicion',
-        columnNames: ['idReposicion'],
-      }),
-    );
+    if (!table?.indices.some((index) => usaIdReposicion(index.columnNames))) {
+      await queryRunner.createIndex(
+        'MovimientoInventario',
+        new TableIndex({
+          name: 'IX_MovimientoInventario_idReposicion',
+          columnNames: ['idReposicion'],
+        }),
+      );
+    }
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {

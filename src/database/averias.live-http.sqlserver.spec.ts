@@ -48,7 +48,9 @@ describe('E2E vivo POST /api/v1/public/averias → SQL Server', () => {
       if (options.type === 'mssql') {
         dataSource = new DataSource(options);
         await dataSource.initialize();
-        await borrarAveriasDePrueba(dataSource, 'nombreReportante LIKE @0', ['Prueba Avería E2E%']);
+        await borrarAveriasDePrueba(dataSource, 'nombreReportante LIKE @0', [
+          'Prueba Avería E2E%',
+        ]);
       }
     } catch {
       dataSource = null;
@@ -58,7 +60,9 @@ describe('E2E vivo POST /api/v1/public/averias → SQL Server', () => {
   afterAll(async () => {
     if (dataSource?.isInitialized) {
       for (const codigo of createdCodes) {
-        await borrarAveriasDePrueba(dataSource, 'codigoSeguimiento = @0', [codigo]);
+        await borrarAveriasDePrueba(dataSource, 'codigoSeguimiento = @0', [
+          codigo,
+        ]);
       }
       await dataSource.destroy();
     }

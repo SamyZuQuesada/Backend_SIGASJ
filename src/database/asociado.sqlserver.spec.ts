@@ -168,13 +168,13 @@ describe('Validación física de tabla Asociado en SQL Server', () => {
 
   it('6. Debe insertar un asociado mediante TypeORM y validar persistencia y fechaInactivacion en NULL', async () => {
     const repo = dataSource.getRepository(Asociado);
-    const testCedula = `TEST-${Date.now()}`;
+    const testCedula = `TEST-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
 
     const nuevoAsociado = repo.create({
       nombre: 'Carlos',
       apellidos: 'Mora Rodríguez',
       cedula: testCedula,
-      correoElectronico: 'carlos.mora@asadasanjuan.cr',
+      correoElectronico: `carlos.mora.${Date.now()}@asadasanjuan.cr`,
       activo: true,
       fechaInactivacion: null,
     });
@@ -210,19 +210,19 @@ describe('Validación física de tabla Asociado en SQL Server', () => {
       expect(rawRows[0]?.cedula).toBe(testCedula);
       expect(rawRows[0]?.fechaInactivacion).toBeNull();
     } finally {
-      await repo.delete({ id: guardado.id });
+      await repo.delete({ cedula: testCedula });
     }
   });
 
   it('7. Debe rechazar la inserción de cédulas duplicadas por la restricción UNIQUE', async () => {
     const repo = dataSource.getRepository(Asociado);
-    const testCedulaDuplicada = `DUP-${Date.now()}`;
+    const testCedulaDuplicada = `DUP-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
 
     const asociado1 = repo.create({
       nombre: 'Asociado Uno',
       apellidos: 'Prueba',
       cedula: testCedulaDuplicada,
-      correoElectronico: 'uno@test.cr',
+      correoElectronico: `uno.${Date.now()}@test.cr`,
       activo: true,
       fechaInactivacion: null,
     });
@@ -234,14 +234,17 @@ describe('Validación física de tabla Asociado en SQL Server', () => {
         nombre: 'Asociado Dos',
         apellidos: 'Prueba',
         cedula: testCedulaDuplicada,
-        correoElectronico: 'dos@test.cr',
+        correoElectronico: `dos.${Date.now()}@test.cr`,
         activo: true,
         fechaInactivacion: null,
       });
 
       await expect(repo.save(asociado2)).rejects.toThrow();
     } finally {
-      await repo.delete({ id: guardado1.id });
+      await repo.delete({ cedula: testCedulaDuplicada });
+      if (guardado1?.id) {
+        await repo.delete({ id: guardado1.id });
+      }
     }
   });
 
@@ -252,11 +255,15 @@ describe('Validación física de tabla Asociado en SQL Server', () => {
     const cedulaEstandar = `1-${String(randomSuffix).slice(0, 4)}-${String(randomSuffix).slice(4)}`;
     const cedulaSinGuiones = `1${randomSuffix}`;
 
+    // Limpia residuos de corridas anteriores con la misma cédula.
+    await repo.delete({ cedula: cedulaEstandar });
+    await repo.delete({ cedula: cedulaSinGuiones });
+
     const asociado1 = repo.create({
       nombre: 'Asociado Original',
       apellidos: 'Prueba',
       cedula: cedulaEstandar,
-      correoElectronico: 'original@test.cr',
+      correoElectronico: `original.${randomSuffix}@test.cr`,
       activo: true,
       fechaInactivacion: null,
     });
@@ -268,14 +275,18 @@ describe('Validación física de tabla Asociado en SQL Server', () => {
         nombre: 'Asociado Evasor',
         apellidos: 'Prueba',
         cedula: cedulaSinGuiones,
-        correoElectronico: 'evasor@test.cr',
+        correoElectronico: `evasor.${randomSuffix}@test.cr`,
         activo: true,
         fechaInactivacion: null,
       });
 
       await expect(repo.save(asociado2)).rejects.toThrow();
     } finally {
-      await repo.delete({ id: guardado1.id });
+      await repo.delete({ cedula: cedulaEstandar });
+      await repo.delete({ cedula: cedulaSinGuiones });
+      if (guardado1?.id) {
+        await repo.delete({ id: guardado1.id });
+      }
     }
   });
 });

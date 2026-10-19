@@ -11,7 +11,7 @@ export const CEDULA_DIMEX = /^\d{11,12}$/;
  */
 export const normalizarCedula = (valor: string): string => {
   if (!valor || typeof valor !== 'string') {
-    return valor as string;
+    return valor;
   }
 
   const limpio = valor.trim().replace(/\s+/g, '');

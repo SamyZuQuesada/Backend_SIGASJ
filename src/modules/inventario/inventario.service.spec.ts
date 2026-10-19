@@ -306,7 +306,8 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
         if (entity === DocumentoMovimientoInventario) return mockDocRepo;
         if (entity === AlertaReposicion) return mockAlertaRepo;
         if (entity === ReposicionMaterial) return mockReposicionRepo;
-        if (entity === DetalleReposicionMaterial) return mockDetalleReposicionRepo;
+        if (entity === DetalleReposicionMaterial)
+          return mockDetalleReposicionRepo;
         return mockRepo;
       }),
       transaction: jest
@@ -2324,7 +2325,9 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
         activo: true,
       };
       repoFindOneSpy.mockResolvedValueOnce(materialMock);
-      alertaRepoSaveSpy.mockRejectedValueOnce(new Error('Fallo al guardar alerta'));
+      alertaRepoSaveSpy.mockRejectedValueOnce(
+        new Error('Fallo al guardar alerta'),
+      );
 
       const result = await service.registrarSalida(
         { idMaterial: 1, cantidad: 1 },
@@ -2596,11 +2599,13 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
         estado: EstadoAlertaReposicion.EN_GESTION,
         idUsuarioGestiona: 2,
       };
-      alertaRepoFindOneSpy.mockResolvedValueOnce(enGestion).mockResolvedValueOnce({
-        ...enGestion,
-        estado: EstadoAlertaReposicion.RESUELTA,
-        usuarioGestiona: { idUsuario: 2, nombre: 'Ana Admin' },
-      });
+      alertaRepoFindOneSpy
+        .mockResolvedValueOnce(enGestion)
+        .mockResolvedValueOnce({
+          ...enGestion,
+          estado: EstadoAlertaReposicion.RESUELTA,
+          usuarioGestiona: { idUsuario: 2, nombre: 'Ana Admin' },
+        });
 
       const result = await service.cambiarEstadoAlertaReposicionAdmin(
         9,
@@ -2620,7 +2625,9 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
           EstadoAlertaReposicion.RESUELTA,
           admin,
         ),
-      ).rejects.toThrow('No se puede cambiar una alerta de PENDIENTE a RESUELTA');
+      ).rejects.toThrow(
+        'No se puede cambiar una alerta de PENDIENTE a RESUELTA',
+      );
       expect(alertaRepoSaveSpy).not.toHaveBeenCalled();
     });
 
@@ -2723,18 +2730,22 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
 
     it('usa la cantidad indicada en el cuerpo cuando es válida', async () => {
       alertaRepoFindOneSpy.mockResolvedValueOnce(alertaPendiente());
-      reposicionRepoFindOneSpy.mockResolvedValueOnce(null).mockResolvedValueOnce({
-        id: 2,
-        codigo: 'REP-0002',
-        origen: OrigenReposicionMaterial.ALERTA_STOCK_MINIMO,
-        estado: EstadoReposicionMaterial.PENDIENTE,
-        idAlertaReposicion: 9,
-        idUsuarioResponsable: 2,
-        detalles: [{ id: 1, idMaterial: 4, cantidad: 30, material: null }],
-      });
+      reposicionRepoFindOneSpy
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          id: 2,
+          codigo: 'REP-0002',
+          origen: OrigenReposicionMaterial.ALERTA_STOCK_MINIMO,
+          estado: EstadoReposicionMaterial.PENDIENTE,
+          idAlertaReposicion: 9,
+          idUsuarioResponsable: 2,
+          detalles: [{ id: 1, idMaterial: 4, cantidad: 30, material: null }],
+        });
       reposicionRepoCountSpy.mockResolvedValueOnce(1);
 
-      await service.generarReposicionDesdeAlertaAdmin(9, admin, { cantidad: 30 });
+      await service.generarReposicionDesdeAlertaAdmin(9, admin, {
+        cantidad: 30,
+      });
 
       const saved = reposicionRepoSaveSpy.mock.calls[0][0];
       expect(saved.codigo).toBe('REP-0002');

@@ -91,16 +91,25 @@ export class CreateColaboradorDto {
   })
   correoElectronico: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 'Fontanero',
-    description: 'Cargo o función del colaborador dentro de la ASADA',
+    description:
+      'Texto de cargo (compatibilidad). Si se envía puestoId, se sincroniza desde el puesto.',
     maxLength: 100,
   })
   @Transform(trimString)
+  @IsOptional()
   @IsString({ message: 'El cargo debe ser una cadena de texto' })
-  @IsNotEmpty({ message: 'El cargo es obligatorio' })
   @MaxLength(100, { message: 'El cargo no puede exceder 100 caracteres' })
-  cargo: string;
+  cargo?: string;
+
+  @ApiProperty({
+    example: 1,
+    description: 'Puesto del catálogo formal (obligatorio en altas nuevas)',
+  })
+  @IsInt({ message: 'El puesto debe ser un identificador numérico entero' })
+  @Min(1, { message: 'El puesto debe ser un identificador válido' })
+  puestoId: number;
 
   @ApiPropertyOptional({
     example: 5,

@@ -42,7 +42,8 @@ export class HistorialAsociadoItemDto {
 
   @ApiProperty({
     example: true,
-    description: 'Estado booleano de afiliación (true = activo, false = inactivo)',
+    description:
+      'Estado booleano de afiliación (true = activo, false = inactivo)',
   })
   activo: boolean;
 
@@ -55,7 +56,8 @@ export class HistorialAsociadoItemDto {
 
   @ApiProperty({
     example: '2026-01-15T08:00:00.000Z',
-    description: 'Fecha en la que el asociado fue registrado formalmente en la ASADA',
+    description:
+      'Fecha en la que el asociado fue registrado formalmente en la ASADA',
   })
   fechaRegistro: Date;
 
@@ -70,8 +72,7 @@ export class HistorialAsociadoItemDto {
   @ApiProperty({
     example: null,
     nullable: true,
-    description:
-      'Motivo por el cual el asociado fue inactivado (si aplica)',
+    description: 'Motivo por el cual el asociado fue inactivado (si aplica)',
   })
   motivoInactivacion: string | null;
 }

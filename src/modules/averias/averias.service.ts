@@ -1856,12 +1856,31 @@ export class AveriasService {
                 manager,
               );
             }
-            return persistida;
+            return {
+              persistida,
+              huboCambio:
+                persistida.prioridad !== prioridadAntes ||
+                persistida.tipoAveria !== tipoAntes,
+            };
           },
         );
 
-        const observaciones = await this.listObservacionesDeAveria(saved.id);
-        return toFontaneroDetail(saved, observaciones);
+        if (
+          saved.huboCambio &&
+          saved.persistida.prioridad?.trim() &&
+          saved.persistida.tipoAveria?.trim()
+        ) {
+          await this.emitirEventosAveria(async () => {
+            await this.notificacionesAverias?.notificarAdministradorasAveriaClasificada(
+              saved.persistida,
+            );
+          });
+        }
+
+        const observaciones = await this.listObservacionesDeAveria(
+          saved.persistida.id,
+        );
+        return toFontaneroDetail(saved.persistida, observaciones);
       });
     } catch (error) {
       if (error instanceof HttpException) {

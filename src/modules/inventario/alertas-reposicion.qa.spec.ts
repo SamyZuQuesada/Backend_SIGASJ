@@ -114,7 +114,9 @@ describe('3.8.3 Consulta administrativa de alertas de reposición', () => {
     materialRepository = moduleRef.get(getRepositoryToken(Material));
     alertaRepository = moduleRef.get(getRepositoryToken(AlertaReposicion));
     usuarioRepository = moduleRef.get(getRepositoryToken(Usuario));
-    const rolRepository = moduleRef.get<Repository<Rol>>(getRepositoryToken(Rol));
+    const rolRepository = moduleRef.get<Repository<Rol>>(
+      getRepositoryToken(Rol),
+    );
     const roles = await seedRolesBase(rolRepository);
 
     administradora = await crearUsuarioPrueba(usuarioRepository, roles, {
@@ -140,7 +142,9 @@ describe('3.8.3 Consulta administrativa de alertas de reposición', () => {
   });
 
   it('rechaza con 403 si el rol no es Administradora', async () => {
-    await adminGet('', signAs(Role.FONTANERO, '7')).expect(HttpStatus.FORBIDDEN);
+    await adminGet('', signAs(Role.FONTANERO, '7')).expect(
+      HttpStatus.FORBIDDEN,
+    );
     await adminGet('', signAs(Role.SECRETARIA, '2')).expect(
       HttpStatus.FORBIDDEN,
     );
@@ -332,7 +336,11 @@ describe('3.8.6 Cambio de estado de alertas de reposición', () => {
     return jwtService.sign(payload);
   };
 
-  const adminPatch = (id: number, body: Record<string, unknown>, token?: string) => {
+  const adminPatch = (
+    id: number,
+    body: Record<string, unknown>,
+    token?: string,
+  ) => {
     const req = request(app.getHttpServer()).patch(
       `/api/v1/admin/inventario/alertas-reposicion/${id}/estado`,
     );
@@ -372,7 +380,9 @@ describe('3.8.6 Cambio de estado de alertas de reposición', () => {
     materialRepository = moduleRef.get(getRepositoryToken(Material));
     alertaRepository = moduleRef.get(getRepositoryToken(AlertaReposicion));
     usuarioRepository = moduleRef.get(getRepositoryToken(Usuario));
-    const rolRepository = moduleRef.get<Repository<Rol>>(getRepositoryToken(Rol));
+    const rolRepository = moduleRef.get<Repository<Rol>>(
+      getRepositoryToken(Rol),
+    );
     const roles = await seedRolesBase(rolRepository);
 
     administradora = await crearUsuarioPrueba(usuarioRepository, roles, {
@@ -416,10 +426,14 @@ describe('3.8.6 Cambio de estado de alertas de reposición', () => {
   };
 
   it('rechaza con 401 si no hay sesión y con 403 si el rol no es Administradora', async () => {
-    await adminPatch(1, { estado: 'EN_GESTION' }).expect(HttpStatus.UNAUTHORIZED);
-    await adminPatch(1, { estado: 'EN_GESTION' }, signAs(Role.FONTANERO, '7')).expect(
-      HttpStatus.FORBIDDEN,
+    await adminPatch(1, { estado: 'EN_GESTION' }).expect(
+      HttpStatus.UNAUTHORIZED,
     );
+    await adminPatch(
+      1,
+      { estado: 'EN_GESTION' },
+      signAs(Role.FONTANERO, '7'),
+    ).expect(HttpStatus.FORBIDDEN);
   });
 
   it('retorna 404 si la alerta no existe', async () => {
@@ -537,12 +551,16 @@ describe('3.9.2 Generar reposición desde alerta de stock mínimo', () => {
     jwtService = moduleRef.get(JwtService);
     materialRepository = moduleRef.get(getRepositoryToken(Material));
     alertaRepository = moduleRef.get(getRepositoryToken(AlertaReposicion));
-    reposicionRepository = moduleRef.get(getRepositoryToken(ReposicionMaterial));
+    reposicionRepository = moduleRef.get(
+      getRepositoryToken(ReposicionMaterial),
+    );
     detalleReposicionRepository = moduleRef.get(
       getRepositoryToken(DetalleReposicionMaterial),
     );
     usuarioRepository = moduleRef.get(getRepositoryToken(Usuario));
-    const rolRepository = moduleRef.get<Repository<Rol>>(getRepositoryToken(Rol));
+    const rolRepository = moduleRef.get<Repository<Rol>>(
+      getRepositoryToken(Rol),
+    );
     const roles = await seedRolesBase(rolRepository);
 
     administradora = await crearUsuarioPrueba(usuarioRepository, roles, {
@@ -605,12 +623,11 @@ describe('3.9.2 Generar reposición desde alerta de stock mínimo', () => {
 
   it('genera reposición desde alerta válida sin modificar stock', async () => {
     const { material, alerta } = await crearAlertaPendiente();
-    const token = signAs(
-      Role.ADMINISTRADORA,
-      String(administradora.idUsuario),
-    );
+    const token = signAs(Role.ADMINISTRADORA, String(administradora.idUsuario));
 
-    const res = await adminPost(alerta.id, {}, token).expect(HttpStatus.CREATED);
+    const res = await adminPost(alerta.id, {}, token).expect(
+      HttpStatus.CREATED,
+    );
 
     expect(res.body.codigo).toMatch(/^REP-\d{4}$/);
     expect(res.body.origen).toBe(OrigenReposicionMaterial.ALERTA_STOCK_MINIMO);
@@ -638,10 +655,7 @@ describe('3.9.2 Generar reposición desde alerta de stock mínimo', () => {
 
   it('acepta cantidad explícita y rechaza alerta resuelta o duplicada', async () => {
     const { alerta } = await crearAlertaPendiente();
-    const token = signAs(
-      Role.ADMINISTRADORA,
-      String(administradora.idUsuario),
-    );
+    const token = signAs(Role.ADMINISTRADORA, String(administradora.idUsuario));
 
     const primera = await adminPost(
       alerta.id,

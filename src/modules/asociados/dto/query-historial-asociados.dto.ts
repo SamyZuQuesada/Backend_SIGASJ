@@ -43,10 +43,20 @@ const toOptionalBoolean = (params: TransformFnParams): unknown => {
   }
   if (typeof raw === 'string') {
     const lower = raw.trim().toLowerCase();
-    if (lower === 'true' || lower === '1' || lower === 'activo' || lower === 'activos') {
+    if (
+      lower === 'true' ||
+      lower === '1' ||
+      lower === 'activo' ||
+      lower === 'activos'
+    ) {
       return true;
     }
-    if (lower === 'false' || lower === '0' || lower === 'inactivo' || lower === 'inactivos') {
+    if (
+      lower === 'false' ||
+      lower === '0' ||
+      lower === 'inactivo' ||
+      lower === 'inactivos'
+    ) {
       return false;
     }
     return raw;
@@ -87,7 +97,8 @@ export class QueryHistorialAsociadosDto {
   @ApiPropertyOptional({
     example: 'Juan',
     maxLength: 100,
-    description: 'Filtro específico por nombre del asociado (coincidencia parcial)',
+    description:
+      'Filtro específico por nombre del asociado (coincidencia parcial)',
   })
   @Transform(trimOptionalString)
   @IsOptional()
@@ -98,7 +109,8 @@ export class QueryHistorialAsociadosDto {
   @ApiPropertyOptional({
     example: 'Pérez',
     maxLength: 100,
-    description: 'Filtro específico por apellidos del asociado (coincidencia parcial)',
+    description:
+      'Filtro específico por apellidos del asociado (coincidencia parcial)',
   })
   @Transform(trimOptionalString)
   @IsOptional()
@@ -130,8 +142,7 @@ export class QueryHistorialAsociadosDto {
 
   @ApiPropertyOptional({
     example: 'activo',
-    description:
-      'Filtro por estado en formato texto ("activo" / "inactivo")',
+    description: 'Filtro por estado en formato texto ("activo" / "inactivo")',
   })
   @Transform(toOptionalBoolean)
   @IsOptional()
@@ -145,7 +156,9 @@ export class QueryHistorialAsociadosDto {
   @Transform(trimOptionalString)
   @IsOptional()
   @IsString({ message: 'fechaRegistro debe ser una cadena de texto' })
-  @Matches(FECHA_ISO, { message: 'fechaRegistro debe tener formato YYYY-MM-DD' })
+  @Matches(FECHA_ISO, {
+    message: 'fechaRegistro debe tener formato YYYY-MM-DD',
+  })
   fechaRegistro?: string;
 
   @ApiPropertyOptional({
@@ -247,7 +260,8 @@ export class QueryHistorialAsociadosDto {
   @ApiPropertyOptional({
     enum: OrdenHistorial,
     default: OrdenHistorial.ASC,
-    description: 'Dirección de ordenamiento alfabético por apellidos y nombre (ASC o DESC)',
+    description:
+      'Dirección de ordenamiento alfabético por apellidos y nombre (ASC o DESC)',
   })
   @Transform(trimOptionalUpperString)
   @IsOptional()

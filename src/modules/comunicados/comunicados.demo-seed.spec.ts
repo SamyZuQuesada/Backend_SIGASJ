@@ -1,4 +1,7 @@
-import { asegurarComunicadosDemo, COMUNICADOS_DEMO } from './comunicados.demo-seed';
+import {
+  asegurarComunicadosDemo,
+  COMUNICADOS_DEMO,
+} from './comunicados.demo-seed';
 import { Comunicado } from './entities/comunicado.entity';
 
 const createMemoryRepo = () => {

@@ -61,7 +61,8 @@ export class ItemRecepcionMaterialDto {
 
   @ApiPropertyOptional({
     example: 4,
-    description: 'Alias de idMaterial para compatibilidad con clientes frontend',
+    description:
+      'Alias de idMaterial para compatibilidad con clientes frontend',
   })
   @Transform(toOptionalInt)
   @IsOptional()
@@ -88,8 +89,12 @@ export class RegistrarRecepcionDto {
   })
   @Transform(toOptionalInt)
   @IsNotEmpty({ message: 'El identificador de la reposición es obligatorio' })
-  @IsInt({ message: 'El identificador de la reposición debe ser un número entero' })
-  @Min(1, { message: 'El identificador de la reposición debe ser mayor a cero' })
+  @IsInt({
+    message: 'El identificador de la reposición debe ser un número entero',
+  })
+  @Min(1, {
+    message: 'El identificador de la reposición debe ser mayor a cero',
+  })
   idReposicion: number;
 
   @ApiProperty({

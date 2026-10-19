@@ -1,5 +1,11 @@
 import { config as loadEnv } from 'dotenv';
-import { DataSource, QueryRunner, Table, TableForeignKey, TableIndex } from 'typeorm';
+import {
+  DataSource,
+  QueryRunner,
+  Table,
+  TableForeignKey,
+  TableIndex,
+} from 'typeorm';
 import { buildMigrationDataSourceOptions } from './data-source.options';
 import { CreateReposicionMaterialTables1724685500000 } from './migrations/1724685500000-CreateReposicionMaterialTables';
 
@@ -16,7 +22,9 @@ describe('Pruebas de Base de Datos: Migración ReposicionMaterial', () => {
   describe('1. Definición de la migración TypeORM', () => {
     it('debe contar con CreateReposicionMaterialTables1724685500000', () => {
       const migration = new CreateReposicionMaterialTables1724685500000();
-      expect(migration.name).toBe('CreateReposicionMaterialTables1724685500000');
+      expect(migration.name).toBe(
+        'CreateReposicionMaterialTables1724685500000',
+      );
       expect(typeof migration.up).toBe('function');
       expect(typeof migration.down).toBe('function');
     });
@@ -29,7 +37,14 @@ describe('Pruebas de Base de Datos: Migración ReposicionMaterial', () => {
 
       const mockQueryRunner = {
         connection: { options: { type: 'mssql' } },
-        hasTable: jest.fn().mockResolvedValue(true),
+        hasTable: jest
+          .fn()
+          .mockImplementation((name: string) =>
+            Promise.resolve(
+              name !== 'ReposicionMaterial' &&
+                name !== 'DetalleReposicionMaterial',
+            ),
+          ),
         createTable: jest.fn().mockImplementation((table: Table) => {
           createdTables.push(table);
           return Promise.resolve();
@@ -50,8 +65,12 @@ describe('Pruebas de Base de Datos: Migración ReposicionMaterial', () => {
 
       await migration.up(mockQueryRunner);
 
-      const reposicion = createdTables.find((table) => table.name === 'ReposicionMaterial');
-      const detalle = createdTables.find((table) => table.name === 'DetalleReposicionMaterial');
+      const reposicion = createdTables.find(
+        (table) => table.name === 'ReposicionMaterial',
+      );
+      const detalle = createdTables.find(
+        (table) => table.name === 'DetalleReposicionMaterial',
+      );
 
       expect(reposicion?.columns.map((column) => column.name)).toEqual([
         'id',
@@ -69,11 +88,26 @@ describe('Pruebas de Base de Datos: Migración ReposicionMaterial', () => {
         'createdAt',
         'updatedAt',
       ]);
-      expect(reposicion?.columns.find((column) => column.name === 'nombre')).toBeUndefined();
-      expect(reposicion?.columns.find((column) => column.name === 'idUsuarioResponsable')?.isNullable).toBe(false);
-      expect(reposicion?.columns.find((column) => column.name === 'idProveedor')?.isNullable).toBe(true);
-      expect(reposicion?.columns.find((column) => column.name === 'fechaCompra')?.isNullable).toBe(true);
-      expect(reposicion?.columns.find((column) => column.name === 'fechaRecepcion')?.isNullable).toBe(true);
+      expect(
+        reposicion?.columns.find((column) => column.name === 'nombre'),
+      ).toBeUndefined();
+      expect(
+        reposicion?.columns.find(
+          (column) => column.name === 'idUsuarioResponsable',
+        )?.isNullable,
+      ).toBe(false);
+      expect(
+        reposicion?.columns.find((column) => column.name === 'idProveedor')
+          ?.isNullable,
+      ).toBe(true);
+      expect(
+        reposicion?.columns.find((column) => column.name === 'fechaCompra')
+          ?.isNullable,
+      ).toBe(true);
+      expect(
+        reposicion?.columns.find((column) => column.name === 'fechaRecepcion')
+          ?.isNullable,
+      ).toBe(true);
 
       expect(detalle?.columns.map((column) => column.name)).toEqual([
         'id',
@@ -121,8 +155,16 @@ describe('Pruebas de Base de Datos: Migración ReposicionMaterial', () => {
 
       await migration.down(mockQueryRunner);
 
-      expect(dropTableSpy).toHaveBeenNthCalledWith(1, 'DetalleReposicionMaterial', true);
-      expect(dropTableSpy).toHaveBeenNthCalledWith(2, 'ReposicionMaterial', true);
+      expect(dropTableSpy).toHaveBeenNthCalledWith(
+        1,
+        'DetalleReposicionMaterial',
+        true,
+      );
+      expect(dropTableSpy).toHaveBeenNthCalledWith(
+        2,
+        'ReposicionMaterial',
+        true,
+      );
     });
   });
 
@@ -139,7 +181,10 @@ describe('Pruebas de Base de Datos: Migración ReposicionMaterial', () => {
           await Promise.race([
             dataSource.initialize(),
             new Promise((_, reject) => {
-              setTimeout(() => reject(new Error('SQL Server no disponible')), 4000);
+              setTimeout(
+                () => reject(new Error('SQL Server no disponible')),
+                4000,
+              );
             }),
           ]);
           isConnected = Boolean(dataSource.isInitialized);
@@ -171,14 +216,18 @@ describe('Pruebas de Base de Datos: Migración ReposicionMaterial', () => {
       }
 
       const tableNames = tables.map((table) => table.TABLE_NAME);
-      expect(tableNames).toEqual(expect.arrayContaining(['ReposicionMaterial']));
+      expect(tableNames).toEqual(
+        expect.arrayContaining(['ReposicionMaterial']),
+      );
 
       const columns = await dataSource.query<ColumnRow[]>(`
         SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE
         FROM INFORMATION_SCHEMA.COLUMNS
         WHERE TABLE_NAME = 'ReposicionMaterial'
       `);
-      const colMap = new Map(columns.map((column) => [column.COLUMN_NAME, column]));
+      const colMap = new Map(
+        columns.map((column) => [column.COLUMN_NAME, column]),
+      );
 
       expect(colMap.has('origen')).toBe(true);
       expect(colMap.has('estado')).toBe(true);

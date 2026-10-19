@@ -11,12 +11,13 @@ import { EstadoAveria } from '../../common/enums/estado-averia.enum';
 import { PrioridadAveria } from '../../common/enums/prioridad-averia.enum';
 import { Role } from '../../common/enums/role.enum';
 import { TipoAveria } from '../../common/enums/tipo-averia.enum';
+import { TipoNotificacionAveria } from '../../common/enums/tipo-notificacion-averia.enum';
 import { HttpExceptionFilter } from '../../common/filters/http-exception.filter';
 import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
 import jwtConfig from '../../config/jwt.config';
 import { AuthModule } from '../auth/auth.module';
+import { NotificacionAveria } from '../notificaciones/entities/notificacion-averia.entity';
 import { Rol } from '../usuarios/entities/rol.entity';
-import { HorarioLaboralFontanero } from '../usuarios/entities/horario-laboral-fontanero.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import {
   crearUsuarioPrueba,
@@ -32,17 +33,18 @@ import {
   AVERIA_FONTANERO_YA_CERRADA,
 } from './averias.service';
 import { Averia } from './entities/averia.entity';
-import { ObservacionAveria } from './entities/observacion-averia.entity';
 
 describe('PATCH /api/v1/fontanero/averias/:id — calificar prioridad y tipo', () => {
   jest.setTimeout(30_000);
   let app: INestApplication<App>;
   let jwtService: JwtService;
   let averias: Repository<Averia>;
+  let notificaciones: Repository<NotificacionAveria>;
   let usuarios: Repository<Usuario>;
   let rolesMap: Record<Role, Rol>;
   let fontaneroA: Usuario;
   let fontaneroB: Usuario;
+  let administradora: Usuario;
   let tokenA: string;
   let tokenB: string;
   let adminToken: string;
@@ -116,6 +118,7 @@ describe('PATCH /api/v1/fontanero/averias/:id — calificar prioridad y tipo', (
     jwtService = moduleFixture.get(JwtService);
     const dataSource = moduleFixture.get(DataSource);
     averias = dataSource.getRepository(Averia);
+    notificaciones = dataSource.getRepository(NotificacionAveria);
     usuarios = dataSource.getRepository(Usuario);
     rolesMap = await seedRolesBase(dataSource.getRepository(Rol));
 
@@ -129,9 +132,14 @@ describe('PATCH /api/v1/fontanero/averias/:id — calificar prioridad y tipo', (
       correo: 'fontanero.b@asadasanjuan.cr',
       role: Role.FONTANERO,
     });
+    administradora = await crearUsuarioPrueba(usuarios, rolesMap, {
+      nombre: 'Administradora',
+      correo: 'admin.clasif@asadasanjuan.cr',
+      role: Role.ADMINISTRADORA,
+    });
     tokenA = signAs(Role.FONTANERO, String(fontaneroA.idUsuario));
     tokenB = signAs(Role.FONTANERO, String(fontaneroB.idUsuario));
-    adminToken = signAs(Role.ADMINISTRADORA, '99');
+    adminToken = signAs(Role.ADMINISTRADORA, String(administradora.idUsuario));
   });
 
   afterAll(async () => {
@@ -153,6 +161,7 @@ describe('PATCH /api/v1/fontanero/averias/:id — calificar prioridad y tipo', (
       .expect(200);
 
     expect(prioridad.body.prioridad).toBe(PrioridadAveria.MEDIA);
+    expect(await notificaciones.count()).toBe(0);
 
     const tipo = await request(app.getHttpServer())
       .patch(`/api/v1/fontanero/averias/${saved.id}/clasificacion`)
@@ -165,6 +174,45 @@ describe('PATCH /api/v1/fontanero/averias/:id — calificar prioridad y tipo', (
     const persistida = await averias.findOneByOrFail({ id: saved.id });
     expect(persistida.prioridad).toBe(PrioridadAveria.MEDIA);
     expect(persistida.tipoAveria).toBe(TipoAveria.TUBO_MADRE);
+
+    const filas = await notificaciones.find({
+      where: {
+        tipo: TipoNotificacionAveria.AVERIA_CLASIFICADA_ADMINISTRADORA,
+      },
+    });
+    expect(filas).toHaveLength(1);
+    expect(filas[0]?.idUsuarioDestinatario).toBe(administradora.idUsuario);
+    expect(filas[0]?.idAveria).toBe(saved.id);
+    expect(filas[0]?.mensaje).toContain('Media');
+    expect(filas[0]?.mensaje).toContain('Tubo madre');
+  });
+
+  it('no duplica la notificación de clasificación si vuelve a calificar', async () => {
+    const saved = await persist({
+      prioridad: PrioridadAveria.BAJA,
+      tipoAveria: TipoAveria.TUBO_MEDIDOR,
+    });
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/fontanero/averias/${saved.id}/prioridad`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ prioridad: PrioridadAveria.ALTA })
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/fontanero/averias/${saved.id}/clasificacion`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ clasificacion: TipoAveria.TUBO_MADRE })
+      .expect(200);
+
+    expect(
+      await notificaciones.count({
+        where: {
+          tipo: TipoNotificacionAveria.AVERIA_CLASIFICADA_ADMINISTRADORA,
+          idAveria: saved.id,
+        },
+      }),
+    ).toBe(1);
   });
 
   it('rechaza Urgente, Fuga u otro tipo fuera del diagrama', async () => {

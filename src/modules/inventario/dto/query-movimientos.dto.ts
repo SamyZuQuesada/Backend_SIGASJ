@@ -1,13 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, type TransformFnParams } from 'class-transformer';
-import {
-  IsEnum,
-  IsInt,
-  IsOptional,
-  Matches,
-  Max,
-  Min,
-} from 'class-validator';
+import { IsEnum, IsInt, IsOptional, Matches, Max, Min } from 'class-validator';
 import { TipoMovimientoInventario } from '../../../common/enums/tipo-movimiento-inventario.enum';
 
 const rawValue = ({ value, obj, key }: TransformFnParams): unknown => {
@@ -119,7 +112,8 @@ export class QueryMovimientosDto {
   idReposicion?: number;
 
   @ApiPropertyOptional({
-    description: 'Inicio inclusivo del rango sobre fechaMovimiento (YYYY-MM-DD)',
+    description:
+      'Inicio inclusivo del rango sobre fechaMovimiento (YYYY-MM-DD)',
     example: '2026-09-01',
   })
   @Transform(trimOptionalString)

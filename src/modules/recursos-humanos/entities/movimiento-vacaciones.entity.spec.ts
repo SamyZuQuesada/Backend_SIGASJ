@@ -37,6 +37,7 @@ describe('MovimientoVacaciones Entity (SIGASJ)', () => {
       expect(Object.values(TipoMovimientoVacaciones)).toEqual([
         'ACUMULADO',
         'DISFRUTADO',
+        'AJUSTE',
       ]);
     });
   });

@@ -599,7 +599,9 @@ describe('QA Backlog 7.8 — Flujo Integral de Revisión Administrativa de Activ
         adminToken,
       ).expect(200);
 
-      expect(getDetalleAdmin.body.estado).toBe(EstadoActividadFontanero.REPORTADA);
+      expect(getDetalleAdmin.body.estado).toBe(
+        EstadoActividadFontanero.REPORTADA,
+      );
       expect(getDetalleAdmin.body.estadoRevision).toBe('PENDIENTE');
       expect(getDetalleAdmin.body.fechaRevision).toBeNull();
       expect(getDetalleAdmin.body.revisadoPorId).toBeNull();
@@ -641,7 +643,9 @@ describe('QA Backlog 7.8 — Flujo Integral de Revisión Administrativa de Activ
         adminToken,
       ).expect(400);
 
-      expect(String(segundoPatch.body.message)).toMatch(/ya (fue|ha sido) revisada/i);
+      expect(String(segundoPatch.body.message)).toMatch(
+        /ya (fue|ha sido) revisada/i,
+      );
 
       // Verificar en BD que los datos de la revisión se preservaron intactos
       const verificacionFinal = await authGet(
@@ -649,9 +653,13 @@ describe('QA Backlog 7.8 — Flujo Integral de Revisión Administrativa de Activ
         adminToken,
       ).expect(200);
 
-      expect(verificacionFinal.body.estado).toBe(EstadoActividadFontanero.REVISADA);
+      expect(verificacionFinal.body.estado).toBe(
+        EstadoActividadFontanero.REVISADA,
+      );
       expect(verificacionFinal.body.estadoRevision).toBe('REVISADA');
-      expect(verificacionFinal.body.revisadoPorId).toBe('admin-supervisora-ciclo');
+      expect(verificacionFinal.body.revisadoPorId).toBe(
+        'admin-supervisora-ciclo',
+      );
       expect(verificacionFinal.body.fechaRevision).toBe(fechaPrimeraRevision);
     });
   });

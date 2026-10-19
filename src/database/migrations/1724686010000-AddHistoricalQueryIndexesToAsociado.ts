@@ -4,15 +4,16 @@ import { MigrationInterface, QueryRunner, TableIndex } from 'typeorm';
  * Optimización de consultas históricas en la tabla Asociado (activos, inactivos y rangos de fechas).
  * Permite consultar el historial directamente sobre la propia tabla Asociado sin duplicar registros.
  */
-export class AddHistoricalQueryIndexesToAsociado1724686010000
-  implements MigrationInterface
-{
+export class AddHistoricalQueryIndexesToAsociado1724686010000 implements MigrationInterface {
   name = 'AddHistoricalQueryIndexesToAsociado1724686010000';
 
   private readonly indices = [
     { name: 'IDX_Asociado_activo', columnNames: ['activo'] },
     { name: 'IDX_Asociado_fechaRegistro', columnNames: ['fechaRegistro'] },
-    { name: 'IDX_Asociado_fechaInactivacion', columnNames: ['fechaInactivacion'] },
+    {
+      name: 'IDX_Asociado_fechaInactivacion',
+      columnNames: ['fechaInactivacion'],
+    },
   ];
 
   public async up(queryRunner: QueryRunner): Promise<void> {

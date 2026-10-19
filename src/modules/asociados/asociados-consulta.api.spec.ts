@@ -197,10 +197,14 @@ describe('GET /api/v1/asociados (consulta y búsqueda)', () => {
     });
 
     it('filtra por rango histórico de fecha de registro (fechaDesde / fechaHasta)', async () => {
-      const enRango = await listar('?fechaDesde=2026-01-01&fechaHasta=2026-01-31');
+      const enRango = await listar(
+        '?fechaDesde=2026-01-01&fechaHasta=2026-01-31',
+      );
       expect(enRango.total).toBe(5);
 
-      const fueraDeRango = await listar('?fechaDesde=2027-01-01&fechaHasta=2027-12-31');
+      const fueraDeRango = await listar(
+        '?fechaDesde=2027-01-01&fechaHasta=2027-12-31',
+      );
       expect(fueraDeRango.total).toBe(0);
     });
 
