@@ -187,7 +187,9 @@ async function main(): Promise<void> {
       String(a.maxIncapUpdated) !== String(b.maxIncapUpdated) ||
       String(a.colaboradorUpdated) !== String(b.colaboradorUpdated)
     ) {
-      throw new Error('Consultar historial modificó registros (solo lectura falló)');
+      throw new Error(
+        'Consultar historial modificó registros (solo lectura falló)',
+      );
     }
 
     console.log(

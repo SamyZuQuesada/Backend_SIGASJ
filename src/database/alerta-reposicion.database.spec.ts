@@ -1,5 +1,11 @@
 import { config as loadEnv } from 'dotenv';
-import { DataSource, QueryRunner, Table, TableForeignKey, TableIndex } from 'typeorm';
+import {
+  DataSource,
+  QueryRunner,
+  Table,
+  TableForeignKey,
+  TableIndex,
+} from 'typeorm';
 import { buildMigrationDataSourceOptions } from './data-source.options';
 import { CreateAlertaReposicionTable1724685400000 } from './migrations/1724685400000-CreateAlertaReposicionTable';
 
@@ -29,7 +35,11 @@ describe('Pruebas de Base de Datos: Migración AlertaReposicion', () => {
 
       const mockQueryRunner = {
         connection: { options: { type: 'mssql' } },
-        hasTable: jest.fn().mockResolvedValue(true),
+        hasTable: jest
+          .fn()
+          .mockImplementation((name: string) =>
+            Promise.resolve(name !== 'AlertaReposicion'),
+          ),
         createTable: jest.fn().mockImplementation((table: Table) => {
           createdTable = table;
           return Promise.resolve();
@@ -62,10 +72,16 @@ describe('Pruebas de Base de Datos: Migración AlertaReposicion', () => {
         'createdAt',
         'updatedAt',
       ]);
-      expect(createdTable?.columns.find((column) => column.name === 'nombre')).toBeUndefined();
-      expect(createdTable?.columns.find((column) => column.name === 'unidadMedida')).toBeUndefined();
+      expect(
+        createdTable?.columns.find((column) => column.name === 'nombre'),
+      ).toBeUndefined();
+      expect(
+        createdTable?.columns.find((column) => column.name === 'unidadMedida'),
+      ).toBeUndefined();
 
-      const idCol = createdTable?.columns.find((column) => column.name === 'id');
+      const idCol = createdTable?.columns.find(
+        (column) => column.name === 'id',
+      );
       expect(idCol?.isPrimary).toBe(true);
       expect(idCol?.isGenerated).toBe(true);
 
@@ -123,7 +139,10 @@ describe('Pruebas de Base de Datos: Migración AlertaReposicion', () => {
           await Promise.race([
             dataSource.initialize(),
             new Promise((_, reject) => {
-              setTimeout(() => reject(new Error('SQL Server no disponible')), 4000);
+              setTimeout(
+                () => reject(new Error('SQL Server no disponible')),
+                4000,
+              );
             }),
           ]);
           isConnected = Boolean(dataSource.isInitialized);
@@ -161,7 +180,9 @@ describe('Pruebas de Base de Datos: Migración AlertaReposicion', () => {
         FROM INFORMATION_SCHEMA.COLUMNS
         WHERE TABLE_NAME = 'AlertaReposicion'
       `);
-      const colMap = new Map(columns.map((column) => [column.COLUMN_NAME, column]));
+      const colMap = new Map(
+        columns.map((column) => [column.COLUMN_NAME, column]),
+      );
 
       expect(colMap.has('idMaterial')).toBe(true);
       expect(colMap.has('stockActual')).toBe(true);

@@ -94,7 +94,10 @@ export class AlertaReposicion {
   @BeforeInsert()
   @BeforeUpdate()
   validar(): void {
-    if (this.estado !== undefined && !isEstadoAlertaReposicionValido(this.estado)) {
+    if (
+      this.estado !== undefined &&
+      !isEstadoAlertaReposicionValido(this.estado)
+    ) {
       throw new BadRequestException(
         `Estado de alerta no válido: ${this.estado}. Estados permitidos: ${Object.values(
           EstadoAlertaReposicion,

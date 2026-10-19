@@ -38,6 +38,7 @@ describe('Pruebas de Base de Datos e Integridad: Migración Asociado', () => {
             type: 'mssql',
           },
         },
+        hasTable: jest.fn().mockResolvedValue(false),
         createTable: createTableSpy,
         createIndex: createIndexSpy,
       } as unknown as QueryRunner;
@@ -135,7 +136,8 @@ describe('Pruebas de Base de Datos e Integridad: Migración Asociado', () => {
 
   describe('2. Migración EnsureAsociadoCedulaUniqueAndNormalized', () => {
     it('debe contar con la migración EnsureAsociadoCedulaUniqueAndNormalized1724685980000 bien nombrada', () => {
-      const migration = new EnsureAsociadoCedulaUniqueAndNormalized1724685980000();
+      const migration =
+        new EnsureAsociadoCedulaUniqueAndNormalized1724685980000();
       expect(migration.name).toBe(
         'EnsureAsociadoCedulaUniqueAndNormalized1724685980000',
       );
@@ -144,7 +146,8 @@ describe('Pruebas de Base de Datos e Integridad: Migración Asociado', () => {
     });
 
     it('debe normalizar registros existentes y asegurar el índice único UQ_Asociado_cedula en up', async () => {
-      const migration = new EnsureAsociadoCedulaUniqueAndNormalized1724685980000();
+      const migration =
+        new EnsureAsociadoCedulaUniqueAndNormalized1724685980000();
       const querySpy = jest.fn().mockImplementation((queryStr: string) => {
         if (queryStr.includes('SELECT id, cedula FROM Asociado')) {
           return Promise.resolve([
@@ -167,7 +170,10 @@ describe('Pruebas de Base de Datos e Integridad: Migración Asociado', () => {
 
       const mockTable = new Table({
         name: 'Asociado',
-        columns: [{ name: 'id', type: 'int' }, { name: 'cedula', type: 'varchar' }],
+        columns: [
+          { name: 'id', type: 'int' },
+          { name: 'cedula', type: 'varchar' },
+        ],
         indices: [], // Simula que no tiene el índice aún
       });
 
@@ -194,12 +200,16 @@ describe('Pruebas de Base de Datos e Integridad: Migración Asociado', () => {
     });
 
     it('no debe duplicar el índice si ya existe en up', async () => {
-      const migration = new EnsureAsociadoCedulaUniqueAndNormalized1724685980000();
+      const migration =
+        new EnsureAsociadoCedulaUniqueAndNormalized1724685980000();
       const createIndexSpy = jest.fn();
 
       const mockTable = new Table({
         name: 'Asociado',
-        columns: [{ name: 'id', type: 'int' }, { name: 'cedula', type: 'varchar' }],
+        columns: [
+          { name: 'id', type: 'int' },
+          { name: 'cedula', type: 'varchar' },
+        ],
         indices: [
           new TableIndex({
             name: 'UQ_Asociado_cedula',
@@ -222,7 +232,8 @@ describe('Pruebas de Base de Datos e Integridad: Migración Asociado', () => {
     });
 
     it('debe eliminar el índice en down si existe', async () => {
-      const migration = new EnsureAsociadoCedulaUniqueAndNormalized1724685980000();
+      const migration =
+        new EnsureAsociadoCedulaUniqueAndNormalized1724685980000();
       const dropIndexSpy = jest.fn().mockResolvedValue(undefined);
 
       const existingIndex = new TableIndex({

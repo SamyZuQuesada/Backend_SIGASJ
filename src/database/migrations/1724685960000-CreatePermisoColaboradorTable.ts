@@ -6,9 +6,7 @@ import {
   TableIndex,
 } from 'typeorm';
 
-export class CreatePermisoColaboradorTable1724685960000
-  implements MigrationInterface
-{
+export class CreatePermisoColaboradorTable1724685960000 implements MigrationInterface {
   name = 'CreatePermisoColaboradorTable1724685960000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

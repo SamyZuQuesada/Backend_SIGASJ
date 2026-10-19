@@ -173,8 +173,7 @@ describe('VacacionesService (SQL.js)', () => {
       await expect(service.calcularSaldo(colaborador.id)).resolves.toEqual({
         colaboradorId: colaborador.id,
         totalMovimientos: 0,
-        diasAcumulados: 0,
-        diasDisfrutados: 0,
+        diasAcumulados: 0,        diasAjusteNeto: 0,        diasDisfrutados: 0,
         diasDisponibles: 0,
       });
     });
@@ -208,8 +207,7 @@ describe('VacacionesService (SQL.js)', () => {
       await expect(service.calcularSaldo(colaborador.id)).resolves.toEqual({
         colaboradorId: colaborador.id,
         totalMovimientos: 4,
-        diasAcumulados: 14,
-        diasDisfrutados: 8,
+        diasAcumulados: 14,        diasAjusteNeto: 0,        diasDisfrutados: 8,
         diasDisponibles: 6,
       });
 

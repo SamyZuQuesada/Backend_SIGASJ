@@ -46,7 +46,9 @@ async function main(): Promise<void> {
   console.log(`  type=${options.type}`);
   console.log(`  host=${'host' in options ? options.host : '(n/a)'}`);
   console.log(`  port=${'port' in options ? options.port : '(n/a)'}`);
-  console.log(`  database=${'database' in options ? options.database : '(n/a)'}`);
+  console.log(
+    `  database=${'database' in options ? options.database : '(n/a)'}`,
+  );
   console.log(`  synchronize=${options.synchronize}`);
   console.log(`  migrationsRun=${options.migrationsRun ?? false}`);
 
@@ -62,7 +64,9 @@ async function main(): Promise<void> {
     /prod|azure|aws|cloud/i.test(host) ||
     /prod/i.test(database);
 
-  console.log(`[SIGASJ] hostLocal=${isLocalHost} looksProduction=${looksProduction}`);
+  console.log(
+    `[SIGASJ] hostLocal=${isLocalHost} looksProduction=${looksProduction}`,
+  );
 
   const dataSource = new DataSource(options);
   await dataSource.initialize();

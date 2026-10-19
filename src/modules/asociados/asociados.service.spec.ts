@@ -182,7 +182,10 @@ describe('AsociadosService', () => {
 
     it('debe lanzar BadRequestException si la cédula excede 30 caracteres', async () => {
       await expect(
-        service.create({ ...validDto, cedula: '1234567890123456789012345678901' }),
+        service.create({
+          ...validDto,
+          cedula: '1234567890123456789012345678901',
+        }),
       ).rejects.toThrow('La cédula no puede exceder 30 caracteres');
     });
 
@@ -202,7 +205,9 @@ describe('AsociadosService', () => {
           ...validDto,
           correoElectronico: `${'a'.repeat(140)}@example.com`,
         }),
-      ).rejects.toThrow('El correo electrónico no puede exceder 150 caracteres');
+      ).rejects.toThrow(
+        'El correo electrónico no puede exceder 150 caracteres',
+      );
     });
   });
 
@@ -303,12 +308,14 @@ describe('AsociadosService', () => {
       await expect(service.update(1, { correo: '   ' })).rejects.toThrow(
         'El correo electrónico no puede estar vacío',
       );
-      await expect(
-        service.update(1, { correo: 'invalido' }),
-      ).rejects.toThrow('El correo electrónico no tiene un formato válido');
+      await expect(service.update(1, { correo: 'invalido' })).rejects.toThrow(
+        'El correo electrónico no tiene un formato válido',
+      );
       await expect(
         service.update(1, { correo: `${'a'.repeat(140)}@example.com` }),
-      ).rejects.toThrow('El correo electrónico no puede exceder 150 caracteres');
+      ).rejects.toThrow(
+        'El correo electrónico no puede exceder 150 caracteres',
+      );
     });
 
     it('debe actualizar los campos válidos (nombre, apellidos, correoElectronico)', async () => {
@@ -496,9 +503,7 @@ describe('AsociadosService', () => {
         .mockResolvedValueOnce(asociadoExistente)
         .mockResolvedValueOnce(otroAsociado);
 
-      await expect(
-        service.update(1, { cedula: '200000000' }),
-      ).rejects.toThrow(
+      await expect(service.update(1, { cedula: '200000000' })).rejects.toThrow(
         'Ya existe un asociado registrado con la cédula "2-0000-0000"',
       );
       expect(repo.save).not.toHaveBeenCalled();

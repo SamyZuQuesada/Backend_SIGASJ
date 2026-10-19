@@ -6,9 +6,7 @@ import { normalizarCedula } from '../../common/utils/cedula.util';
  * 1. Todas las cédulas existentes en la tabla Asociado estén normalizadas al formato canónico estándar.
  * 2. Exista el índice / restricción única UQ_Asociado_cedula en SQL Server y otros motores.
  */
-export class EnsureAsociadoCedulaUniqueAndNormalized1724685980000
-  implements MigrationInterface
-{
+export class EnsureAsociadoCedulaUniqueAndNormalized1724685980000 implements MigrationInterface {
   name = 'EnsureAsociadoCedulaUniqueAndNormalized1724685980000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, type TransformFnParams } from 'class-transformer';
 import {
+  IsEnum,
   IsInt,
   IsOptional,
   IsString,
@@ -8,6 +9,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { OrigenIncapacidad } from '../../../common/enums/origen-incapacidad.enum';
 
 const rawValue = ({ value, obj, key }: TransformFnParams): unknown => {
   if (obj && typeof obj === 'object' && key in obj) {
@@ -82,4 +84,16 @@ export class CreateIncapacidadDto {
     message: 'Las observaciones no pueden exceder 500 caracteres',
   })
   observaciones?: string | null;
+
+  @ApiPropertyOptional({
+    enum: OrigenIncapacidad,
+    example: OrigenIncapacidad.CCSS,
+    nullable: true,
+    description: 'Origen administrativo opcional',
+  })
+  @IsOptional()
+  @IsEnum(OrigenIncapacidad, {
+    message: 'El origen debe ser CCSS, INS u OTRO',
+  })
+  origen?: OrigenIncapacidad | null;
 }

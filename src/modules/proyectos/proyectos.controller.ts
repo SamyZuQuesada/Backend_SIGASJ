@@ -40,7 +40,7 @@ import { ProyectosService } from './proyectos.service';
 @ApiTags('Proyectos')
 @Controller()
 export class ProyectosController {
-  constructor(private readonly proyectosService: ProyectosService) { }
+  constructor(private readonly proyectosService: ProyectosService) {}
 
   @Get(['public/proyectos', 'proyectos'])
   @HttpCode(HttpStatus.OK)

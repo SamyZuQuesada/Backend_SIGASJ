@@ -157,7 +157,10 @@ export class ReposicionMaterial {
   @BeforeInsert()
   @BeforeUpdate()
   validar(): void {
-    if (this.estado !== undefined && !isEstadoReposicionMaterialValido(this.estado)) {
+    if (
+      this.estado !== undefined &&
+      !isEstadoReposicionMaterialValido(this.estado)
+    ) {
       throw new BadRequestException(
         `Estado de reposición no válido: ${this.estado}. Estados permitidos: ${Object.values(
           EstadoReposicionMaterial,
@@ -165,7 +168,10 @@ export class ReposicionMaterial {
       );
     }
 
-    if (this.origen !== undefined && !isOrigenReposicionMaterialValido(this.origen)) {
+    if (
+      this.origen !== undefined &&
+      !isOrigenReposicionMaterialValido(this.origen)
+    ) {
       throw new BadRequestException(
         `Origen de reposición no válido: ${this.origen}. Orígenes permitidos: ${Object.values(
           OrigenReposicionMaterial,

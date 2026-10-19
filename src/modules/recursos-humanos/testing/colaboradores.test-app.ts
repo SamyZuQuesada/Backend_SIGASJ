@@ -17,6 +17,7 @@ import { Colaborador } from '../entities/colaborador.entity';
 import { Incapacidad } from '../entities/incapacidad.entity';
 import { MovimientoVacaciones } from '../entities/movimiento-vacaciones.entity';
 import { PermisoColaborador } from '../entities/permiso-colaborador.entity';
+import { Puesto } from '../entities/puesto.entity';
 import { RecursosHumanosModule } from '../recursos-humanos.module';
 
 export const COLABORADORES_URL = '/api/v1/rrhh/colaboradores';
@@ -24,10 +25,12 @@ export const COLABORADORES_URL = '/api/v1/rrhh/colaboradores';
 export type ColaboradoresTestApp = {
   app: INestApplication<App>;
   colaboradorRepository: Repository<Colaborador>;
+  puestoRepository: Repository<Puesto>;
   usuarioRepository: Repository<Usuario>;
   rolRepository: Repository<Rol>;
   signAs: (role: Role) => string;
   crearUsuario: (correo: string) => Promise<Usuario>;
+  seedPuesto: (nombre?: string) => Promise<Puesto>;
 };
 
 /** App Nest con base SQL.js en memoria y la misma configuración de main.ts. */
@@ -44,6 +47,7 @@ export async function crearColaboradoresTestApp(): Promise<ColaboradoresTestApp>
           PermisoColaborador,
           MovimientoVacaciones,
           Incapacidad,
+          Puesto,
           Usuario,
           Rol,
         ],
@@ -71,6 +75,9 @@ export async function crearColaboradoresTestApp(): Promise<ColaboradoresTestApp>
   const colaboradorRepository = moduleFixture.get<Repository<Colaborador>>(
     getRepositoryToken(Colaborador),
   );
+  const puestoRepository = moduleFixture.get<Repository<Puesto>>(
+    getRepositoryToken(Puesto),
+  );
   const usuarioRepository = moduleFixture.get<Repository<Usuario>>(
     getRepositoryToken(Usuario),
   );
@@ -86,6 +93,18 @@ export async function crearColaboradoresTestApp(): Promise<ColaboradoresTestApp>
       name: `Usuario ${role}`,
     };
     return jwtService.sign(payload);
+  };
+
+  const seedPuesto = async (nombre = 'Fontanero'): Promise<Puesto> => {
+    const existente = await puestoRepository.findOneBy({ nombre });
+    if (existente) return existente;
+    return puestoRepository.save(
+      puestoRepository.create({
+        nombre,
+        critico: false,
+        activo: true,
+      }),
+    );
   };
 
   const crearUsuario = async (correo: string): Promise<Usuario> => {
@@ -107,9 +126,11 @@ export async function crearColaboradoresTestApp(): Promise<ColaboradoresTestApp>
   return {
     app,
     colaboradorRepository,
+    puestoRepository,
     usuarioRepository,
     rolRepository,
     signAs,
     crearUsuario,
+    seedPuesto,
   };
 }

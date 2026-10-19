@@ -57,7 +57,11 @@ describe('Pruebas de Base de Datos: Migración Averia', () => {
           return Promise.resolve();
         });
       const createForeignKeySpy = jest.fn().mockResolvedValue(undefined);
-      const hasTableSpy = jest.fn().mockResolvedValue(true);
+      const hasTableSpy = jest
+        .fn()
+        .mockImplementation((name: string) =>
+          Promise.resolve(name !== 'Averia'),
+        );
       const querySpy = jest.fn().mockResolvedValue(undefined);
 
       const mockQueryRunner = {

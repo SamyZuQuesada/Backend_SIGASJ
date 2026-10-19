@@ -12,7 +12,8 @@ export const ORIGEN_REPOSICION_MATERIAL_LABELS: Record<
   string
 > = {
   [OrigenReposicionMaterial.ALERTA_STOCK_MINIMO]: 'Alerta de stock mínimo',
-  [OrigenReposicionMaterial.SOLICITUD_APROBADA]: 'Solicitud de materiales aprobada',
+  [OrigenReposicionMaterial.SOLICITUD_APROBADA]:
+    'Solicitud de materiales aprobada',
   [OrigenReposicionMaterial.ADMINISTRATIVA]: 'Necesidad administrativa',
 };
 

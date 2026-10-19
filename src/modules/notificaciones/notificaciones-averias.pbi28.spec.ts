@@ -42,6 +42,7 @@ import {
 
 const payloadMinimo = {
   nombreReportante: 'María Rodríguez',
+  identificacionReportante: '1-2345-6789',
   telefonoReportante: '8888-8888',
   ubicacion: 'Frente a la escuela, 50 m sur, casa verde',
   sectorComunidad: 'San Juan',

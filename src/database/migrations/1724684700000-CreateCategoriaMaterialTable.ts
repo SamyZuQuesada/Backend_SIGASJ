@@ -63,16 +63,26 @@ export class CreateCategoriaMaterialTable1724684700000 implements MigrationInter
     );
 
     // 2. Agregar columna foránea idCategoria en la tabla Material
-    await queryRunner.addColumn(
-      'Material',
-      new TableColumn({
-        name: 'idCategoria',
-        type: 'int',
-        isNullable: true,
-      }),
-    );
+    if (!(await queryRunner.hasColumn('Material', 'idCategoria'))) {
+      await queryRunner.addColumn(
+        'Material',
+        new TableColumn({
+          name: 'idCategoria',
+          type: 'int',
+          isNullable: true,
+        }),
+      );
+    }
 
     // 3. Crear llave foránea FK_Material_CategoriaMaterial
+    const material = await queryRunner.getTable('Material');
+    const hasFk = material?.foreignKeys.some(
+      (fk) =>
+        fk.columnNames.length === 1 && fk.columnNames[0] === 'idCategoria',
+    );
+    if (hasFk) {
+      return;
+    }
     await queryRunner.createForeignKey(
       'Material',
       new TableForeignKey({

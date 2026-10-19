@@ -45,6 +45,7 @@ export class IncapacidadesService {
       fechaInicio: dto.fechaInicio,
       fechaFin: dto.fechaFin,
       observaciones: dto.observaciones ?? null,
+      origen: dto.origen ?? null,
     });
 
     const guardada = await this.incapacidadRepository.save(incapacidad);
@@ -149,6 +150,9 @@ export class IncapacidadesService {
 
     if (dto.observaciones !== undefined) {
       incapacidad.observaciones = dto.observaciones;
+    }
+    if (dto.origen !== undefined) {
+      incapacidad.origen = dto.origen;
     }
 
     await this.incapacidadRepository.save(incapacidad);

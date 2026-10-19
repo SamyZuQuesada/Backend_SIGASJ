@@ -70,9 +70,9 @@ describe('ConsultaCedulaService', () => {
   it('rechaza una cédula demasiado corta', async () => {
     global.fetch = jest.fn() as typeof fetch;
 
-    await expect(new ConsultaCedulaService().consultar('123')).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    await expect(
+      new ConsultaCedulaService().consultar('123'),
+    ).rejects.toBeInstanceOf(BadRequestException);
     expect(global.fetch).not.toHaveBeenCalled();
   });
 });

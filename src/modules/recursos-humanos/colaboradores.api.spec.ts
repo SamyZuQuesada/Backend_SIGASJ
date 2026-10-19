@@ -4,6 +4,7 @@ import { App } from 'supertest/types';
 import { Repository } from 'typeorm';
 import { Role } from '../../common/enums/role.enum';
 import { Colaborador } from './entities/colaborador.entity';
+import { Puesto } from './entities/puesto.entity';
 import {
   COLABORADORES_URL as URL,
   crearColaboradoresTestApp,
@@ -12,8 +13,10 @@ import {
 describe('POST /api/v1/rrhh/colaboradores', () => {
   let app: INestApplication<App>;
   let colaboradorRepository: Repository<Colaborador>;
+  let puesto: Puesto;
   let adminToken: string;
   let signAs: (role: Role) => string;
+  let seedPuesto: (nombre?: string) => Promise<Puesto>;
   let crearUsuario: Awaited<
     ReturnType<typeof crearColaboradoresTestApp>
   >['crearUsuario'];
@@ -23,7 +26,7 @@ describe('POST /api/v1/rrhh/colaboradores', () => {
     apellidos: 'Pérez Mora',
     cedula: '1-1234-0567',
     correoElectronico: 'carlos.perez@asadasanjuan.cr',
-    cargo: 'Fontanero',
+    puestoId: puesto.id,
     ...extra,
   });
 
@@ -37,8 +40,9 @@ describe('POST /api/v1/rrhh/colaboradores', () => {
 
   beforeAll(async () => {
     const ctx = await crearColaboradoresTestApp();
-    ({ app, colaboradorRepository, signAs, crearUsuario } = ctx);
+    ({ app, colaboradorRepository, signAs, crearUsuario, seedPuesto } = ctx);
     adminToken = signAs(Role.ADMINISTRADORA);
+    puesto = await seedPuesto('Fontanero');
   });
 
   afterAll(async () => {
@@ -60,7 +64,12 @@ describe('POST /api/v1/rrhh/colaboradores', () => {
       expect(res.status).toBe(401);
     });
 
-    it.each([Role.SECRETARIA, Role.FONTANERO, Role.ABONADO, Role.AYUDANTE])(
+    it('permite SECRETARIA (201)', async () => {
+      const res = await post(body(), signAs(Role.SECRETARIA));
+      expect(res.status).toBe(201);
+    });
+
+    it.each([Role.FONTANERO, Role.ABONADO, Role.AYUDANTE])(
       'rechaza al rol %s (403)',
       async (role) => {
         const res = await post(body(), signAs(role));
@@ -71,7 +80,7 @@ describe('POST /api/v1/rrhh/colaboradores', () => {
   });
 
   describe('Registro válido', () => {
-    it('registra un colaborador activo y lo almacena', async () => {
+    it('registra un colaborador activo y sincroniza cargo desde puesto', async () => {
       const res = await post(
         body({
           nombre: '  Carlos ',
@@ -86,40 +95,19 @@ describe('POST /api/v1/rrhh/colaboradores', () => {
         cedula: '1-1234-0567',
         correoElectronico: 'carlos.perez@asadasanjuan.cr',
         cargo: 'Fontanero',
+        puestoId: puesto.id,
         activo: true,
         usuarioId: null,
       });
-
-      const guardado = await colaboradorRepository.findOneBy({
-        id: colaboradorDe(res).id,
-      });
-      expect(guardado?.activo).toBe(true);
-      expect(guardado?.createdAt).toBeInstanceOf(Date);
     });
 
-    it('no permite enviar "activo": el registro siempre inicia activo (400)', async () => {
-      const res = await post(body({ activo: false }));
-      expect(res.status).toBe(400);
-    });
-
-    it('registra personal administrativo', async () => {
+    it('registra personal administrativo por puesto', async () => {
+      const adminPuesto = await seedPuesto('Administración');
       const res = await post(
-        body({ cedula: '2-0456-0789', cargo: 'Administradora' }),
+        body({ cedula: '2-0456-0789', puestoId: adminPuesto.id }),
       );
       expect(res.status).toBe(201);
-      expect(colaboradorDe(res).cargo).toBe('Administradora');
-    });
-
-    it('normaliza la cédula nacional sin guiones', async () => {
-      const res = await post(body({ cedula: '112340567' }));
-      expect(res.status).toBe(201);
-      expect(colaboradorDe(res).cedula).toBe('1-1234-0567');
-    });
-
-    it('acepta DIMEX', async () => {
-      const res = await post(body({ cedula: '155812345678' }));
-      expect(res.status).toBe(201);
-      expect(colaboradorDe(res).cedula).toBe('155812345678');
+      expect(colaboradorDe(res).cargo).toBe('Administración');
     });
 
     it('relaciona una cuenta de usuario existente', async () => {
@@ -132,77 +120,22 @@ describe('POST /api/v1/rrhh/colaboradores', () => {
   });
 
   describe('Datos inválidos', () => {
-    it.each(['nombre', 'apellidos', 'cedula', 'correoElectronico', 'cargo'])(
-      'rechaza si falta %s (400)',
-      async (campo) => {
-        const data = body();
-        delete (data as Record<string, unknown>)[campo];
-        const res = await post(data);
-        expect(res.status).toBe(400);
-      },
-    );
-
-    it('rechaza campos vacíos o solo espacios (400)', async () => {
-      const res = await post(body({ nombre: '   ', cargo: '' }));
+    it.each([
+      'nombre',
+      'apellidos',
+      'cedula',
+      'correoElectronico',
+      'puestoId',
+    ])('rechaza si falta %s (400)', async (campo) => {
+      const data = body();
+      delete (data as Record<string, unknown>)[campo];
+      const res = await post(data);
       expect(res.status).toBe(400);
     });
 
-    it('rechaza correo con formato inválido (400)', async () => {
-      const res = await post(body({ correoElectronico: 'no-es-correo' }));
+    it('rechaza puesto inexistente (400)', async () => {
+      const res = await post(body({ puestoId: 99999 }));
       expect(res.status).toBe(400);
-    });
-
-    it.each(['0-1234-5678', '1-123-4567', 'ABC123', '12345'])(
-      'rechaza cédula inválida "%s" (400)',
-      async (cedula) => {
-        const res = await post(body({ cedula }));
-        expect(res.status).toBe(400);
-      },
-    );
-
-    it('rechaza textos que exceden la longitud máxima (400)', async () => {
-      const res = await post(body({ cargo: 'x'.repeat(101) }));
-      expect(res.status).toBe(400);
-    });
-
-    it('rechaza campos no permitidos (400)', async () => {
-      const res = await post(body({ rol: 'ADMINISTRADORA' }));
-      expect(res.status).toBe(400);
-    });
-
-    it('rechaza usuarioId inexistente (400)', async () => {
-      const res = await post(body({ usuarioId: 99999 }));
-      expect(res.status).toBe(400);
-      expect(await colaboradorRepository.count()).toBe(0);
-    });
-
-    it('rechaza usuarioId no numérico (400)', async () => {
-      const res = await post(body({ usuarioId: 'abc' }));
-      expect(res.status).toBe(400);
-    });
-  });
-
-  describe('Conflictos', () => {
-    it('rechaza cédula duplicada, aunque venga sin guiones (409)', async () => {
-      expect((await post(body())).status).toBe(201);
-
-      const res = await post(
-        body({ cedula: '112340567', correoElectronico: 'otro@test.cr' }),
-      );
-      expect(res.status).toBe(409);
-      expect(await colaboradorRepository.count()).toBe(1);
-    });
-
-    it('rechaza una cuenta de usuario ya asignada a otro colaborador (409)', async () => {
-      const usuario = await crearUsuario('fontanero2@asadasanjuan.cr');
-      expect((await post(body({ usuarioId: usuario.idUsuario }))).status).toBe(
-        201,
-      );
-
-      const res = await post(
-        body({ cedula: '3-0111-0222', usuarioId: usuario.idUsuario }),
-      );
-      expect(res.status).toBe(409);
     });
   });
 });

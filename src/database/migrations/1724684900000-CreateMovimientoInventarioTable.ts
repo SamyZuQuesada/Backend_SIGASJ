@@ -10,6 +10,10 @@ export class CreateMovimientoInventarioTable1724684900000 implements MigrationIn
   name = 'CreateMovimientoInventarioTable1724684900000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (await queryRunner.hasTable('MovimientoInventario')) {
+      return;
+    }
+
     const isMssql = queryRunner.connection.options.type === 'mssql';
     const dateTimeType = isMssql ? 'datetime2' : 'datetime';
     const defaultDate = isMssql ? 'GETDATE()' : 'CURRENT_TIMESTAMP';

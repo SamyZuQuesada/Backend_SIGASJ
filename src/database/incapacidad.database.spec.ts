@@ -495,10 +495,14 @@ describe('Migración e integridad Incapacidad', () => {
       expect(colMap.get('observaciones')?.IS_NULLABLE).toBe('YES');
       expect(colMap.get('createdAt')?.DATA_TYPE).toBe('datetime2');
       expect(colMap.get('createdAt')?.IS_NULLABLE).toBe('NO');
-      expect(colMap.get('createdAt')?.COLUMN_DEFAULT).toMatch(/getutcdate|sysutcdatetime/i); // UTC tras la migración UseUtcDefaultsForTimestamps
+      expect(colMap.get('createdAt')?.COLUMN_DEFAULT).toMatch(
+        /getutcdate|sysutcdatetime/i,
+      ); // UTC tras la migración UseUtcDefaultsForTimestamps
       expect(colMap.get('updatedAt')?.DATA_TYPE).toBe('datetime2');
       expect(colMap.get('updatedAt')?.IS_NULLABLE).toBe('NO');
-      expect(colMap.get('updatedAt')?.COLUMN_DEFAULT).toMatch(/getutcdate|sysutcdatetime/i); // UTC tras la migración UseUtcDefaultsForTimestamps
+      expect(colMap.get('updatedAt')?.COLUMN_DEFAULT).toMatch(
+        /getutcdate|sysutcdatetime/i,
+      ); // UTC tras la migración UseUtcDefaultsForTimestamps
 
       expect(colMap.has('diagnostico')).toBe(false);
       expect(colMap.has('enfermedad')).toBe(false);

@@ -50,14 +50,18 @@ describe('validar-stock.util — Regla de negocio de existencias disponibles (4.
       expect(res.stockFinal).toBe(3);
       expect(res.alcanzaStockMinimo).toBe(true);
       expect(res.esAgotamientoTotal).toBe(false);
-      expect(res.mensaje).toContain('alcanzará o estará por debajo del stock mínimo (3)');
+      expect(res.mensaje).toContain(
+        'alcanzará o estará por debajo del stock mínimo (3)',
+      );
     });
 
     it('rechaza cuando la salida dejaría el material por debajo del stock mínimo (reserva obligatoria)', () => {
       const res = validarStockDisponible(baseMaterial, 8); // 10 - 8 = 2 < 3
 
       expect(res.esValido).toBe(false);
-      expect(res.mensaje).toContain('La salida dejaría el material por debajo del stock mínimo.');
+      expect(res.mensaje).toContain(
+        'La salida dejaría el material por debajo del stock mínimo.',
+      );
       expect(res.mensaje).toContain('Puede retirar como máximo 7 unidades.');
     });
 

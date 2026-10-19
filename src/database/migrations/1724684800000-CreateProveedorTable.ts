@@ -92,16 +92,26 @@ export class CreateProveedorTable1724684800000 implements MigrationInterface {
     );
 
     // 2. Agregar columna foránea idProveedor en la tabla Material
-    await queryRunner.addColumn(
-      'Material',
-      new TableColumn({
-        name: 'idProveedor',
-        type: 'int',
-        isNullable: true,
-      }),
-    );
+    if (!(await queryRunner.hasColumn('Material', 'idProveedor'))) {
+      await queryRunner.addColumn(
+        'Material',
+        new TableColumn({
+          name: 'idProveedor',
+          type: 'int',
+          isNullable: true,
+        }),
+      );
+    }
 
     // 3. Crear llave foránea FK_Material_Proveedor con restricción de eliminación
+    const material = await queryRunner.getTable('Material');
+    const hasFk = material?.foreignKeys.some(
+      (fk) =>
+        fk.columnNames.length === 1 && fk.columnNames[0] === 'idProveedor',
+    );
+    if (hasFk) {
+      return;
+    }
     await queryRunner.createForeignKey(
       'Material',
       new TableForeignKey({

@@ -273,10 +273,17 @@ export class HistorialColaboradorService {
     movimiento: MovimientoVacaciones,
   ): EventoHistorialColaboradorDto {
     const fecha = aFechaIso(movimiento.fecha);
-    const etiqueta =
-      movimiento.tipo === TipoMovimientoVacaciones.ACUMULADO
-        ? 'Acumulado'
-        : 'Disfrutado';
+    const n = movimiento.cantidadDias;
+    const dias = `${n} día${n === 1 ? '' : 's'}`;
+    let descripcionBase: string;
+    if (movimiento.tipo === TipoMovimientoVacaciones.ACUMULADO) {
+      descripcionBase = `+${dias} adquirido${n === 1 ? '' : 's'}`;
+    } else if (movimiento.tipo === TipoMovimientoVacaciones.DISFRUTADO) {
+      descripcionBase = `${dias} disfrutado${n === 1 ? '' : 's'}`;
+    } else {
+      const signo = movimiento.signoAjuste === -1 ? '-' : '+';
+      descripcionBase = `${signo}${dias} de ajuste`;
+    }
     const obs = movimiento.observaciones?.trim();
     return {
       id: movimiento.id,
@@ -284,9 +291,7 @@ export class HistorialColaboradorService {
       fecha,
       fechaInicio: null,
       fechaFin: null,
-      descripcion: obs
-        ? `${etiqueta}: ${movimiento.cantidadDias} día(s). ${obs}`
-        : `${etiqueta}: ${movimiento.cantidadDias} día(s)`,
+      descripcion: obs ? `${descripcionBase}. ${obs}` : descripcionBase,
       tipoMovimiento: movimiento.tipo,
       cantidadDias: movimiento.cantidadDias,
       observaciones: movimiento.observaciones ?? null,

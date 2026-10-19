@@ -88,7 +88,7 @@ describe('GET /api/v1/rrhh/colaboradores/:id/historial', () => {
       expect(res.status).toBe(401);
     });
 
-    it.each([Role.SECRETARIA, Role.FONTANERO, Role.ABONADO, Role.AYUDANTE])(
+    it.each([Role.FONTANERO, Role.ABONADO, Role.AYUDANTE])(
       'rechaza al rol %s (403)',
       async (role) => {
         const colaborador = await crearColaborador();

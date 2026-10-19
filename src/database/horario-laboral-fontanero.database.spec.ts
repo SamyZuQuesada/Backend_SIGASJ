@@ -1,5 +1,11 @@
 import { config as loadEnv } from 'dotenv';
-import { DataSource, QueryRunner, Table, TableForeignKey, TableIndex } from 'typeorm';
+import {
+  DataSource,
+  QueryRunner,
+  Table,
+  TableForeignKey,
+  TableIndex,
+} from 'typeorm';
 import { buildMigrationDataSourceOptions } from './data-source.options';
 import { CreateHorarioLaboralFontaneroTable1724685800000 } from './migrations/1724685800000-CreateHorarioLaboralFontaneroTable';
 
@@ -164,7 +170,9 @@ describe('Migración HorarioLaboralFontanero', () => {
         WHERE TABLE_NAME = 'HorarioLaboralFontanero'
         ORDER BY ORDINAL_POSITION
       `);
-      const colMap = new Map(columns.map((column) => [column.COLUMN_NAME, column]));
+      const colMap = new Map(
+        columns.map((column) => [column.COLUMN_NAME, column]),
+      );
       expect(colMap.get('id')?.DATA_TYPE).toBe('int');
       expect(colMap.get('idFontanero')?.IS_NULLABLE).toBe('NO');
       expect(colMap.get('diaSemana')?.DATA_TYPE).toBe('tinyint');
@@ -245,7 +253,9 @@ describe('Migración HorarioLaboralFontanero', () => {
         `)) as { idUsuario: number }[];
         const idFontanero = fontaneros[0]?.idUsuario;
         if (!idFontanero) {
-          pending('No hay un Fontanero persistido para la prueba de integridad');
+          pending(
+            'No hay un Fontanero persistido para la prueba de integridad',
+          );
           return;
         }
 

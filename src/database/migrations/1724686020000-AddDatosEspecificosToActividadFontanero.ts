@@ -6,9 +6,7 @@ import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
  * synchronize desactivado, cualquier consulta de actividades fallaba con
  * "Invalid column name 'datosEspecificos'".
  */
-export class AddDatosEspecificosToActividadFontanero1724686020000
-  implements MigrationInterface
-{
+export class AddDatosEspecificosToActividadFontanero1724686020000 implements MigrationInterface {
   name = 'AddDatosEspecificosToActividadFontanero1724686020000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

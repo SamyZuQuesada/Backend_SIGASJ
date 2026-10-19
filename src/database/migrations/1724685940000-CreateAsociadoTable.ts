@@ -4,6 +4,10 @@ export class CreateAsociadoTable1724685940000 implements MigrationInterface {
   name = 'CreateAsociadoTable1724685940000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (await queryRunner.hasTable('Asociado')) {
+      return;
+    }
+
     const isMssql = queryRunner.connection.options.type === 'mssql';
     const dateTimeType = isMssql ? 'datetime2' : 'datetime';
     const defaultDate = isMssql ? 'GETDATE()' : 'CURRENT_TIMESTAMP';

@@ -1,11 +1,22 @@
 import { QueryRunner, Table, TableForeignKey, TableIndex } from 'typeorm';
 import { CreateIntentoSmsAveriaTable1724685910000 } from './migrations/1724685910000-CreateIntentoSmsAveriaTable';
 import { CreateNotificacionAveriaTable1724685900000 } from './migrations/1724685900000-CreateNotificacionAveriaTable';
+import { ExtendNotificacionAveriaForSolicitudAusencia1724686080000 } from './migrations/1724686080000-ExtendNotificacionAveriaForSolicitudAusencia';
 
 describe('Migraciones PBI 2.8 — NotificacionAveria e IntentoSmsAveria', () => {
   it('define CreateNotificacionAveriaTable1724685900000', () => {
     const migration = new CreateNotificacionAveriaTable1724685900000();
     expect(migration.name).toBe('CreateNotificacionAveriaTable1724685900000');
+    expect(typeof migration.up).toBe('function');
+    expect(typeof migration.down).toBe('function');
+  });
+
+  it('define ExtendNotificacionAveriaForSolicitudAusencia1724686080000', () => {
+    const migration =
+      new ExtendNotificacionAveriaForSolicitudAusencia1724686080000();
+    expect(migration.name).toBe(
+      'ExtendNotificacionAveriaForSolicitudAusencia1724686080000',
+    );
     expect(typeof migration.up).toBe('function');
     expect(typeof migration.down).toBe('function');
   });

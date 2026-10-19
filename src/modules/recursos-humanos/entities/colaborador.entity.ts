@@ -11,11 +11,13 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { SolicitudAusencia } from '../../solicitudes-ausencia/entities/solicitud-ausencia.entity';
 import { Usuario } from '../../usuarios/entities/usuario.entity';
 import { Incapacidad } from './incapacidad.entity';
 import { MovimientoVacaciones } from './movimiento-vacaciones.entity';
 import { PermisoColaborador } from './permiso-colaborador.entity';
+import { Puesto } from './puesto.entity';
 
 /**
  * Personal administrado desde Recursos Humanos (fontaneros y personal
@@ -68,10 +70,30 @@ export class Colaborador {
 
   @ApiProperty({
     example: 'Fontanero',
-    description: 'Cargo o función del colaborador dentro de la ASADA',
+    description:
+      'Nombre del puesto (sincronizado desde Puesto.nombre por compatibilidad)',
   })
   @Column({ type: 'varchar', length: 100 })
   cargo: string;
+
+  @ApiPropertyOptional({
+    example: 1,
+    nullable: true,
+    description: 'Puesto del catálogo formal',
+  })
+  @Column({ type: 'int', nullable: true })
+  puestoId: number | null;
+
+  @ManyToOne(() => Puesto, (puesto) => puesto.colaboradores, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({
+    name: 'puestoId',
+    referencedColumnName: 'id',
+    foreignKeyConstraintName: 'FK_Colaborador_Puesto',
+  })
+  puesto: Puesto | null;
 
   @ApiProperty({
     example: true,
@@ -109,6 +131,9 @@ export class Colaborador {
 
   @OneToMany(() => Incapacidad, (incapacidad) => incapacidad.colaborador)
   incapacidades: Incapacidad[];
+
+  @OneToMany(() => SolicitudAusencia, (solicitud) => solicitud.colaborador)
+  solicitudesAusencia: SolicitudAusencia[];
 
   @ApiProperty({
     description: 'Fecha y hora de creación del registro',

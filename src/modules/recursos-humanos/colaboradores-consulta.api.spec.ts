@@ -98,7 +98,7 @@ describe('GET /api/v1/rrhh/colaboradores', () => {
       expect(res.status).toBe(401);
     });
 
-    it.each([Role.SECRETARIA, Role.FONTANERO, Role.ABONADO, Role.AYUDANTE])(
+    it.each([Role.FONTANERO, Role.ABONADO, Role.AYUDANTE])(
       'rechaza al rol %s en listado y detalle (403)',
       async (role) => {
         const token = signAs(role);

@@ -140,8 +140,12 @@ describe('GET /api/v1/asociados/historial (Endpoint Administrativo de Consulta d
 
     it('cada elemento del historial debe mostrar nombre, apellidos, cédula, correo, estado y fechas históricas', async () => {
       const response = await listar();
-      const inactivo = response.data.find((item) => item.cedula === '3-0111-0222');
-      const activo = response.data.find((item) => item.cedula === '1-1234-0567');
+      const inactivo = response.data.find(
+        (item) => item.cedula === '3-0111-0222',
+      );
+      const activo = response.data.find(
+        (item) => item.cedula === '1-1234-0567',
+      );
 
       // Verificación de campos para inactivo
       expect(inactivo).toBeDefined();
@@ -294,9 +298,7 @@ describe('GET /api/v1/asociados/historial (Endpoint Administrativo de Consulta d
         totalPages: 0,
       });
 
-      const combinadaVacia = await listar(
-        '?nombre=Carlos&estado=inactivo',
-      );
+      const combinadaVacia = await listar('?nombre=Carlos&estado=inactivo');
       expect(combinadaVacia).toEqual({
         data: [],
         total: 0,
@@ -329,10 +331,13 @@ describe('GET /api/v1/asociados/historial (Endpoint Administrativo de Consulta d
       '?fechaRegistro=2026/01/01',
       '?fechaRegistroDesde=invalido',
       '?fechaInactivacion=10-05-2026',
-    ])('valida fechas y parámetros rechazando formatos inválidos %s (400)', async (query) => {
-      const res = await getHistorial(query);
-      expect(res.status).toBe(400);
-    });
+    ])(
+      'valida fechas y parámetros rechazando formatos inválidos %s (400)',
+      async (query) => {
+        const res = await getHistorial(query);
+        expect(res.status).toBe(400);
+      },
+    );
   });
 
   describe('4. Paginación y Estabilidad de Resultados en el Historial', () => {

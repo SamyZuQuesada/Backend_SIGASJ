@@ -15,7 +15,12 @@ import { Usuario } from '../../usuarios/entities/usuario.entity';
 @Index(
   'UQ_NotificacionAveria_destinatario_averia_tipo',
   ['idUsuarioDestinatario', 'idAveria', 'tipo'],
-  { unique: true },
+  { unique: true, where: '"idAveria" IS NOT NULL' },
+)
+@Index(
+  'UQ_NotificacionAveria_destinatario_solicitud_tipo',
+  ['idUsuarioDestinatario', 'idSolicitudAusencia', 'tipo'],
+  { unique: true, where: '"idSolicitudAusencia" IS NOT NULL' },
 )
 export class NotificacionAveria {
   @PrimaryGeneratedColumn()
@@ -36,15 +41,23 @@ export class NotificacionAveria {
   destinatario: Usuario;
 
   @Index('IX_NotificacionAveria_idAveria')
-  @Column({ type: 'int' })
-  idAveria: number;
+  @Column({ type: 'int', nullable: true })
+  idAveria: number | null;
 
   @ManyToOne(() => Averia, {
-    nullable: false,
+    nullable: true,
     onDelete: 'NO ACTION',
   })
   @JoinColumn({ name: 'idAveria', referencedColumnName: 'id' })
-  averia: Averia;
+  averia: Averia | null;
+
+  /**
+   * FK a SolicitudAusencia (migración). Sin @ManyToOne para no acoplar
+   * el metadata de averías/tests a todo el grafo RRHH.
+   */
+  @Index('IX_NotificacionAveria_idSolicitudAusencia')
+  @Column({ type: 'int', nullable: true })
+  idSolicitudAusencia: number | null;
 
   @Column({ type: 'varchar', length: 80 })
   tipo: TipoNotificacionAveria;

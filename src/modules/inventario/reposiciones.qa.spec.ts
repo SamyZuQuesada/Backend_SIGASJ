@@ -118,12 +118,16 @@ describe('3.9.3 Registrar compra de reposición de materiales', () => {
     jwtService = moduleRef.get(JwtService);
     materialRepository = moduleRef.get(getRepositoryToken(Material));
     proveedorRepository = moduleRef.get(getRepositoryToken(Proveedor));
-    reposicionRepository = moduleRef.get(getRepositoryToken(ReposicionMaterial));
+    reposicionRepository = moduleRef.get(
+      getRepositoryToken(ReposicionMaterial),
+    );
     detalleReposicionRepository = moduleRef.get(
       getRepositoryToken(DetalleReposicionMaterial),
     );
     usuarioRepository = moduleRef.get(getRepositoryToken(Usuario));
-    const rolRepository = moduleRef.get<Repository<Rol>>(getRepositoryToken(Rol));
+    const rolRepository = moduleRef.get<Repository<Rol>>(
+      getRepositoryToken(Rol),
+    );
     const roles = await seedRolesBase(rolRepository);
 
     administradora = await crearUsuarioPrueba(usuarioRepository, roles, {
@@ -217,11 +221,9 @@ describe('3.9.3 Registrar compra de reposición de materiales', () => {
   });
 
   it('registra compra en reposición válida sin modificar stock', async () => {
-    const { material, proveedor, reposicion } = await crearReposicionPendiente();
-    const token = signAs(
-      Role.ADMINISTRADORA,
-      String(administradora.idUsuario),
-    );
+    const { material, proveedor, reposicion } =
+      await crearReposicionPendiente();
+    const token = signAs(Role.ADMINISTRADORA, String(administradora.idUsuario));
 
     const res = await adminPostCompra(
       reposicion.id,
@@ -257,17 +259,17 @@ describe('3.9.3 Registrar compra de reposición de materiales', () => {
       where: { id: reposicion.id },
       relations: { detalles: true, proveedor: true },
     });
-    expect(persistida?.estado).toBe(EstadoReposicionMaterial.PENDIENTE_RECEPCION);
+    expect(persistida?.estado).toBe(
+      EstadoReposicionMaterial.PENDIENTE_RECEPCION,
+    );
     expect(persistida?.idProveedor).toBe(proveedor.id);
     expect(persistida?.detalles[0].cantidad).toBe(30);
   });
 
   it('rechaza proveedor inactivo, compra duplicada y materiales incompletos', async () => {
-    const { material, proveedor, reposicion } = await crearReposicionPendiente();
-    const token = signAs(
-      Role.ADMINISTRADORA,
-      String(administradora.idUsuario),
-    );
+    const { material, proveedor, reposicion } =
+      await crearReposicionPendiente();
+    const token = signAs(Role.ADMINISTRADORA, String(administradora.idUsuario));
 
     const proveedorInactivo = await proveedorRepository.save(
       proveedorRepository.create({
@@ -380,12 +382,16 @@ describe('3.9.4 Consulta administrativa de reposiciones', () => {
     jwtService = moduleRef.get(JwtService);
     materialRepository = moduleRef.get(getRepositoryToken(Material));
     proveedorRepository = moduleRef.get(getRepositoryToken(Proveedor));
-    reposicionRepository = moduleRef.get(getRepositoryToken(ReposicionMaterial));
+    reposicionRepository = moduleRef.get(
+      getRepositoryToken(ReposicionMaterial),
+    );
     detalleReposicionRepository = moduleRef.get(
       getRepositoryToken(DetalleReposicionMaterial),
     );
     usuarioRepository = moduleRef.get(getRepositoryToken(Usuario));
-    const rolRepository = moduleRef.get<Repository<Rol>>(getRepositoryToken(Rol));
+    const rolRepository = moduleRef.get<Repository<Rol>>(
+      getRepositoryToken(Rol),
+    );
     const roles = await seedRolesBase(rolRepository);
 
     administradora = await crearUsuarioPrueba(usuarioRepository, roles, {
@@ -435,10 +441,7 @@ describe('3.9.4 Consulta administrativa de reposiciones', () => {
       }),
     );
 
-    const token = signAs(
-      Role.ADMINISTRADORA,
-      String(administradora.idUsuario),
-    );
+    const token = signAs(Role.ADMINISTRADORA, String(administradora.idUsuario));
 
     const res = await adminGet('', token).expect(HttpStatus.OK);
 
@@ -482,10 +485,7 @@ describe('3.9.4 Consulta administrativa de reposiciones', () => {
       }),
     );
 
-    const token = signAs(
-      Role.ADMINISTRADORA,
-      String(administradora.idUsuario),
-    );
+    const token = signAs(Role.ADMINISTRADORA, String(administradora.idUsuario));
 
     const detalle = await adminGet(`/${reposicion.id}`, token).expect(
       HttpStatus.OK,
@@ -562,12 +562,16 @@ describe('3.9.6 Estados y transiciones de reposiciones', () => {
     jwtService = moduleRef.get(JwtService);
     materialRepository = moduleRef.get(getRepositoryToken(Material));
     proveedorRepository = moduleRef.get(getRepositoryToken(Proveedor));
-    reposicionRepository = moduleRef.get(getRepositoryToken(ReposicionMaterial));
+    reposicionRepository = moduleRef.get(
+      getRepositoryToken(ReposicionMaterial),
+    );
     detalleReposicionRepository = moduleRef.get(
       getRepositoryToken(DetalleReposicionMaterial),
     );
     usuarioRepository = moduleRef.get(getRepositoryToken(Usuario));
-    const rolRepository = moduleRef.get<Repository<Rol>>(getRepositoryToken(Rol));
+    const rolRepository = moduleRef.get<Repository<Rol>>(
+      getRepositoryToken(Rol),
+    );
     const roles = await seedRolesBase(rolRepository);
 
     administradora = await crearUsuarioPrueba(usuarioRepository, roles, {
@@ -617,10 +621,7 @@ describe('3.9.6 Estados y transiciones de reposiciones', () => {
       }),
     );
 
-    const token = signAs(
-      Role.ADMINISTRADORA,
-      String(administradora.idUsuario),
-    );
+    const token = signAs(Role.ADMINISTRADORA, String(administradora.idUsuario));
 
     const enGestion = await adminPatchEstado(
       reposicion.id,
@@ -673,10 +674,7 @@ describe('3.9.6 Estados y transiciones de reposiciones', () => {
       }),
     );
 
-    const token = signAs(
-      Role.ADMINISTRADORA,
-      String(administradora.idUsuario),
-    );
+    const token = signAs(Role.ADMINISTRADORA, String(administradora.idUsuario));
 
     const recibida = await request(app.getHttpServer())
       .post('/api/v1/admin/inventario/recepciones')

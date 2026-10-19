@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -21,7 +22,10 @@ import { MovimientoVacaciones } from './entities/movimiento-vacaciones.entity';
 import { compararFechasIso, esFechaCalendario } from './fecha-permiso';
 import { calcularSaldoVacaciones, SaldoVacaciones } from './saldo-vacaciones';
 
-export type RegistrarMovimientoVacacionesInput = CreateMovimientoVacacionesDto;
+export type RegistrarMovimientoVacacionesInput = CreateMovimientoVacacionesDto & {
+  signoAjuste?: 1 | -1 | null;
+  registradoPorUsuarioId?: number | null;
+};
 
 export type SaldoVacacionesColaborador = SaldoVacaciones & {
   colaboradorId: number;
@@ -46,12 +50,6 @@ export type MovimientosVacacionesListado = {
   totalPages: number;
 };
 
-type TotalPorTipoRow = {
-  tipo: TipoMovimientoVacaciones;
-  totalDias: string | number | null;
-  cantidad: string | number | null;
-};
-
 /**
  * Historial y saldo de vacaciones por colaborador.
  * Los movimientos son inmutables: para corregir se registra otro movimiento.
@@ -68,53 +66,84 @@ export class VacacionesService {
   ) {}
 
   /**
-   * Registra un movimiento ACUMULADO o DISFRUTADO.
-   * Un DISFRUTADO solo se acepta si no deja el saldo del colaborador en negativo;
-   * la verificación y el insert ocurren en la misma transacción.
+   * Registra ACUMULADO, DISFRUTADO o AJUSTE.
+   * DISFRUTADO / AJUSTE negativo no pueden dejar el saldo en negativo.
    */
   async registrarMovimiento(
     input: RegistrarMovimientoVacacionesInput,
+    managerExterno?: EntityManager,
   ): Promise<MovimientoVacaciones> {
     this.validarTipo(input.tipo);
     this.validarCantidadDias(input.cantidadDias);
     this.validarFecha(input.fecha);
-
-    const guardado = await this.movimientoRepository.manager.transaction(
-      async (manager) => {
-        await this.validarColaboradorExiste(
-          input.colaboradorId,
-          manager,
-          BadRequestException,
+    if (input.tipo === TipoMovimientoVacaciones.AJUSTE) {
+      if (input.signoAjuste !== 1 && input.signoAjuste !== -1) {
+        throw new BadRequestException(
+          'Un AJUSTE requiere signoAjuste 1 (suma) o -1 (resta)',
         );
+      }
+      if (!input.observaciones?.trim()) {
+        throw new BadRequestException('Un AJUSTE requiere motivo');
+      }
+      if (
+        input.registradoPorUsuarioId == null ||
+        !Number.isInteger(input.registradoPorUsuarioId)
+      ) {
+        throw new BadRequestException(
+          'Un AJUSTE requiere el usuario responsable del registro',
+        );
+      }
+    }
 
-        if (input.tipo === TipoMovimientoVacaciones.DISFRUTADO) {
-          const { diasDisponibles } = await this.obtenerSaldo(
-            input.colaboradorId,
-            manager,
+    const ejecutar = async (manager: EntityManager) => {
+      await this.validarColaboradorExiste(
+        input.colaboradorId,
+        manager,
+        BadRequestException,
+      );
+
+      const saldo = await this.obtenerSaldo(input.colaboradorId, manager);
+      if (input.tipo === TipoMovimientoVacaciones.DISFRUTADO) {
+        if (input.cantidadDias > saldo.diasDisponibles) {
+          throw new BadRequestException(
+            `El colaborador no tiene saldo suficiente de vacaciones: dispone de ${saldo.diasDisponibles} día(s) y se intentan disfrutar ${input.cantidadDias}`,
           );
-          if (input.cantidadDias > diasDisponibles) {
-            throw new BadRequestException(
-              `El colaborador no tiene saldo suficiente de vacaciones: dispone de ${diasDisponibles} día(s) y se intentan disfrutar ${input.cantidadDias}`,
-            );
-          }
         }
+      }
+      if (
+        input.tipo === TipoMovimientoVacaciones.AJUSTE &&
+        input.signoAjuste === -1 &&
+        input.cantidadDias > saldo.diasDisponibles
+      ) {
+        throw new BadRequestException(
+          `El ajuste dejaría el saldo negativo: dispone de ${saldo.diasDisponibles} día(s)`,
+        );
+      }
 
-        const repo = manager.getRepository(MovimientoVacaciones);
-        const movimiento = repo.create({
-          colaboradorId: input.colaboradorId,
-          tipo: input.tipo,
-          cantidadDias: input.cantidadDias,
-          fecha: input.fecha,
-          observaciones: input.observaciones ?? null,
-        });
-        return repo.save(movimiento);
-      },
-    );
+      const repo = manager.getRepository(MovimientoVacaciones);
+      const movimiento = repo.create({
+        colaboradorId: input.colaboradorId,
+        tipo: input.tipo,
+        cantidadDias: input.cantidadDias,
+        signoAjuste:
+          input.tipo === TipoMovimientoVacaciones.AJUSTE
+            ? input.signoAjuste!
+            : null,
+        fecha: input.fecha,
+        observaciones: input.observaciones ?? null,
+        registradoPorUsuarioId: input.registradoPorUsuarioId ?? null,
+      });
+      return repo.save(movimiento);
+    };
+
+    const guardado = managerExterno
+      ? await ejecutar(managerExterno)
+      : await this.movimientoRepository.manager.transaction(ejecutar);
 
     this.logger.log(
       `Movimiento de vacaciones registrado: id=${guardado.id}, colaboradorId=${guardado.colaboradorId}, tipo=${guardado.tipo}, dias=${guardado.cantidadDias}`,
     );
-    return this.findOne(guardado.id);
+    return managerExterno ? guardado : this.findOne(guardado.id);
   }
 
   async findOne(id: number): Promise<MovimientoVacaciones> {
@@ -238,10 +267,6 @@ export class VacacionesService {
     };
   }
 
-  /**
-   * Saldo derivado del historial: SUM(ACUMULADO) - SUM(DISFRUTADO).
-   * Se agrega en la base de datos para no cargar todos los movimientos en memoria.
-   */
   async calcularSaldo(
     colaboradorId: number,
   ): Promise<SaldoVacacionesColaborador> {
@@ -249,33 +274,38 @@ export class VacacionesService {
     return this.obtenerSaldo(colaboradorId);
   }
 
+  async obtenerBalancePorUsuarioId(
+    usuarioId: number,
+  ): Promise<BalanceVacaciones> {
+    const colaborador = await this.colaboradorRepository.findOne({
+      where: { usuarioId, activo: true },
+    });
+    if (!colaborador) {
+      throw new ForbiddenException(
+        'No hay un colaborador activo vinculado a su cuenta',
+      );
+    }
+    return this.obtenerBalance(colaborador.id);
+  }
+
   private async obtenerSaldo(
     colaboradorId: number,
     manager: EntityManager = this.movimientoRepository.manager,
   ): Promise<SaldoVacacionesColaborador> {
-    const filas = await manager
-      .getRepository(MovimientoVacaciones)
-      .createQueryBuilder('m')
-      .select('m.tipo', 'tipo')
-      .addSelect('SUM(m.cantidadDias)', 'totalDias')
-      .addSelect('COUNT(m.id)', 'cantidad')
-      .where('m.colaboradorId = :colaboradorId', { colaboradorId })
-      .groupBy('m.tipo')
-      .getRawMany<TotalPorTipoRow>();
-
-    const totales = filas.map((fila) => ({
-      tipo: fila.tipo,
-      cantidadDias: Number(fila.totalDias ?? 0),
-    }));
-    const totalMovimientos = filas.reduce(
-      (acc, fila) => acc + Number(fila.cantidad ?? 0),
-      0,
-    );
+    const movimientos = await manager.getRepository(MovimientoVacaciones).find({
+      where: { colaboradorId },
+      select: {
+        id: true,
+        tipo: true,
+        cantidadDias: true,
+        signoAjuste: true,
+      },
+    });
 
     return {
       colaboradorId,
-      totalMovimientos,
-      ...calcularSaldoVacaciones(totales),
+      totalMovimientos: movimientos.length,
+      ...calcularSaldoVacaciones(movimientos),
     };
   }
 

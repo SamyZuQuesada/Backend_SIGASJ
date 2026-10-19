@@ -28,9 +28,9 @@ const baseEvaluacion = (
 
 describe('estadoTrasValidarHorarioAsignacion', () => {
   it('mantiene ASIGNADA solo cuando el Fontanero está dentro de jornada', () => {
-    expect(
-      estadoTrasValidarHorarioAsignacion(baseEvaluacion({})),
-    ).toBe(EstadoAveria.ASIGNADA);
+    expect(estadoTrasValidarHorarioAsignacion(baseEvaluacion({}))).toBe(
+      EstadoAveria.ASIGNADA,
+    );
   });
 
   it('pasa a PENDIENTE si está fuera, sin horario o incompleto', () => {
@@ -72,9 +72,9 @@ describe('estadoTrasValidarHorarioAsignacion', () => {
     );
     expect(estado).toBe(EstadoAveria.PENDIENTE);
     expect(Object.values(EstadoAveria)).not.toContain('FUERA_DE_HORARIO');
-    expect(
-      esTransicionEstadoAveriaValida(EstadoAveria.ASIGNADA, estado),
-    ).toBe(true);
+    expect(esTransicionEstadoAveriaValida(EstadoAveria.ASIGNADA, estado)).toBe(
+      true,
+    );
   });
 });
 

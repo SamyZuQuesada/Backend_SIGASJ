@@ -111,8 +111,7 @@ export class QueryAsociadosDto {
 
   @ApiPropertyOptional({
     example: '2026-01-01',
-    description:
-      'Fecha mínima de registro formal del asociado (YYYY-MM-DD)',
+    description: 'Fecha mínima de registro formal del asociado (YYYY-MM-DD)',
   })
   @Transform(trimOptionalString)
   @IsOptional()
@@ -124,8 +123,7 @@ export class QueryAsociadosDto {
 
   @ApiPropertyOptional({
     example: '2026-12-31',
-    description:
-      'Fecha máxima de registro formal del asociado (YYYY-MM-DD)',
+    description: 'Fecha máxima de registro formal del asociado (YYYY-MM-DD)',
   })
   @Transform(trimOptionalString)
   @IsOptional()
@@ -137,8 +135,7 @@ export class QueryAsociadosDto {
 
   @ApiPropertyOptional({
     example: '2026-01-01',
-    description:
-      'Fecha mínima de inactivación del asociado (YYYY-MM-DD)',
+    description: 'Fecha mínima de inactivación del asociado (YYYY-MM-DD)',
   })
   @Transform(trimOptionalString)
   @IsOptional()
@@ -150,8 +147,7 @@ export class QueryAsociadosDto {
 
   @ApiPropertyOptional({
     example: '2026-12-31',
-    description:
-      'Fecha máxima de inactivación del asociado (YYYY-MM-DD)',
+    description: 'Fecha máxima de inactivación del asociado (YYYY-MM-DD)',
   })
   @Transform(trimOptionalString)
   @IsOptional()

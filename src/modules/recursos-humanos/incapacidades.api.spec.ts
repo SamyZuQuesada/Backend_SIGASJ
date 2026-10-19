@@ -62,7 +62,7 @@ describe('POST/PATCH /api/v1/rrhh/incapacidades', () => {
       expect(res.status).toBe(401);
     });
 
-    it.each([Role.SECRETARIA, Role.FONTANERO, Role.ABONADO, Role.AYUDANTE])(
+    it.each([Role.FONTANERO, Role.ABONADO, Role.AYUDANTE])(
       'rechaza al rol %s (403)',
       async (role) => {
         const res = await post(body(), signAs(role));
@@ -231,7 +231,7 @@ describe('POST/PATCH /api/v1/rrhh/incapacidades', () => {
       expect(enDb?.colaboradorId).toBe(colaborador.id);
     });
 
-    it.each([Role.SECRETARIA, Role.FONTANERO])(
+    it.each([Role.FONTANERO])(
       'rechaza actualización al rol %s (403)',
       async (role) => {
         const creado = await post(body());

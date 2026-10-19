@@ -21,10 +21,7 @@ import { Colaborador } from './colaborador.entity';
 
 /**
  * Movimiento del historial de vacaciones de un colaborador.
- *
- * Cada fila es un hecho inmutable: cuántos días se ACUMULARON o DISFRUTARON,
- * en qué fecha y por qué. El saldo disponible se calcula sumando el historial
- * (ACUMULADO - DISFRUTADO), por lo que nunca depende de editar un número a mano.
+ * ACUMULADO / DISFRUTADO / AJUSTE (± vía signoAjuste). Saldo derivado.
  */
 @Entity('MovimientoVacaciones')
 @Index('IX_MovimientoVacaciones_colaboradorId', ['colaboradorId'])
@@ -59,8 +56,6 @@ export class MovimientoVacaciones {
   @ApiProperty({
     enum: TipoMovimientoVacaciones,
     example: TipoMovimientoVacaciones.ACUMULADO,
-    description:
-      'ACUMULADO suma días al saldo; DISFRUTADO los resta. Determina el signo del movimiento.',
   })
   @Column({ type: 'varchar', length: 20 })
   tipo: TipoMovimientoVacaciones;
@@ -68,27 +63,40 @@ export class MovimientoVacaciones {
   @ApiProperty({
     example: 5,
     minimum: 1,
-    description:
-      'Cantidad de días del movimiento. Siempre positiva; el signo lo da el tipo.',
+    description: 'Cantidad positiva; el signo lo da el tipo o signoAjuste.',
   })
   @Column({ type: 'int' })
   cantidadDias: number;
+
+  @ApiPropertyOptional({
+    example: 1,
+    nullable: true,
+    description: 'Solo AJUSTE: 1 suma, -1 resta',
+  })
+  @Column({ type: 'int', nullable: true })
+  signoAjuste: 1 | -1 | null;
 
   @ApiProperty({
     example: '2026-10-12',
     description: 'Fecha en que aplica el movimiento (YYYY-MM-DD)',
   })
-  // varchar(10) como en PermisoColaborador: evita desfase de un día con mssql/DATE.
   @Column({ type: 'varchar', length: 10 })
   fecha: string;
 
   @ApiPropertyOptional({
     example: 'Vacaciones de fin de año',
     nullable: true,
-    description: 'Observaciones del registro',
   })
   @Column({ type: 'varchar', length: 500, nullable: true })
   observaciones: string | null;
+
+  @ApiPropertyOptional({
+    example: 2,
+    nullable: true,
+    description: 'idUsuario que registró el movimiento',
+  })
+  @Column({ type: 'int', nullable: true })
+  registradoPorUsuarioId: number | null;
 
   @ApiProperty({
     description: 'Fecha y hora en que se registró el movimiento',
@@ -142,6 +150,23 @@ export class MovimientoVacaciones {
           'La cantidad de días debe ser mayor a cero',
         );
       }
+    }
+
+    if (this.tipo === TipoMovimientoVacaciones.AJUSTE) {
+      if (this.signoAjuste !== 1 && this.signoAjuste !== -1) {
+        throw new BadRequestException(
+          'Un AJUSTE requiere signoAjuste 1 (suma) o -1 (resta)',
+        );
+      }
+      if (!this.observaciones?.trim()) {
+        throw new BadRequestException(
+          'Un AJUSTE requiere motivo en observaciones',
+        );
+      }
+    } else if (this.signoAjuste != null) {
+      throw new BadRequestException(
+        'signoAjuste solo aplica al tipo AJUSTE',
+      );
     }
   }
 }

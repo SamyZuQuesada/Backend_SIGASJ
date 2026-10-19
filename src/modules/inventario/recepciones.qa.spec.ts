@@ -77,7 +77,10 @@ describe('3.10 Recepción y actualización de inventario', () => {
     return jwtService.sign(payload);
   };
 
-  const adminPostRecepcion = (body: Record<string, unknown>, token?: string) => {
+  const adminPostRecepcion = (
+    body: Record<string, unknown>,
+    token?: string,
+  ) => {
     const req = request(app.getHttpServer()).post(
       '/api/v1/admin/inventario/recepciones',
     );
@@ -113,13 +116,19 @@ describe('3.10 Recepción y actualización de inventario', () => {
     jwtService = moduleRef.get(JwtService);
     materialRepository = moduleRef.get(getRepositoryToken(Material));
     proveedorRepository = moduleRef.get(getRepositoryToken(Proveedor));
-    reposicionRepository = moduleRef.get(getRepositoryToken(ReposicionMaterial));
+    reposicionRepository = moduleRef.get(
+      getRepositoryToken(ReposicionMaterial),
+    );
     detalleReposicionRepository = moduleRef.get(
       getRepositoryToken(DetalleReposicionMaterial),
     );
-    movimientoRepository = moduleRef.get(getRepositoryToken(MovimientoInventario));
+    movimientoRepository = moduleRef.get(
+      getRepositoryToken(MovimientoInventario),
+    );
     usuarioRepository = moduleRef.get(getRepositoryToken(Usuario));
-    const rolRepository = moduleRef.get<Repository<Rol>>(getRepositoryToken(Rol));
+    const rolRepository = moduleRef.get<Repository<Rol>>(
+      getRepositoryToken(Rol),
+    );
     const roles = await seedRolesBase(rolRepository);
 
     administradora = await crearUsuarioPrueba(usuarioRepository, roles, {
@@ -145,7 +154,10 @@ describe('3.10 Recepción y actualización de inventario', () => {
 
   const crearReposicionPendienteRecepcion = async () => {
     const proveedor = await proveedorRepository.save(
-      proveedorRepository.create({ nombre: 'Ferretería Recepción', activo: true }),
+      proveedorRepository.create({
+        nombre: 'Ferretería Recepción',
+        activo: true,
+      }),
     );
     const material = await materialRepository.save(
       materialRepository.create({
@@ -178,10 +190,7 @@ describe('3.10 Recepción y actualización de inventario', () => {
 
   it('registra recepción válida, genera ENTRADA y actualiza stock', async () => {
     const { material, reposicion } = await crearReposicionPendienteRecepcion();
-    const token = signAs(
-      Role.ADMINISTRADORA,
-      String(administradora.idUsuario),
-    );
+    const token = signAs(Role.ADMINISTRADORA, String(administradora.idUsuario));
 
     const res = await adminPostRecepcion(
       {
@@ -198,7 +207,9 @@ describe('3.10 Recepción y actualización de inventario', () => {
     expect(res.body.movimientos[0].tipo).toBe(TipoMovimientoInventario.ENTRADA);
     expect(res.body.movimientos[0].idReposicion).toBe(reposicion.id);
 
-    const materialDespues = await materialRepository.findOneBy({ id: material.id });
+    const materialDespues = await materialRepository.findOneBy({
+      id: material.id,
+    });
     expect(materialDespues?.stockActual).toBe(35);
 
     const movimientos = await movimientoRepository.find({
@@ -211,10 +222,7 @@ describe('3.10 Recepción y actualización de inventario', () => {
 
   it('rechaza recepción duplicada, cantidades inválidas y estados no permitidos', async () => {
     const { material, reposicion } = await crearReposicionPendienteRecepcion();
-    const token = signAs(
-      Role.ADMINISTRADORA,
-      String(administradora.idUsuario),
-    );
+    const token = signAs(Role.ADMINISTRADORA, String(administradora.idUsuario));
 
     await adminPostRecepcion(
       {
@@ -232,7 +240,9 @@ describe('3.10 Recepción y actualización de inventario', () => {
       token,
     ).expect(HttpStatus.BAD_REQUEST);
 
-    const materialDespues = await materialRepository.findOneBy({ id: material.id });
+    const materialDespues = await materialRepository.findOneBy({
+      id: material.id,
+    });
     expect(materialDespues?.stockActual).toBe(35);
 
     await movimientoRepository.clear();
@@ -259,10 +269,7 @@ describe('3.10 Recepción y actualización de inventario', () => {
 
   it('rechaza PATCH directo a RECIBIDA y exige endpoint de recepción', async () => {
     const { material, reposicion } = await crearReposicionPendienteRecepcion();
-    const token = signAs(
-      Role.ADMINISTRADORA,
-      String(administradora.idUsuario),
-    );
+    const token = signAs(Role.ADMINISTRADORA, String(administradora.idUsuario));
 
     await request(app.getHttpServer())
       .patch(`/api/v1/admin/inventario/reposiciones/${reposicion.id}/estado`)

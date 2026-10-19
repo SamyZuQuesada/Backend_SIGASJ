@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { CreatePermisoColaboradorDto } from './dto/create-permiso-colaborador.dto';
 import {
   PERMISOS_LIMIT_DEFAULT,
@@ -36,23 +36,42 @@ export class PermisosColaboradorService {
     private readonly colaboradorRepository: Repository<Colaborador>,
   ) {}
 
-  async create(dto: CreatePermisoColaboradorDto): Promise<PermisoColaborador> {
-    await this.validarColaborador(dto.colaboradorId);
+  async create(
+    dto: CreatePermisoColaboradorDto,
+    managerExterno?: EntityManager,
+  ): Promise<PermisoColaborador> {
     this.validarRango(dto.fechaInicio, dto.fechaFin);
 
-    const permiso = this.permisoRepository.create({
-      colaboradorId: dto.colaboradorId,
-      fechaInicio: dto.fechaInicio,
-      fechaFin: dto.fechaFin,
-      motivo: dto.motivo.trim(),
-      observaciones: dto.observaciones ?? null,
-    });
+    const ejecutar = async (manager: EntityManager) => {
+      const colaboradorRepo = manager.getRepository(Colaborador);
+      const existe = await colaboradorRepo.exists({
+        where: { id: dto.colaboradorId },
+      });
+      if (!existe) {
+        throw new BadRequestException(
+          `El colaborador con id ${dto.colaboradorId} no existe`,
+        );
+      }
 
-    const guardado = await this.permisoRepository.save(permiso);
+      const permisoRepo = manager.getRepository(PermisoColaborador);
+      const permiso = permisoRepo.create({
+        colaboradorId: dto.colaboradorId,
+        fechaInicio: dto.fechaInicio,
+        fechaFin: dto.fechaFin,
+        motivo: dto.motivo.trim(),
+        observaciones: dto.observaciones ?? null,
+      });
+      return permisoRepo.save(permiso);
+    };
+
+    const guardado = managerExterno
+      ? await ejecutar(managerExterno)
+      : await this.permisoRepository.manager.transaction(ejecutar);
+
     this.logger.log(
       `Permiso registrado: id=${guardado.id}, colaboradorId=${guardado.colaboradorId}`,
     );
-    return this.findOne(guardado.id);
+    return managerExterno ? guardado : this.findOne(guardado.id);
   }
 
   async findAll(
@@ -185,7 +204,9 @@ export class PermisosColaboradorService {
 
   private validarRango(fechaInicio: string, fechaFin: string): void {
     if (!esFechaCalendario(fechaInicio)) {
-      throw new BadRequestException('La fecha de inicio no es una fecha válida');
+      throw new BadRequestException(
+        'La fecha de inicio no es una fecha válida',
+      );
     }
     if (!esFechaCalendario(fechaFin)) {
       throw new BadRequestException('La fecha de fin no es una fecha válida');

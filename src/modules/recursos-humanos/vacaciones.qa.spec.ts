@@ -7,7 +7,7 @@ import { Role, ROLES_SISTEMA } from '../../common/enums/role.enum';
 import { TipoMovimientoVacaciones } from '../../common/enums/tipo-movimiento-vacaciones.enum';
 import { Colaborador } from './entities/colaborador.entity';
 import { MovimientoVacaciones } from './entities/movimiento-vacaciones.entity';
-import { SIGNO_MOVIMIENTO_VACACIONES } from './saldo-vacaciones';
+import { calcularSaldoVacaciones } from './saldo-vacaciones';
 import { crearPermisosTestApp } from './testing/permisos-colaborador.test-app';
 import {
   BalanceVacaciones,
@@ -46,7 +46,7 @@ const mensajeDe = (res: request.Response): string => {
 };
 
 const ROLES_SIN_ACCESO = ROLES_SISTEMA.filter(
-  (role) => role !== Role.ADMINISTRADORA,
+  (role) => role !== Role.ADMINISTRADORA && role !== Role.SECRETARIA,
 );
 
 describe('QA Vacaciones — checklist completo (6.3)', () => {
@@ -139,8 +139,7 @@ describe('QA Vacaciones — checklist completo (6.3)', () => {
     it('parte de un saldo en cero sin movimientos', async () => {
       expect(await balance(juan.id)).toMatchObject({
         totalMovimientos: 0,
-        diasAcumulados: 0,
-        diasDisfrutados: 0,
+        diasAcumulados: 0,        diasAjusteNeto: 0,        diasDisfrutados: 0,
         diasDisponibles: 0,
       });
     });
@@ -236,8 +235,7 @@ describe('QA Vacaciones — checklist completo (6.3)', () => {
       expect(res).toEqual({
         colaboradorId: juan.id,
         totalMovimientos: 4,
-        diasAcumulados: 20,
-        diasDisfrutados: 8,
+        diasAcumulados: 20,        diasAjusteNeto: 0,        diasDisfrutados: 8,
         diasDisponibles: 12,
         colaborador: {
           id: juan.id,
@@ -270,8 +268,7 @@ describe('QA Vacaciones — checklist completo (6.3)', () => {
       expect(saldo).toEqual({
         colaboradorId: juan.id,
         totalMovimientos: 4,
-        diasAcumulados: 20,
-        diasDisfrutados: 8,
+        diasAcumulados: 20,        diasAjusteNeto: 0,        diasDisfrutados: 8,
         diasDisponibles: 12,
       });
     });
@@ -516,10 +513,7 @@ describe('QA Vacaciones — checklist completo (6.3)', () => {
 
     it('la suma con signo del historial reproduce los 12 días disponibles', async () => {
       const res = await listar(`?colaboradorId=${juan.id}&limit=100`);
-      const conSigno = res.data.reduce(
-        (acc, m) => acc + SIGNO_MOVIMIENTO_VACACIONES[m.tipo] * m.cantidadDias,
-        0,
-      );
+      const conSigno = calcularSaldoVacaciones(res.data).diasDisponibles;
       expect(conSigno).toBe(12);
       expect(conSigno).toBe((await balance(juan.id)).diasDisponibles);
     });

@@ -44,5 +44,5 @@ export function isDiaSemanaValido(valor: unknown): valor is DiaSemana {
 /** Convierte `Date.getDay()` (0 = domingo) al valor ISO de `DiaSemana`. */
 export function diaSemanaDesdeFecha(fecha: Date): DiaSemana {
   const jsDay = fecha.getDay();
-  return (jsDay === 0 ? DiaSemana.DOMINGO : jsDay) as DiaSemana;
+  return jsDay === 0 ? DiaSemana.DOMINGO : jsDay;
 }

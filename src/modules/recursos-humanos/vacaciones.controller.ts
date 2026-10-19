@@ -16,13 +16,16 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/enums/role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { CreateMovimientoVacacionesDto } from './dto/create-movimiento-vacaciones.dto';
 import { QueryMovimientosVacacionesDto } from './dto/query-movimientos-vacaciones.dto';
 import { MovimientoVacaciones } from './entities/movimiento-vacaciones.entity';
+import { RRHH_ADMIN_ROLES } from './rrhh-roles';
 import {
   BalanceVacaciones,
   MovimientosVacacionesListado,
@@ -32,55 +35,55 @@ import {
 @ApiTags('Recursos Humanos - Vacaciones')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMINISTRADORA)
 @Controller('rrhh/vacaciones')
 export class VacacionesController {
   constructor(private readonly vacacionesService: VacacionesService) {}
 
+  @Get('mias/balance')
+  @Roles(Role.FONTANERO)
+  @ApiOperation({
+    summary: 'Saldo de vacaciones del Fontanero autenticado (solo lectura)',
+  })
+  @ApiResponse({ status: 200, description: 'Balance propio.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Sin vínculo colaborador o rol incorrecto.',
+  })
+  obtenerBalancePropio(
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<BalanceVacaciones> {
+    const usuarioId = user.idUsuario ?? Number(user.userId);
+    return this.vacacionesService.obtenerBalancePorUsuarioId(usuarioId);
+  }
+
   @Post('movimientos')
+  @Roles(...RRHH_ADMIN_ROLES)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
-    summary: 'Registrar días de vacaciones acumulados o disfrutados',
+    summary: 'Registrar ACUMULADO, DISFRUTADO o AJUSTE',
     description:
-      'Registra un movimiento ACUMULADO (suma días) o DISFRUTADO (resta días) para un colaborador existente. ' +
-      'Un DISFRUTADO se rechaza si dejaría el saldo del colaborador en negativo. Requiere rol ADMINISTRADORA.',
+      'AJUSTE requiere motivo (observaciones), signoAjuste y deja auditoría del usuario. ' +
+      'Roles: ADMINISTRADORA o SECRETARIA.',
   })
   @ApiResponse({
     status: 201,
     description: 'Movimiento registrado.',
     type: MovimientoVacaciones,
   })
-  @ApiResponse({
-    status: 400,
-    description:
-      'Datos incompletos o inválidos, tipo fuera del catálogo, cantidad no positiva, fecha inválida, colaborador inexistente o saldo insuficiente.',
-  })
-  @ApiResponse({ status: 401, description: 'No autenticado.' })
-  @ApiResponse({ status: 403, description: 'Sin rol ADMINISTRADORA.' })
   registrarMovimiento(
     @Body() dto: CreateMovimientoVacacionesDto,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<MovimientoVacaciones> {
-    return this.vacacionesService.registrarMovimiento(dto);
+    const registradoPorUsuarioId = user.idUsuario ?? Number(user.userId);
+    return this.vacacionesService.registrarMovimiento({
+      ...dto,
+      registradoPorUsuarioId,
+    });
   }
 
   @Get('movimientos')
-  @ApiOperation({
-    summary: 'Historial de movimientos de vacaciones',
-    description:
-      'Listado paginado del historial. Permite filtrar por colaborador, tipo y rango de fechas del movimiento. ' +
-      'Orden: fecha descendente. Requiere rol ADMINISTRADORA.',
-  })
-  @ApiResponse({
-    status: 200,
-    description:
-      'Página de movimientos: { data, total, page, limit, totalPages }.',
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Parámetros de consulta inválidos.',
-  })
-  @ApiResponse({ status: 401, description: 'No autenticado.' })
-  @ApiResponse({ status: 403, description: 'Sin rol ADMINISTRADORA.' })
+  @Roles(...RRHH_ADMIN_ROLES)
+  @ApiOperation({ summary: 'Historial de movimientos de vacaciones' })
   findAll(
     @Query() query: QueryMovimientosVacacionesDto,
   ): Promise<MovimientosVacacionesListado> {
@@ -88,21 +91,10 @@ export class VacacionesController {
   }
 
   @Get('colaboradores/:colaboradorId/balance')
+  @Roles(...RRHH_ADMIN_ROLES)
   @ApiOperation({
     summary: 'Balance actual de vacaciones de un colaborador',
-    description:
-      'Devuelve días acumulados, disfrutados y disponibles calculados en el servidor a partir del historial de movimientos. ' +
-      'El Frontend no debe recalcular el saldo. Requiere rol ADMINISTRADORA.',
   })
-  @ApiResponse({
-    status: 200,
-    description:
-      '{ colaboradorId, colaborador, diasAcumulados, diasDisfrutados, diasDisponibles, totalMovimientos }.',
-  })
-  @ApiResponse({ status: 400, description: 'El id no es un número entero.' })
-  @ApiResponse({ status: 401, description: 'No autenticado.' })
-  @ApiResponse({ status: 403, description: 'Sin rol ADMINISTRADORA.' })
-  @ApiResponse({ status: 404, description: 'El colaborador no existe.' })
   obtenerBalance(
     @Param('colaboradorId', ParseIntPipe) colaboradorId: number,
   ): Promise<BalanceVacaciones> {

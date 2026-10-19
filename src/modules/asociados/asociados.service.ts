@@ -91,9 +91,7 @@ export class AsociadosService {
       throw new BadRequestException('La cédula es obligatoria');
     }
     if (cedulaNormalizada.length > 30) {
-      throw new BadRequestException(
-        'La cédula no puede exceder 30 caracteres',
-      );
+      throw new BadRequestException('La cédula no puede exceder 30 caracteres');
     }
 
     const correoRaw = dto.correoElectronico ?? (dto as any).correo;

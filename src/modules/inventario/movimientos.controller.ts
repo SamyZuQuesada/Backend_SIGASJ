@@ -39,7 +39,8 @@ export class MovimientosController {
   @HttpCode(HttpStatus.OK)
   @Roles(Role.ADMINISTRADORA)
   @ApiOperation({
-    summary: 'Consultar historial de movimientos de inventario (Administradora)',
+    summary:
+      'Consultar historial de movimientos de inventario (Administradora)',
     description:
       'Listado paginado de entradas y salidas registradas en MovimientoInventario. Solo lectura.',
   })
@@ -66,7 +67,8 @@ export class MovimientosController {
   @HttpCode(HttpStatus.OK)
   @Roles(Role.ADMINISTRADORA)
   @ApiOperation({
-    summary: 'Consultar detalle de un movimiento de inventario (Administradora)',
+    summary:
+      'Consultar detalle de un movimiento de inventario (Administradora)',
   })
   @ApiParam({ name: 'id', description: 'ID del movimiento', type: Number })
   @ApiResponse({ status: HttpStatus.OK, description: 'Detalle del movimiento' })

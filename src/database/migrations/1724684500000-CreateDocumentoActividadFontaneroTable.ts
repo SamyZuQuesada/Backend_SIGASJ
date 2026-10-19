@@ -10,6 +10,10 @@ export class CreateDocumentoActividadFontaneroTable1724684500000 implements Migr
   name = 'CreateDocumentoActividadFontaneroTable1724684500000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (await queryRunner.hasTable('DocumentoActividadFontanero')) {
+      return;
+    }
+
     const databaseType = queryRunner.connection.options.type;
     const dateTimeType = databaseType === 'postgres' ? 'timestamp' : 'datetime';
     const defaultDate =

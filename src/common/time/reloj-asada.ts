@@ -44,7 +44,9 @@ export function partesLaboralesEnAsada(fecha: Date): PartesLaboralesAsada {
     !Number.isFinite(minutos) ||
     !Number.isFinite(segundos)
   ) {
-    throw new Error('No se pudo resolver la fecha laboral en America/Costa_Rica.');
+    throw new Error(
+      'No se pudo resolver la fecha laboral en America/Costa_Rica.',
+    );
   }
   return {
     diaSemana,

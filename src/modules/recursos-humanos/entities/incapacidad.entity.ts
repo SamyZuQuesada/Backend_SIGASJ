@@ -12,6 +12,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { OrigenIncapacidad } from '../../../common/enums/origen-incapacidad.enum';
 import { aFechaIso } from '../fecha-permiso';
 import { Colaborador } from './colaborador.entity';
 
@@ -70,6 +71,14 @@ export class Incapacidad {
   })
   @Column({ type: 'varchar', length: 500, nullable: true })
   observaciones: string | null;
+
+  @ApiPropertyOptional({
+    enum: OrigenIncapacidad,
+    nullable: true,
+    description: 'Origen administrativo opcional (CCSS / INS / OTRO)',
+  })
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  origen: OrigenIncapacidad | null;
 
   @ApiProperty({
     description: 'Fecha y hora de creación del registro',

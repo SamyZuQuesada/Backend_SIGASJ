@@ -28,7 +28,9 @@ describe('ResolverAveriaDto', () => {
     const { errors } = await validateDto({ observacionFinal: '' });
     expect(
       errors.some((error) =>
-        Object.values(error.constraints ?? {}).includes(OBSERVACION_FINAL_VACIA),
+        Object.values(error.constraints ?? {}).includes(
+          OBSERVACION_FINAL_VACIA,
+        ),
       ),
     ).toBe(true);
   });

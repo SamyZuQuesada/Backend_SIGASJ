@@ -128,7 +128,7 @@ describe('GET /api/v1/rrhh/vacaciones (balance e historial)', () => {
       expect(res.status).toBe(401);
     });
 
-    it.each([Role.SECRETARIA, Role.FONTANERO, Role.ABONADO, Role.AYUDANTE])(
+    it.each([Role.FONTANERO, Role.ABONADO, Role.AYUDANTE])(
       'rechaza al rol %s en ambos endpoints (403)',
       async (role) => {
         const token = signAs(role);
@@ -144,8 +144,7 @@ describe('GET /api/v1/rrhh/vacaciones (balance e historial)', () => {
       expect(res).toEqual({
         colaboradorId: carlos.id,
         totalMovimientos: 4,
-        diasAcumulados: 20,
-        diasDisfrutados: 8,
+        diasAcumulados: 20,        diasAjusteNeto: 0,        diasDisfrutados: 8,
         diasDisponibles: 12,
         colaborador: {
           id: carlos.id,
@@ -173,8 +172,7 @@ describe('GET /api/v1/rrhh/vacaciones (balance e historial)', () => {
       const res = await balance(sinMovimientos.id);
       expect(res).toMatchObject({
         totalMovimientos: 0,
-        diasAcumulados: 0,
-        diasDisfrutados: 0,
+        diasAcumulados: 0,        diasAjusteNeto: 0,        diasDisfrutados: 0,
         diasDisponibles: 0,
       });
     });

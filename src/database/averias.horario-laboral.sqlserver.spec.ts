@@ -53,18 +53,18 @@ describe('SQL Server — horario laboral 3.6', () => {
 
   it('confirma HorarioLaboralFontanero y que Averia no persiste Fuera de horario', async () => {
     const db = requireSqlServer();
-    const tablas = (await db.query(`
+    const tablas = await db.query(`
       SELECT TABLE_NAME
       FROM INFORMATION_SCHEMA.TABLES
       WHERE TABLE_NAME IN ('HorarioLaboralFontanero', 'Averia')
-    `)) as { TABLE_NAME: string }[];
+    `);
     expect(tablas.map((row) => row.TABLE_NAME)).toEqual(
       expect.arrayContaining(['HorarioLaboralFontanero', 'Averia']),
     );
 
-    const estados = (await db.query(`
+    const estados = await db.query(`
       SELECT DISTINCT estado FROM Averia
-    `)) as EstadoRow[];
+    `);
     expect(estados.map((row) => row.estado)).not.toContain('FUERA_DE_HORARIO');
     expect(Object.values(EstadoAveria)).not.toContain('FUERA_DE_HORARIO');
   });

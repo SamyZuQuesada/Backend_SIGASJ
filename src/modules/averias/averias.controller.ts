@@ -34,7 +34,8 @@ export class AveriasController {
   })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'Resultado de la consulta. encontrada=false si no hay nombre público.',
+    description:
+      'Resultado de la consulta. encontrada=false si no hay nombre público.',
   })
   @ApiResponse({
     status: HttpStatus.BAD_REQUEST,

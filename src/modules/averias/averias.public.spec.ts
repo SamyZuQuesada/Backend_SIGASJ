@@ -18,6 +18,7 @@ import { Averia } from './entities/averia.entity';
 
 const payloadMinimo = {
   nombreReportante: 'María Rodríguez',
+  identificacionReportante: '1-2345-6789',
   telefonoReportante: '8888-8888',
   ubicacion: 'Frente a la escuela, 50 m sur, casa verde',
   sectorComunidad: 'San Juan',
@@ -124,15 +125,16 @@ describe('POST /api/v1/public/averias — registro público', () => {
     expect(persistida?.nombreReportante).toBe('María Rodríguez');
   });
 
-  it('acepta identificación y correo omitidos, y correo válido', async () => {
-    const sinOpcionales = await postAveria(payloadMinimo).expect(201);
-    expect(sinOpcionales.body).toMatchObject({
-      data: { estado: 'Recibida' },
+  it('exige cédula y acepta correo opcional válido', async () => {
+    const sinCedula = await postAveria({
+      ...payloadMinimo,
+      identificacionReportante: '',
     });
+    expect(sinCedula.status).toBe(400);
+    expect(await averias.count()).toBe(0);
 
     const conCorreo = await postAveria({
       ...payloadMinimo,
-      identificacionReportante: '1-2345-6789',
       correoReportante: 'maria@example.com',
     }).expect(201);
     const body = conCorreo.body as PublicResponse;
@@ -154,6 +156,7 @@ describe('POST /api/v1/public/averias — registro público', () => {
 
   it.each([
     ['nombreReportante', ''],
+    ['identificacionReportante', '   '],
     ['telefonoReportante', '   '],
     ['ubicacion', ''],
     ['sectorComunidad', ''],

@@ -2,12 +2,14 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, type TransformFnParams } from 'class-transformer';
 import {
   IsEnum,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
   Matches,
   MaxLength,
   Min,
+  ValidateIf,
 } from 'class-validator';
 import {
   TIPOS_MOVIMIENTO_VACACIONES,
@@ -61,7 +63,7 @@ export class CreateMovimientoVacacionesDto {
     enum: TipoMovimientoVacaciones,
     example: TipoMovimientoVacaciones.ACUMULADO,
     description:
-      'ACUMULADO suma días al saldo del colaborador; DISFRUTADO los resta',
+      'ACUMULADO / DISFRUTADO / AJUSTE. AJUSTE requiere signoAjuste y motivo.',
   })
   @Transform(trimUpperString)
   @IsEnum(TipoMovimientoVacaciones, {
@@ -79,6 +81,14 @@ export class CreateMovimientoVacacionesDto {
   @Min(1, { message: 'La cantidad de días debe ser mayor a cero' })
   cantidadDias: number;
 
+  @ApiPropertyOptional({
+    example: 1,
+    description: 'Solo AJUSTE: 1 suma, -1 resta',
+  })
+  @ValidateIf((o: CreateMovimientoVacacionesDto) => o.tipo === 'AJUSTE')
+  @IsIn([1, -1], { message: 'signoAjuste debe ser 1 o -1' })
+  signoAjuste?: 1 | -1 | null;
+
   @ApiProperty({
     example: '2026-10-12',
     description: 'Fecha en que aplica el movimiento (YYYY-MM-DD)',
@@ -89,10 +99,10 @@ export class CreateMovimientoVacacionesDto {
   fecha: string;
 
   @ApiPropertyOptional({
-    example: 'Vacaciones de fin de año',
+    example: 'Corrección de saldo por acuerdo administrativo',
     maxLength: 500,
     nullable: true,
-    description: 'Observaciones opcionales del registro',
+    description: 'Obligatorio para AJUSTE (motivo); opcional en otros tipos',
   })
   @Transform(trimOptionalString)
   @IsOptional()

@@ -18,7 +18,6 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { Role } from '../../common/enums/role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import {
@@ -33,11 +32,12 @@ import { UpdateColaboradorDto } from './dto/update-colaborador.dto';
 import { UpdateEstadoColaboradorDto } from './dto/update-estado-colaborador.dto';
 import { Colaborador } from './entities/colaborador.entity';
 import { HistorialColaboradorService } from './historial-colaborador.service';
+import { RRHH_ADMIN_ROLES } from './rrhh-roles';
 
 @ApiTags('Recursos Humanos - Colaboradores')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMINISTRADORA)
+@Roles(...RRHH_ADMIN_ROLES)
 @Controller('rrhh/colaboradores')
 export class ColaboradoresController {
   constructor(

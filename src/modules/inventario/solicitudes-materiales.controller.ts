@@ -217,7 +217,8 @@ export class SolicitudesMaterialesController {
   @HttpCode(HttpStatus.OK)
   @Roles(Role.ADMINISTRADORA)
   @ApiOperation({
-    summary: 'Consultar detalle de una solicitud de materiales (Administradora)',
+    summary:
+      'Consultar detalle de una solicitud de materiales (Administradora)',
     description:
       'Devuelve la solicitud completa con fontanero, avería, materiales, cantidades, ' +
       'unidad de medida y existencia actual. Solo consulta: no modifica stock.',
@@ -239,9 +240,7 @@ export class SolicitudesMaterialesController {
     status: HttpStatus.NOT_FOUND,
     description: 'Solicitud no encontrada',
   })
-  obtenerDetalleAdmin(
-    @Param('id', ParseIntPipe) id: number,
-  ): Promise<any> {
+  obtenerDetalleAdmin(@Param('id', ParseIntPipe) id: number): Promise<any> {
     return this.inventarioService.obtenerSolicitudMaterialAdmin(id);
   }
 
@@ -321,7 +320,8 @@ export class SolicitudesMaterialesController {
   rechazarSolicitud(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: AuthenticatedUser,
-    @Body() dto: RechazarSolicitudMaterialDto = new RechazarSolicitudMaterialDto(),
+    @Body()
+    dto: RechazarSolicitudMaterialDto = new RechazarSolicitudMaterialDto(),
   ): Promise<any> {
     return this.inventarioService.rechazarSolicitudMaterialAdmin(
       id,

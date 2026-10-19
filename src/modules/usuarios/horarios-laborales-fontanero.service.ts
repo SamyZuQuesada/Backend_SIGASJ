@@ -123,7 +123,7 @@ export class HorariosLaboralesFontaneroService {
     const partes = partesLaboralesEnAsada(momento);
     const horarios = await this.listarActivosPorFontaneroYDia(
       idFontanero,
-      partes.diaSemana as DiaSemana,
+      partes.diaSemana,
     );
     const instante = partes.segundosDesdeMedianoche;
     return horarios.some((horario) => {

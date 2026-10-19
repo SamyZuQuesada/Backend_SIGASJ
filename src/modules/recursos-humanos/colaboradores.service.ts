@@ -19,6 +19,7 @@ import {
 } from './dto/query-colaboradores.dto';
 import { UpdateColaboradorDto } from './dto/update-colaborador.dto';
 import { Colaborador } from './entities/colaborador.entity';
+import { Puesto } from './entities/puesto.entity';
 
 export type ColaboradoresListado = {
   data: Colaborador[];
@@ -56,11 +57,14 @@ export class ColaboradoresService {
     private readonly colaboradorRepository: Repository<Colaborador>,
     @InjectRepository(Usuario)
     private readonly usuarioRepository: Repository<Usuario>,
+    @InjectRepository(Puesto)
+    private readonly puestoRepository: Repository<Puesto>,
   ) {}
 
   async create(dto: CreateColaboradorDto): Promise<Colaborador> {
     const cedula = normalizarCedula(dto.cedula);
     const usuarioId = dto.usuarioId ?? null;
+    const puesto = await this.obtenerPuestoActivo(dto.puestoId);
 
     if (await this.colaboradorRepository.exists({ where: { cedula } })) {
       throw new ConflictException(
@@ -77,7 +81,8 @@ export class ColaboradoresService {
       apellidos: dto.apellidos.trim(),
       cedula,
       correoElectronico: dto.correoElectronico.trim().toLowerCase(),
-      cargo: dto.cargo.trim(),
+      puestoId: puesto.id,
+      cargo: puesto.nombre,
       activo: true,
       usuarioId,
     });
@@ -210,7 +215,13 @@ export class ColaboradoresService {
     if (dto.correoElectronico !== undefined) {
       colaborador.correoElectronico = dto.correoElectronico;
     }
-    if (dto.cargo !== undefined) colaborador.cargo = dto.cargo;
+    if (dto.puestoId !== undefined) {
+      const puesto = await this.obtenerPuestoActivo(dto.puestoId);
+      colaborador.puestoId = puesto.id;
+      colaborador.cargo = puesto.nombre;
+    } else if (dto.cargo !== undefined) {
+      colaborador.cargo = dto.cargo;
+    }
 
     try {
       await this.colaboradorRepository.save(colaborador);
@@ -251,6 +262,16 @@ export class ColaboradoresService {
     qb.orWhere(
       `REPLACE(c.cedula, '-', '') LIKE :${parametro} ESCAPE :likeEscape`,
     );
+  }
+
+  private async obtenerPuestoActivo(puestoId: number): Promise<Puesto> {
+    const puesto = await this.puestoRepository.findOneBy({ id: puestoId });
+    if (!puesto || !puesto.activo) {
+      throw new BadRequestException(
+        `El puesto con id ${puestoId} no existe o no está activo`,
+      );
+    }
+    return puesto;
   }
 
   private async validarUsuarioDisponible(

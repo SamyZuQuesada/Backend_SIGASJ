@@ -1,6 +1,4 @@
-export {
-  ValidacionHorarioLaboralFontaneroService,
-} from '../usuarios/validacion-horario-laboral-fontanero.service';
+export { ValidacionHorarioLaboralFontaneroService } from '../usuarios/validacion-horario-laboral-fontanero.service';
 export {
   ResultadoHorarioLaboral,
   assertPuedeIniciarAtencionPorHorario,
