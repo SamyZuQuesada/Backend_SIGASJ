@@ -83,6 +83,7 @@
       "ts"
     ],
     "rootDir": "src",
+    "globalSetup": "<rootDir>/../test/jest-global-setup.cjs",
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
