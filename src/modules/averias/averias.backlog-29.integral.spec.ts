@@ -1,3 +1,4 @@
+import { fechaCalendarioEnAsada } from '../../common/time/reloj-asada';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER } from '@nestjs/core';
@@ -30,8 +31,8 @@ import {
 import { AveriasModule } from './averias.module';
 import {
   buildAveriasReporteResumen,
-  toStartOfNextUtcDay,
-  toStartOfUtcDay,
+  toStartOfNextAsadaDay,
+  toStartOfAsadaDay,
   type AveriaEventosHistorial,
   type AveriasHistorialListado,
   type AveriasReporteResumen,
@@ -202,7 +203,8 @@ describe('Backlog 2.9 — historial, reporte y trazabilidad', () => {
 
   it('cruza historial general, filtros, resumen y línea de tiempo con lo persistido', async () => {
     const averia = await crearYAtender();
-    const dia = averia.fechaReporte.toISOString().slice(0, 10);
+    // El filtro por día usa el día de Costa Rica, no el de UTC.
+    const dia = fechaCalendarioEnAsada(averia.fechaReporte);
 
     const listado = (
       await request(app.getHttpServer())
@@ -290,10 +292,10 @@ describe('Backlog 2.9 — historial, reporte y trazabilidad', () => {
       .select('averia.estado', 'estado')
       .addSelect('COUNT(averia.id)', 'cantidad')
       .where('averia.fechaReporte >= :desde', {
-        desde: toStartOfUtcDay(dia),
+        desde: toStartOfAsadaDay(dia),
       })
       .andWhere('averia.fechaReporte < :hasta', {
-        hasta: toStartOfNextUtcDay(dia),
+        hasta: toStartOfNextAsadaDay(dia),
       })
       .groupBy('averia.estado')
       .getRawMany<{ estado: string; cantidad: number | string }>();

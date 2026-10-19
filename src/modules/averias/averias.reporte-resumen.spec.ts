@@ -184,7 +184,8 @@ describe('GET /api/v1/admin/averias/reportes/resumen', () => {
       [EstadoAveria.EN_REVISION, '2026-08-16T15:00:00.000Z', 'AV-2026-0007'],
       [EstadoAveria.RECIBIDA, '2026-08-31T23:30:00.000Z', 'AV-2026-0031'],
       [EstadoAveria.RECIBIDA, '2026-07-20T12:00:00.000Z', 'AV-2026-0701'],
-      [EstadoAveria.RESUELTA, '2026-09-01T00:00:00.000Z', 'AV-2026-0901'],
+      // 01/09 00:00 en Costa Rica: ya es septiembre allá.
+      [EstadoAveria.RESUELTA, '2026-09-01T06:00:00.000Z', 'AV-2026-0901'],
     ];
     for (const [estado, fecha, codigo] of agosto) {
       await persist(estado, fecha, codigo);

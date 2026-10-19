@@ -217,6 +217,14 @@ describe('POST /api/v1/public/averias — registro público', () => {
     expect(result.data.codigoSeguimiento).toBe('AV-2025-0001');
   });
 
+  it('el año del código es el de Costa Rica: 31/12 a las 20:00 allá (01/01 02:00Z) sigue siendo el año anterior', async () => {
+    const result = await service.createPublicReport(
+      payloadMinimo,
+      new Date('2027-01-01T02:00:00.000Z'),
+    );
+    expect(result.data.codigoSeguimiento).toMatch(/^AV-2026-\d{4}$/);
+  });
+
   it('devuelve solo la confirmación mínima', async () => {
     const response = await postAveria(payloadMinimo).expect(201);
     const body = response.body as PublicResponse;
