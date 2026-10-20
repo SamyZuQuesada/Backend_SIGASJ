@@ -1,6 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
+import { JwtModule, JwtService } from '@nestjs/jwt';
+import { PassportModule } from '@nestjs/passport';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
@@ -8,7 +9,7 @@ import { Role } from '../../common/enums/role.enum';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import jwtConfig from '../../config/jwt.config';
 import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
-import { AuthModule } from '../auth/auth.module';
+import { JwtStrategy } from '../auth/strategies/jwt.strategy';
 import { SolicitudesController } from './solicitudes.controller';
 import { SolicitudesService } from './solicitudes.service';
 
@@ -52,10 +53,14 @@ describe('Tarea #338 — Solicitudes aprobadas pendientes', () => {
           isGlobal: true,
           load: [jwtConfig],
         }),
-        AuthModule,
+        PassportModule.register({ defaultStrategy: 'jwt' }),
+        JwtModule.register({
+          secret: 'super_secret_jwt_key_sigasj_2026',
+        }),
       ],
       controllers: [SolicitudesController],
       providers: [
+        JwtStrategy,
         {
           provide: SolicitudesService,
           useValue: { findAprobadasPendientes },

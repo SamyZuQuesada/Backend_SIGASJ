@@ -21,7 +21,13 @@ async function bootstrap() {
 
   // Asegurar existencia de directorios de medios públicos
   const uploadDir = join(process.cwd(), 'uploads');
-  ['galeria', 'comunicados', 'proyectos', 'transparencia'].forEach((sub) => {
+  [
+    'galeria',
+    'comunicados',
+    'proyectos',
+    'transparencia',
+    'formularios-oficiales',
+  ].forEach((sub) => {
     const subDir = join(uploadDir, sub);
     if (!existsSync(subDir)) {
       mkdirSync(subDir, { recursive: true });
