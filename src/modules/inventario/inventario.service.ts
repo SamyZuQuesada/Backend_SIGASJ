@@ -58,6 +58,8 @@ import {
 import { TipoEventoAveria } from '../../common/enums/tipo-evento-averia.enum';
 import { registrarEventoHistorialEnManager } from '../averias/historial-averias.registro';
 import { Averia } from '../averias/entities/averia.entity';
+import { Usuario } from '../usuarios/entities/usuario.entity';
+import { NotificacionesAveriasService } from '../notificaciones/notificaciones-averias.service';
 import { CategoriaMaterial } from './entities/categoria-material.entity';
 import { DocumentoMovimientoInventario } from './entities/documento-movimiento-inventario.entity';
 import { Material } from './entities/material.entity';
@@ -153,6 +155,8 @@ export class InventarioService {
     @Optional()
     @InjectRepository(DetalleReposicionMaterial)
     private readonly detalleReposicionRepository?: Repository<DetalleReposicionMaterial>,
+    @Optional()
+    private readonly notificacionesService?: NotificacionesAveriasService,
   ) {}
 
   /**
@@ -1304,6 +1308,22 @@ export class InventarioService {
               });
             }
 
+            if (this.notificacionesService) {
+              let usuarioResponsable: Usuario | null = null;
+              try {
+                usuarioResponsable = await manager.getRepository(Usuario).findOne({
+                  where: { idUsuario },
+                });
+              } catch {
+                // fallback
+              }
+              await this.notificacionesService.notificarAdministradorasSalidaInventario(
+                movimientoGuardado,
+                usuarioResponsable ?? (user as any),
+                manager,
+              );
+            }
+
             await this.evaluarYGenerarAlertaReposicion(
               materialPersistido ?? material,
               manager,
@@ -1403,6 +1423,13 @@ export class InventarioService {
       });
 
       const guardada = await alertaRepo.save(alerta);
+      if (this.notificacionesService) {
+        await this.notificacionesService.notificarAdministradorasAlertaReposicion(
+          guardada,
+          material,
+          manager,
+        );
+      }
       this.logger.warn(
         `Alerta de reposición generada: Material "${material.nombre}" (ID: ${material.id}), stock ${stockActual} <= mínimo ${stockMinimo}. Alerta ID: ${guardada.id}`,
       );
@@ -3054,6 +3081,22 @@ export class InventarioService {
             });
           }
 
+          if (this.notificacionesService) {
+            let fontaneroUsuario: Usuario | null = null;
+            try {
+              fontaneroUsuario = await manager.getRepository(Usuario).findOne({
+                where: { idUsuario: idFontanero },
+              });
+            } catch {
+              // fallback
+            }
+            await this.notificacionesService.notificarAdministradorasSolicitudMaterialesPendiente(
+              solicitudGuardada,
+              fontaneroUsuario ?? (user as any),
+              manager,
+            );
+          }
+
           return (await solicitudRepo.findOne({
             where: { id: solicitudGuardada.id },
             relations: {
@@ -3386,6 +3429,25 @@ export class InventarioService {
         : null;
 
     await solicitudRepo.save(solicitud);
+
+    if (
+      estadoDestino === EstadoSolicitudMaterial.APROBADA &&
+      this.notificacionesService
+    ) {
+      await this.notificacionesService.notificarFontaneroSolicitudMaterialesAprobada(
+        solicitud,
+        solicitudRepo.manager,
+      );
+    } else if (
+      estadoDestino === EstadoSolicitudMaterial.RECHAZADA &&
+      this.notificacionesService
+    ) {
+      await this.notificacionesService.notificarFontaneroSolicitudMaterialesRechazada(
+        solicitud,
+        solicitud.motivoRechazo,
+        solicitudRepo.manager,
+      );
+    }
 
     const persistida = await solicitudRepo.findOne({
       where: { id: solicitud.id },

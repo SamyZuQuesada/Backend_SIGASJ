@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Averia } from '../averias/entities/averia.entity';
@@ -16,6 +16,7 @@ import {
   type SmsAveriaSender,
 } from './sms-averia.sender';
 
+@Global()
 @Module({
   imports: [
     TypeOrmModule.forFeature([
