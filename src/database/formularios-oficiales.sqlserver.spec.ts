@@ -69,11 +69,15 @@ describe('Validación física de tabla FormularioOficial en SQL Server', () => {
     expect(colMap.get('tipoSolicitudId')?.IS_NULLABLE).toBe('NO');
 
     expect(colMap.get('nombreArchivoOriginal')?.DATA_TYPE).toBe('varchar');
-    expect(colMap.get('nombreArchivoOriginal')?.CHARACTER_MAXIMUM_LENGTH).toBe(255);
+    expect(colMap.get('nombreArchivoOriginal')?.CHARACTER_MAXIMUM_LENGTH).toBe(
+      255,
+    );
     expect(colMap.get('nombreArchivoOriginal')?.IS_NULLABLE).toBe('NO');
 
     expect(colMap.get('nombreArchivoInterno')?.DATA_TYPE).toBe('varchar');
-    expect(colMap.get('nombreArchivoInterno')?.CHARACTER_MAXIMUM_LENGTH).toBe(255);
+    expect(colMap.get('nombreArchivoInterno')?.CHARACTER_MAXIMUM_LENGTH).toBe(
+      255,
+    );
     expect(colMap.get('nombreArchivoInterno')?.IS_NULLABLE).toBe('NO');
 
     expect(colMap.get('mimeType')?.DATA_TYPE).toBe('varchar');
@@ -152,28 +156,54 @@ describe('Validación física de tabla FormularioOficial en SQL Server', () => {
     const tipoId = tipos[0].id;
 
     // Limpiar previo si existiera
-    await dataSource.query(`DELETE FROM FormularioOficial WHERE tipoSolicitudId = @0`, [tipoId]);
+    await dataSource.query(
+      `DELETE FROM FormularioOficial WHERE tipoSolicitudId = @0`,
+      [tipoId],
+    );
 
     // Insertar primer formulario
-    await dataSource.query(`
+    await dataSource.query(
+      `
       INSERT INTO FormularioOficial (
         tipoSolicitudId, nombreArchivoOriginal, nombreArchivoInterno,
         mimeType, tamano, ubicacionArchivo, fechaCarga, createdAt, updatedAt
       ) VALUES (@0, @1, @2, @3, @4, @5, SYSUTCDATETIME(), SYSUTCDATETIME(), SYSUTCDATETIME())
-    `, [tipoId, 'oficial-test.pdf', 'internal-uuid-1.pdf', 'application/pdf', 2048, 'formularios-oficiales/internal-uuid-1.pdf']);
+    `,
+      [
+        tipoId,
+        'oficial-test.pdf',
+        'internal-uuid-1.pdf',
+        'application/pdf',
+        2048,
+        'formularios-oficiales/internal-uuid-1.pdf',
+      ],
+    );
 
     // Intentar duplicado debe fallar por restricción única
     await expect(
-      dataSource.query(`
+      dataSource.query(
+        `
         INSERT INTO FormularioOficial (
           tipoSolicitudId, nombreArchivoOriginal, nombreArchivoInterno,
           mimeType, tamano, ubicacionArchivo, fechaCarga, createdAt, updatedAt
         ) VALUES (@0, @1, @2, @3, @4, @5, SYSUTCDATETIME(), SYSUTCDATETIME(), SYSUTCDATETIME())
-      `, [tipoId, 'otro.pdf', 'internal-uuid-2.pdf', 'application/pdf', 1024, 'formularios-oficiales/internal-uuid-2.pdf']),
+      `,
+        [
+          tipoId,
+          'otro.pdf',
+          'internal-uuid-2.pdf',
+          'application/pdf',
+          1024,
+          'formularios-oficiales/internal-uuid-2.pdf',
+        ],
+      ),
     ).rejects.toThrow();
 
     // Limpiar registro de prueba
-    await dataSource.query(`DELETE FROM FormularioOficial WHERE tipoSolicitudId = @0`, [tipoId]);
+    await dataSource.query(
+      `DELETE FROM FormularioOficial WHERE tipoSolicitudId = @0`,
+      [tipoId],
+    );
   });
 
   it('6. Debe probar rollback (down) y re-ejecución (up) de la migración FormularioOficial', async () => {

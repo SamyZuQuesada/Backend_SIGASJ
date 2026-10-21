@@ -22,10 +22,11 @@ import { MovimientoVacaciones } from './entities/movimiento-vacaciones.entity';
 import { compararFechasIso, esFechaCalendario } from './fecha-permiso';
 import { calcularSaldoVacaciones, SaldoVacaciones } from './saldo-vacaciones';
 
-export type RegistrarMovimientoVacacionesInput = CreateMovimientoVacacionesDto & {
-  signoAjuste?: 1 | -1 | null;
-  registradoPorUsuarioId?: number | null;
-};
+export type RegistrarMovimientoVacacionesInput =
+  CreateMovimientoVacacionesDto & {
+    signoAjuste?: 1 | -1 | null;
+    registradoPorUsuarioId?: number | null;
+  };
 
 export type SaldoVacacionesColaborador = SaldoVacaciones & {
   colaboradorId: number;

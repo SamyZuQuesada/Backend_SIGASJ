@@ -27,7 +27,9 @@ describe('Entidad SolicitudArregloPago', () => {
     expect(detalle.solicitudId).toBe(10);
     expect(detalle.nombre).toBe('Juan Carlos Rodríguez Mora');
     expect(detalle.cedula).toBe('1-1234-0567');
-    expect(detalle.vecinoDe).toBe('San Juan de Desamparados, 200m norte de la plaza');
+    expect(detalle.vecinoDe).toBe(
+      'San Juan de Desamparados, 200m norte de la plaza',
+    );
     expect(detalle.telefono).toBe('8888-1234');
     expect(detalle.numeroCuentaServicio).toBe('CTA-00984');
     expect(detalle.montoPrimaInicial).toBe(30000);

@@ -42,5 +42,3 @@ import { TiposSolicitudService } from './tipos-solicitud.service';
   ],
 })
 export class SolicitudesModule {}
-
-

@@ -1,14 +1,7 @@
-import {
-  MigrationInterface,
-  QueryRunner,
-  Table,
-  TableIndex,
-} from 'typeorm';
+import { MigrationInterface, QueryRunner, Table, TableIndex } from 'typeorm';
 import { TIPOS_SOLICITUD_SEED } from '../../common/enums/tipo-solicitud-slug.enum';
 
-export class CreateTipoSolicitudTable1724686090000
-  implements MigrationInterface
-{
+export class CreateTipoSolicitudTable1724686090000 implements MigrationInterface {
   name = 'CreateTipoSolicitudTable1724686090000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

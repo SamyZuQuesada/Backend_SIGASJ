@@ -164,9 +164,7 @@ export class MovimientoVacaciones {
         );
       }
     } else if (this.signoAjuste != null) {
-      throw new BadRequestException(
-        'signoAjuste solo aplica al tipo AJUSTE',
-      );
+      throw new BadRequestException('signoAjuste solo aplica al tipo AJUSTE');
     }
   }
 }

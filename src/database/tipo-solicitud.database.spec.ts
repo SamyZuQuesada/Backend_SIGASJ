@@ -146,14 +146,24 @@ describe('Pruebas de Base de Datos e Integridad: Migración TipoSolicitud', () =
       await migration.up(mockQueryRunner);
 
       expect(inserts).toHaveLength(6);
-      expect(inserts.some((q) => q.includes(TipoSolicitudSlug.ARREGLO_PAGO))).toBe(true);
-      expect(inserts.some((q) => q.includes(TipoSolicitudSlug.CAMBIO_TITULAR))).toBe(true);
       expect(
-        inserts.some((q) => q.includes(TipoSolicitudSlug.INFRAESTRUCTURA_LINDEROS)),
+        inserts.some((q) => q.includes(TipoSolicitudSlug.ARREGLO_PAGO)),
       ).toBe(true);
-      expect(inserts.some((q) => q.includes(TipoSolicitudSlug.AFILIACION))).toBe(true);
       expect(
-        inserts.some((q) => q.includes(TipoSolicitudSlug.DISPONIBILIDAD_SERVICIOS)),
+        inserts.some((q) => q.includes(TipoSolicitudSlug.CAMBIO_TITULAR)),
+      ).toBe(true);
+      expect(
+        inserts.some((q) =>
+          q.includes(TipoSolicitudSlug.INFRAESTRUCTURA_LINDEROS),
+        ),
+      ).toBe(true);
+      expect(
+        inserts.some((q) => q.includes(TipoSolicitudSlug.AFILIACION)),
+      ).toBe(true);
+      expect(
+        inserts.some((q) =>
+          q.includes(TipoSolicitudSlug.DISPONIBILIDAD_SERVICIOS),
+        ),
       ).toBe(true);
       expect(
         inserts.some((q) => q.includes(TipoSolicitudSlug.SERVICIO_EXISTENTE)),

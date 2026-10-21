@@ -182,7 +182,8 @@ describe('Validación física de tabla SolicitudArregloPago en SQL Server', () =
 
     // IX_SolicitudArregloPago_cedula
     const ixCedula = indices.find(
-      (idx) => idx.COLUMN_NAME === 'cedula' && idx.INDEX_NAME.includes('cedula'),
+      (idx) =>
+        idx.COLUMN_NAME === 'cedula' && idx.INDEX_NAME.includes('cedula'),
     );
     expect(ixCedula).toBeDefined();
 

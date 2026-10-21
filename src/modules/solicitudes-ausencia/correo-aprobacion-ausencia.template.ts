@@ -56,9 +56,7 @@ export const construirHtmlAprobacionAusencia = (
   const periodo = escapeHtml(
     `${formatearFechaCorreo(datos.fechaInicio)} — ${formatearFechaCorreo(datos.fechaFin)}`,
   );
-  const motivo = datos.motivo?.trim()
-    ? escapeHtml(datos.motivo.trim())
-    : null;
+  const motivo = datos.motivo?.trim() ? escapeHtml(datos.motivo.trim()) : null;
   const url = datos.urlMisSolicitudes?.trim() || '';
   const cta = url
     ? `<a href="${escapeHtml(url)}" style="display:inline-block;background:#1d6fd8;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:14px 28px;border-radius:10px;">Ver mis solicitudes</a>`

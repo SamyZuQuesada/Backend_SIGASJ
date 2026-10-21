@@ -120,18 +120,15 @@ describe('POST /api/v1/rrhh/colaboradores', () => {
   });
 
   describe('Datos inválidos', () => {
-    it.each([
-      'nombre',
-      'apellidos',
-      'cedula',
-      'correoElectronico',
-      'puestoId',
-    ])('rechaza si falta %s (400)', async (campo) => {
-      const data = body();
-      delete (data as Record<string, unknown>)[campo];
-      const res = await post(data);
-      expect(res.status).toBe(400);
-    });
+    it.each(['nombre', 'apellidos', 'cedula', 'correoElectronico', 'puestoId'])(
+      'rechaza si falta %s (400)',
+      async (campo) => {
+        const data = body();
+        delete (data as Record<string, unknown>)[campo];
+        const res = await post(data);
+        expect(res.status).toBe(400);
+      },
+    );
 
     it('rechaza puesto inexistente (400)', async () => {
       const res = await post(body({ puestoId: 99999 }));

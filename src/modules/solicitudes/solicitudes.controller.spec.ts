@@ -46,7 +46,9 @@ describe('SolicitudesController', () => {
               solicitudes: [mockSolicitud],
               total: 1,
             }),
-            crearSolicitudArregloPago: jest.fn().mockResolvedValue(mockSolicitud),
+            crearSolicitudArregloPago: jest
+              .fn()
+              .mockResolvedValue(mockSolicitud),
           },
         },
       ],

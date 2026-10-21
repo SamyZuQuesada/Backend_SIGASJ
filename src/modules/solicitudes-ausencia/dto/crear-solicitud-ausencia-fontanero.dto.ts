@@ -28,7 +28,10 @@ const trimOptional = ({ value }: TransformFnParams): unknown => {
 };
 
 export class CrearSolicitudAusenciaFontaneroDto {
-  @ApiProperty({ enum: TipoSolicitudAusencia, example: TipoSolicitudAusencia.PERMISO })
+  @ApiProperty({
+    enum: TipoSolicitudAusencia,
+    example: TipoSolicitudAusencia.PERMISO,
+  })
   @Transform(trimUpper)
   @IsEnum(TipoSolicitudAusencia)
   tipo!: TipoSolicitudAusencia;

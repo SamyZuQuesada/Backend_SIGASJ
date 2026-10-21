@@ -214,7 +214,9 @@ describe('SolicitudesService', () => {
 
       const resultado = await service.crearSolicitudArregloPago(dtoValido);
 
-      expect(findBySlugTipo).toHaveBeenCalledWith(TipoSolicitudSlug.ARREGLO_PAGO);
+      expect(findBySlugTipo).toHaveBeenCalledWith(
+        TipoSolicitudSlug.ARREGLO_PAGO,
+      );
       expect(createSolicitud).toHaveBeenCalled();
       expect(saveSolicitud).toHaveBeenCalled();
       expect(createArregloPago).toHaveBeenCalledWith(

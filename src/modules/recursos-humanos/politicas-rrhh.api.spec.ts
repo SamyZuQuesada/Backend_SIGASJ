@@ -150,10 +150,7 @@ describe('Políticas RRHH ASADA', () => {
 
     await request(app.getHttpServer())
       .get(`${VAC}/mias/balance`)
-      .set(
-        'Authorization',
-        `Bearer ${signAsUsuario(Role.FONTANERO, 999999)}`,
-      )
+      .set('Authorization', `Bearer ${signAsUsuario(Role.FONTANERO, 999999)}`)
       .expect(403);
   });
 

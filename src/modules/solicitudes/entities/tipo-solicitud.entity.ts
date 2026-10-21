@@ -77,7 +77,6 @@ export class TipoSolicitud {
   @OneToOne(() => FormularioOficial, (formulario) => formulario.tipoSolicitud)
   formularioOficial?: FormularioOficial;
 
-
   @ApiProperty({
     description: 'Fecha y hora de registro del tipo de solicitud en el sistema',
   })

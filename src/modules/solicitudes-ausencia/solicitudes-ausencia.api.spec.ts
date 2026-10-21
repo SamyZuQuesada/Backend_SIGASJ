@@ -158,7 +158,9 @@ describe('SolicitudesAusencia (épica 6.5)', () => {
     correlacionRepo = moduleFixture.get(
       getRepositoryToken(CorrelacionSolicitudAusencia),
     );
-    notificacionRepo = moduleFixture.get(getRepositoryToken(NotificacionAveria));
+    notificacionRepo = moduleFixture.get(
+      getRepositoryToken(NotificacionAveria),
+    );
   });
 
   afterAll(async () => {
@@ -915,7 +917,9 @@ describe('SolicitudesAusencia (épica 6.5)', () => {
       );
       expect(filas[0]?.leida).toBe(false);
       expect(
-        filas.some((row) => row.idUsuarioDestinatario === adminInactiva.idUsuario),
+        filas.some(
+          (row) => row.idUsuarioDestinatario === adminInactiva.idUsuario,
+        ),
       ).toBe(false);
     });
 

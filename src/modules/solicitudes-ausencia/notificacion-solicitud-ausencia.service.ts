@@ -24,7 +24,9 @@ import { SolicitudAusencia } from './entities/solicitud-ausencia.entity';
  */
 @Injectable()
 export class NotificacionSolicitudAusenciaService {
-  private readonly logger = new Logger(NotificacionSolicitudAusenciaService.name);
+  private readonly logger = new Logger(
+    NotificacionSolicitudAusenciaService.name,
+  );
   private transporter: Transporter | null = null;
   private transporterReady: Promise<Transporter | null> | null = null;
 

@@ -79,7 +79,10 @@ export class FontaneroSolicitudesAusenciaController {
     description: 'Solicitud creada en PENDIENTE.',
     type: SolicitudAusenciaFontaneroResponse,
   })
-  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Datos inválidos.' })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Datos inválidos.',
+  })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Sin JWT.' })
   @ApiResponse({
     status: HttpStatus.FORBIDDEN,

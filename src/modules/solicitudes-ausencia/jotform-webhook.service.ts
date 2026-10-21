@@ -132,7 +132,7 @@ export class JotformWebhookService {
           id: solicitud.id,
           estado: solicitud.estado,
           creada,
-          jotformSubmissionId: solicitud.jotformSubmissionId!,
+          jotformSubmissionId: solicitud.jotformSubmissionId,
           solicitud,
         };
       },

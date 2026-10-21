@@ -119,7 +119,9 @@ describe('API POST /solicitudes/arreglo-pago', () => {
     expect(messages.some((m: string) => m.includes('vecinoDe'))).toBe(true);
     expect(messages.some((m: string) => m.includes('teléfono'))).toBe(true);
     expect(messages.some((m: string) => m.includes('cuenta'))).toBe(true);
-    expect(messages.some((m: string) => m.includes('prima inicial'))).toBe(true);
+    expect(messages.some((m: string) => m.includes('prima inicial'))).toBe(
+      true,
+    );
     expect(messages.some((m: string) => m.includes('plazo seleccionado'))).toBe(
       true,
     );

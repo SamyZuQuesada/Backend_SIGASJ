@@ -23,7 +23,7 @@ describe('correo-aprobacion-ausencia.template', () => {
     const text = construirTextoAprobacionAusencia(datos);
     expect(text).toContain('Hola Fontanero Demo,');
     expect(text).toContain('20/10/2026 — 21/10/2026');
-    expect(text).toContain(datos.urlMisSolicitudes!);
+    expect(text).toContain(datos.urlMisSolicitudes);
   });
 
   it('html incluye marca, estado y CTA', () => {
@@ -31,7 +31,7 @@ describe('correo-aprobacion-ausencia.template', () => {
     expect(html).toContain('SIGASJ');
     expect(html).toContain('Aprobada');
     expect(html).toContain('Ver mis solicitudes');
-    expect(html).toContain(datos.urlMisSolicitudes!);
+    expect(html).toContain(datos.urlMisSolicitudes);
     expect(html).toContain('20/10/2026');
     expect(html).not.toContain('<script');
   });
