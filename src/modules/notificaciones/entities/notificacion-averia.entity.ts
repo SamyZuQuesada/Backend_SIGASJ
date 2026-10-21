@@ -22,6 +22,26 @@ import { Usuario } from '../../usuarios/entities/usuario.entity';
   ['idUsuarioDestinatario', 'idSolicitudAusencia', 'tipo'],
   { unique: true, where: '"idSolicitudAusencia" IS NOT NULL' },
 )
+@Index(
+  'UQ_NotificacionAveria_destinatario_solicitud_materiales_tipo',
+  ['idUsuarioDestinatario', 'idSolicitudMateriales', 'tipo'],
+  { unique: true, where: '"idSolicitudMateriales" IS NOT NULL' },
+)
+@Index(
+  'UQ_NotificacionAveria_destinatario_salida_inventario_tipo',
+  ['idUsuarioDestinatario', 'idSalidaInventario', 'tipo'],
+  { unique: true, where: '"idSalidaInventario" IS NOT NULL' },
+)
+@Index(
+  'UQ_NotificacionAveria_destinatario_reposicion_tipo',
+  ['idUsuarioDestinatario', 'idReposicion', 'tipo'],
+  { unique: true, where: '"idReposicion" IS NOT NULL' },
+)
+@Index('IX_NotificacionAveria_destinatario_leida_fecha', [
+  'idUsuarioDestinatario',
+  'leida',
+  'fechaCreacion',
+])
 export class NotificacionAveria {
   @PrimaryGeneratedColumn()
   id: number;
@@ -58,6 +78,18 @@ export class NotificacionAveria {
   @Index('IX_NotificacionAveria_idSolicitudAusencia')
   @Column({ type: 'int', nullable: true })
   idSolicitudAusencia: number | null;
+
+  @Index('IX_NotificacionAveria_idSolicitudMateriales')
+  @Column({ type: 'int', nullable: true })
+  idSolicitudMateriales: number | null;
+
+  @Index('IX_NotificacionAveria_idSalidaInventario')
+  @Column({ type: 'int', nullable: true })
+  idSalidaInventario: number | null;
+
+  @Index('IX_NotificacionAveria_idReposicion')
+  @Column({ type: 'int', nullable: true })
+  idReposicion: number | null;
 
   @Column({ type: 'varchar', length: 80 })
   tipo: TipoNotificacionAveria;

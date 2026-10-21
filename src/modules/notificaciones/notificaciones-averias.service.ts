@@ -25,6 +25,9 @@ export type NotificacionAveriaItem = {
   id: number;
   idAveria: number | null;
   idSolicitudAusencia: number | null;
+  idSolicitudMateriales: number | null;
+  idSalidaInventario: number | null;
+  idReposicion: number | null;
   tipo: TipoNotificacionAveria;
   titulo: string;
   mensaje: string;
@@ -46,6 +49,9 @@ const toItem = (row: NotificacionAveria): NotificacionAveriaItem => ({
   id: row.id,
   idAveria: row.idAveria ?? null,
   idSolicitudAusencia: row.idSolicitudAusencia ?? null,
+  idSolicitudMateriales: row.idSolicitudMateriales ?? null,
+  idSalidaInventario: row.idSalidaInventario ?? null,
+  idReposicion: row.idReposicion ?? null,
   tipo: row.tipo,
   titulo: row.titulo,
   mensaje: row.mensaje,
@@ -63,10 +69,13 @@ function resolveDestinatarioId(user: AuthenticatedUser): number {
   return id;
 }
 
-type RegistrarNotificacionInput = {
+export type RegistrarNotificacionInput = {
   idUsuarioDestinatario: number;
   idAveria?: number | null;
   idSolicitudAusencia?: number | null;
+  idSolicitudMateriales?: number | null;
+  idSalidaInventario?: number | null;
+  idReposicion?: number | null;
   tipo: TipoNotificacionAveria;
   titulo: string;
   mensaje: string;
@@ -85,6 +94,7 @@ export class NotificacionesAveriasService {
 
   async registrarSiNoExiste(
     input: RegistrarNotificacionInput,
+    manager?: EntityManager,
   ): Promise<NotificacionAveria | null> {
     const idAveria =
       input.idAveria != null && Number.isInteger(input.idAveria)
@@ -95,38 +105,66 @@ export class NotificacionesAveriasService {
       Number.isInteger(input.idSolicitudAusencia)
         ? input.idSolicitudAusencia
         : null;
+    const idSolicitudMateriales =
+      input.idSolicitudMateriales != null &&
+      Number.isInteger(input.idSolicitudMateriales)
+        ? input.idSolicitudMateriales
+        : null;
+    const idSalidaInventario =
+      input.idSalidaInventario != null &&
+      Number.isInteger(input.idSalidaInventario)
+        ? input.idSalidaInventario
+        : null;
+    const idReposicion =
+      input.idReposicion != null && Number.isInteger(input.idReposicion)
+        ? input.idReposicion
+        : null;
 
-    if (
-      (idAveria == null && idSolicitudAusencia == null) ||
-      (idAveria != null && idSolicitudAusencia != null)
-    ) {
+    const refs = [
+      idAveria,
+      idSolicitudAusencia,
+      idSolicitudMateriales,
+      idSalidaInventario,
+      idReposicion,
+    ].filter((r) => r != null);
+
+    if (refs.length !== 1) {
       this.logger.warn(
-        'Notificación omitida: se requiere exactamente una referencia (avería o solicitud).',
+        'Notificación omitida: se requiere exactamente una referencia principal.',
       );
       return null;
     }
 
-    const usuario = await this.usuarioRepository.findOne({
+    const userRepo =
+      manager && typeof manager.getRepository === 'function'
+        ? manager.getRepository(Usuario)
+        : this.usuarioRepository;
+    const usuario = await userRepo.findOne({
       where: { idUsuario: input.idUsuarioDestinatario },
     });
     if (!usuario || !usuario.activo) {
       return null;
     }
 
-    const where =
-      idAveria != null
-        ? {
-            idUsuarioDestinatario: input.idUsuarioDestinatario,
-            idAveria,
-            tipo: input.tipo,
-          }
-        : {
-            idUsuarioDestinatario: input.idUsuarioDestinatario,
-            idSolicitudAusencia: idSolicitudAusencia!,
-            tipo: input.tipo,
-          };
+    const where: Record<string, unknown> = {
+      idUsuarioDestinatario: input.idUsuarioDestinatario,
+      tipo: input.tipo,
+    };
+    if (idAveria != null) where.idAveria = idAveria;
+    if (idSolicitudAusencia != null)
+      where.idSolicitudAusencia = idSolicitudAusencia;
+    if (idSolicitudMateriales != null)
+      where.idSolicitudMateriales = idSolicitudMateriales;
+    if (idSalidaInventario != null)
+      where.idSalidaInventario = idSalidaInventario;
+    if (idReposicion != null) where.idReposicion = idReposicion;
 
-    const existente = await this.notificacionRepository.findOne({ where });
+    const notifRepo =
+      manager && typeof manager.getRepository === 'function'
+        ? manager.getRepository(NotificacionAveria)
+        : this.notificacionRepository;
+
+    const existente = await notifRepo.findOne({ where: where as any });
     if (existente) {
       return existente;
     }
@@ -135,13 +173,16 @@ export class NotificacionesAveriasService {
       ...input,
       idAveria,
       idSolicitudAusencia,
+      idSolicitudMateriales,
+      idSalidaInventario,
+      idReposicion,
     };
 
     try {
-      return await this.insertarNotificacion(payload);
+      return await this.insertarNotificacion(payload, manager);
     } catch (error) {
       if (isUniqueViolation(error)) {
-        return this.notificacionRepository.findOne({ where });
+        return notifRepo.findOne({ where: where as any });
       }
       throw error;
     }
@@ -162,17 +203,38 @@ export class NotificacionesAveriasService {
 
   private async insertarNotificacion(
     input: RegistrarNotificacionInput,
+    externalManager?: EntityManager,
   ): Promise<NotificacionAveria> {
     const data = {
       idUsuarioDestinatario: input.idUsuarioDestinatario,
       idAveria: input.idAveria ?? null,
       idSolicitudAusencia: input.idSolicitudAusencia ?? null,
+      idSolicitudMateriales: input.idSolicitudMateriales ?? null,
+      idSalidaInventario: input.idSalidaInventario ?? null,
+      idReposicion: input.idReposicion ?? null,
       tipo: input.tipo,
       titulo: input.titulo,
       mensaje: input.mensaje,
       leida: false,
       fechaLectura: null,
     };
+
+    if (externalManager && typeof externalManager.getRepository === 'function') {
+      const notifRepo = externalManager.getRepository(NotificacionAveria);
+      const created = notifRepo.create(data);
+      const saved = await notifRepo.save(created);
+      if (input.idAveria != null) {
+        await registrarEventoHistorialEnManager(externalManager, {
+          idAveria: input.idAveria,
+          tipoEvento: TipoEventoAveria.NOTIFICACION,
+          descripcion: `Notificación interna registrada: ${input.titulo}. Resultado: registrada.`,
+          referenciaTipo: 'NotificacionAveria',
+          referenciaId: saved.id,
+        });
+      }
+      return saved;
+    }
+
     const manager = this.managerTransaccional();
     if (!manager) {
       return this.notificacionRepository.save(
@@ -291,6 +353,151 @@ export class NotificacionesAveriasService {
         titulo,
         mensaje,
       });
+    }
+  }
+
+  async notificarAdministradorasSolicitudMaterialesPendiente(
+    solicitud: { id: number },
+    fontanero?: { nombre?: string | null } | null,
+    manager?: EntityManager,
+  ): Promise<void> {
+    const userRepo =
+      manager && typeof manager.getRepository === 'function'
+        ? manager.getRepository(Usuario)
+        : this.usuarioRepository;
+    const administradoras = await userRepo.find({
+      where: { activo: true, rol: { nombre: Role.ADMINISTRADORA } },
+      relations: { rol: true },
+    });
+
+    const nombre = fontanero?.nombre ? fontanero.nombre.trim() : '';
+    const mensaje = nombre
+      ? `El fontanero ${nombre} registró una solicitud de materiales.`
+      : 'Un fontanero registró una solicitud de materiales.';
+
+    for (const admin of administradoras) {
+      await this.registrarSiNoExiste(
+        {
+          idUsuarioDestinatario: admin.idUsuario,
+          idSolicitudMateriales: solicitud.id,
+          tipo: TipoNotificacionAveria.SOLICITUD_MATERIALES_PENDIENTE_ADMINISTRADORA,
+          titulo: 'Nueva solicitud de materiales',
+          mensaje,
+        },
+        manager,
+      );
+    }
+  }
+
+  async notificarFontaneroSolicitudMaterialesAprobada(
+    solicitud: { id: number; codigo?: string | null; idFontanero: number },
+    manager?: EntityManager,
+  ): Promise<void> {
+    const codigo =
+      solicitud.codigo?.trim() ||
+      `SM-${String(solicitud.id).padStart(4, '0')}`;
+    const titulo = 'Solicitud de materiales aprobada';
+    const mensaje = `Su solicitud de materiales ${codigo} fue aprobada.`;
+
+    await this.registrarSiNoExiste(
+      {
+        idUsuarioDestinatario: solicitud.idFontanero,
+        idSolicitudMateriales: solicitud.id,
+        tipo: TipoNotificacionAveria.SOLICITUD_MATERIALES_APROBADA_FONTANERO,
+        titulo,
+        mensaje,
+      },
+      manager,
+    );
+  }
+
+  async notificarFontaneroSolicitudMaterialesRechazada(
+    solicitud: { id: number; codigo?: string | null; idFontanero: number },
+    motivoRechazo?: string | null,
+    manager?: EntityManager,
+  ): Promise<void> {
+    const codigo =
+      solicitud.codigo?.trim() ||
+      `SM-${String(solicitud.id).padStart(4, '0')}`;
+    const titulo = 'Solicitud de materiales rechazada';
+    const motivoTexto = motivoRechazo?.trim()
+      ? ` Motivo: ${motivoRechazo.trim()}.`
+      : '';
+    const mensaje = `Su solicitud de materiales ${codigo} fue rechazada.${motivoTexto}`;
+
+    await this.registrarSiNoExiste(
+      {
+        idUsuarioDestinatario: solicitud.idFontanero,
+        idSolicitudMateriales: solicitud.id,
+        tipo: TipoNotificacionAveria.SOLICITUD_MATERIALES_RECHAZADA_FONTANERO,
+        titulo,
+        mensaje,
+      },
+      manager,
+    );
+  }
+
+  async notificarAdministradorasSalidaInventario(
+    movimiento: { id: number },
+    usuario?: { nombre?: string | null } | null,
+    manager?: EntityManager,
+  ): Promise<void> {
+    const userRepo =
+      manager && typeof manager.getRepository === 'function'
+        ? manager.getRepository(Usuario)
+        : this.usuarioRepository;
+    const administradoras = await userRepo.find({
+      where: { activo: true, rol: { nombre: Role.ADMINISTRADORA } },
+      relations: { rol: true },
+    });
+
+    const nombre = usuario?.nombre ? usuario.nombre.trim() : '';
+    const mensaje = nombre
+      ? `El fontanero ${nombre} registró una salida de materiales.`
+      : 'El fontanero registró una salida de materiales.';
+
+    for (const admin of administradoras) {
+      await this.registrarSiNoExiste(
+        {
+          idUsuarioDestinatario: admin.idUsuario,
+          idSalidaInventario: movimiento.id,
+          tipo: TipoNotificacionAveria.SALIDA_INVENTARIO_REGISTRADA_ADMINISTRADORA,
+          titulo: 'Nueva salida de inventario',
+          mensaje,
+        },
+        manager,
+      );
+    }
+  }
+
+  async notificarAdministradorasAlertaReposicion(
+    alerta: { id: number },
+    material: { nombre: string },
+    manager?: EntityManager,
+  ): Promise<void> {
+    const userRepo =
+      manager && typeof manager.getRepository === 'function'
+        ? manager.getRepository(Usuario)
+        : this.usuarioRepository;
+    const administradoras = await userRepo.find({
+      where: { activo: true, rol: { nombre: Role.ADMINISTRADORA } },
+      relations: { rol: true },
+    });
+
+    const nombreMaterial = material.nombre ? material.nombre.trim() : '';
+    const mensaje = `El material ${nombreMaterial} alcanzó el nivel mínimo de existencias.`;
+
+    for (const admin of administradoras) {
+      await this.registrarSiNoExiste(
+        {
+          idUsuarioDestinatario: admin.idUsuario,
+          idReposicion: alerta.id,
+          tipo: TipoNotificacionAveria.ALERTA_REPOSICION_ADMINISTRADORA,
+          titulo: 'Alerta de reposición',
+          mensaje,
+        },
+        manager,
+      );
     }
   }
 
