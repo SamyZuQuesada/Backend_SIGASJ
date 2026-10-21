@@ -6,9 +6,7 @@ import {
   TableIndex,
 } from 'typeorm';
 
-export class CreateFormularioOficialTable1724686120000
-  implements MigrationInterface
-{
+export class CreateFormularioOficialTable1724686120000 implements MigrationInterface {
   name = 'CreateFormularioOficialTable1724686120000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

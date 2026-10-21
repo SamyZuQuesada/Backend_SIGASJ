@@ -21,7 +21,8 @@ import {
 export class CreateSolicitudArregloPagoDto {
   @ApiProperty({
     example: 'Juan Carlos Rodríguez Mora',
-    description: 'Nombre completo de la persona solicitante titular o usuaria del servicio',
+    description:
+      'Nombre completo de la persona solicitante titular o usuaria del servicio',
     maxLength: 150,
   })
   @IsNotEmpty({ message: 'El nombre es obligatorio' })
@@ -41,17 +42,23 @@ export class CreateSolicitudArregloPagoDto {
 
   @ApiProperty({
     example: 'San Juan de Desamparados, 200m norte de la plaza',
-    description: 'Lugar de residencia oficial según el formulario ("Vecino de")',
+    description:
+      'Lugar de residencia oficial según el formulario ("Vecino de")',
     maxLength: 200,
   })
   @IsNotEmpty({ message: 'El lugar de residencia (vecinoDe) es obligatorio' })
-  @IsString({ message: 'El lugar de residencia (vecinoDe) debe ser una cadena de texto' })
-  @MaxLength(200, { message: 'El lugar de residencia no puede exceder 200 caracteres' })
+  @IsString({
+    message: 'El lugar de residencia (vecinoDe) debe ser una cadena de texto',
+  })
+  @MaxLength(200, {
+    message: 'El lugar de residencia no puede exceder 200 caracteres',
+  })
   vecinoDe: string;
 
   @ApiProperty({
     example: '8888-1234',
-    description: 'Número de teléfono de contacto para notificaciones del trámite',
+    description:
+      'Número de teléfono de contacto para notificaciones del trámite',
     maxLength: 30,
   })
   @IsNotEmpty({ message: 'El teléfono es obligatorio' })
@@ -61,22 +68,31 @@ export class CreateSolicitudArregloPagoDto {
 
   @ApiProperty({
     example: 'CTA-00984',
-    description: 'Número de cuenta, contrato o NIS del servicio de agua potable ante la ASADA',
+    description:
+      'Número de cuenta, contrato o NIS del servicio de agua potable ante la ASADA',
     maxLength: 50,
   })
   @IsNotEmpty({ message: 'El número de cuenta del servicio es obligatorio' })
-  @IsString({ message: 'El número de cuenta del servicio debe ser una cadena de texto' })
-  @MaxLength(50, { message: 'El número de cuenta no puede exceder 50 caracteres' })
+  @IsString({
+    message: 'El número de cuenta del servicio debe ser una cadena de texto',
+  })
+  @MaxLength(50, {
+    message: 'El número de cuenta no puede exceder 50 caracteres',
+  })
   numeroCuentaServicio: string;
 
   @ApiProperty({
     example: 25000,
-    description: 'Monto en colones ofrecido o cancelado como prima inicial (no puede ser negativo)',
+    description:
+      'Monto en colones ofrecido o cancelado como prima inicial (no puede ser negativo)',
     minimum: 0,
   })
   @IsNotEmpty({ message: 'El monto de la prima inicial es obligatorio' })
   @Type(() => Number)
-  @IsNumber({}, { message: 'El monto de la prima inicial debe ser un número válido' })
+  @IsNumber(
+    {},
+    { message: 'El monto de la prima inicial debe ser un número válido' },
+  )
   @Min(0, { message: 'El monto de la prima inicial no puede ser negativo' })
   montoPrimaInicial: number;
 

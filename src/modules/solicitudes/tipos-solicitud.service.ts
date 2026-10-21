@@ -82,7 +82,10 @@ export class TiposSolicitudService {
   /**
    * Activa o inactiva un tipo de solicitud sin afectar ni eliminar registros históricos.
    */
-  async cambiarEstadoActivo(id: number, activo: boolean): Promise<TipoSolicitud> {
+  async cambiarEstadoActivo(
+    id: number,
+    activo: boolean,
+  ): Promise<TipoSolicitud> {
     const tipo = await this.findById(id);
     tipo.activo = activo;
     return this.tipoSolicitudRepository.save(tipo);

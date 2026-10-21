@@ -87,7 +87,9 @@ export class FormulariosOficialesService {
   /**
    * Valida rigurosamente que el archivo subido sea un documento PDF auténtico y seguro.
    */
-  validarArchivoPdf(file: UploadedPdfFile | undefined): asserts file is UploadedPdfFile {
+  validarArchivoPdf(
+    file: UploadedPdfFile | undefined,
+  ): asserts file is UploadedPdfFile {
     if (!file?.buffer || file.buffer.length === 0) {
       throw new BadRequestException('Debe adjuntar un archivo PDF no vacío.');
     }

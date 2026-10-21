@@ -14,6 +14,7 @@ import { Averia } from './entities/averia.entity';
 import { HistorialAveria } from './entities/historial-averia.entity';
 import { ObservacionAveria } from './entities/observacion-averia.entity';
 import { HistorialAveriasService } from './historial-averias.service';
+import { NotificacionCorreoAveriaService } from './notificacion-correo-averia.service';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { HistorialAveriasService } from './historial-averias.service';
     ConsultaCedulaService,
     HistorialAveriasService,
     ValidacionHorarioLaboralFontaneroService,
+    NotificacionCorreoAveriaService,
   ],
   exports: [TypeOrmModule, AveriasService, HistorialAveriasService],
 })

@@ -139,7 +139,9 @@ describe('QA Vacaciones — checklist completo (6.3)', () => {
     it('parte de un saldo en cero sin movimientos', async () => {
       expect(await balance(juan.id)).toMatchObject({
         totalMovimientos: 0,
-        diasAcumulados: 0,        diasAjusteNeto: 0,        diasDisfrutados: 0,
+        diasAcumulados: 0,
+        diasAjusteNeto: 0,
+        diasDisfrutados: 0,
         diasDisponibles: 0,
       });
     });
@@ -235,7 +237,9 @@ describe('QA Vacaciones — checklist completo (6.3)', () => {
       expect(res).toEqual({
         colaboradorId: juan.id,
         totalMovimientos: 4,
-        diasAcumulados: 20,        diasAjusteNeto: 0,        diasDisfrutados: 8,
+        diasAcumulados: 20,
+        diasAjusteNeto: 0,
+        diasDisfrutados: 8,
         diasDisponibles: 12,
         colaborador: {
           id: juan.id,
@@ -268,7 +272,9 @@ describe('QA Vacaciones — checklist completo (6.3)', () => {
       expect(saldo).toEqual({
         colaboradorId: juan.id,
         totalMovimientos: 4,
-        diasAcumulados: 20,        diasAjusteNeto: 0,        diasDisfrutados: 8,
+        diasAcumulados: 20,
+        diasAjusteNeto: 0,
+        diasDisfrutados: 8,
         diasDisponibles: 12,
       });
     });

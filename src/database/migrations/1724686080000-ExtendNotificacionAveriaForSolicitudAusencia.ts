@@ -10,9 +10,7 @@ import {
  * Permite notificaciones de campana por SolicitudAusencia (además de Averia).
  * Exactamente una referencia: idAveria XOR idSolicitudAusencia.
  */
-export class ExtendNotificacionAveriaForSolicitudAusencia1724686080000
-  implements MigrationInterface
-{
+export class ExtendNotificacionAveriaForSolicitudAusencia1724686080000 implements MigrationInterface {
   name = 'ExtendNotificacionAveriaForSolicitudAusencia1724686080000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

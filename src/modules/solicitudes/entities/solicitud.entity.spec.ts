@@ -106,7 +106,9 @@ describe('Solicitud Entity (Encabezado central)', () => {
     solicitud4.detalleAfiliacion = { tipoAbonado: 'DOMICILIAR' };
 
     const solicitud5 = new Solicitud();
-    solicitud5.detalleDisponibilidadServicios = { usoPropiedad: 'HABITACIONAL' };
+    solicitud5.detalleDisponibilidadServicios = {
+      usoPropiedad: 'HABITACIONAL',
+    };
 
     const solicitud6 = new Solicitud();
     solicitud6.detalleServicioExistente = { numeroNIS: '987654' };

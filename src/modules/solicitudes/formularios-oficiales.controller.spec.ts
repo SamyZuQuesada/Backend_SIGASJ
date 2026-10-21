@@ -136,7 +136,8 @@ describe('FormulariosOficialesController', () => {
       );
       expect(setMock).toHaveBeenCalledWith({
         'Content-Type': 'application/pdf',
-        'Content-Disposition': 'attachment; filename="solicitud-arreglo-pago.pdf"',
+        'Content-Disposition':
+          'attachment; filename="solicitud-arreglo-pago.pdf"',
         'Cache-Control': 'no-cache',
       });
     });

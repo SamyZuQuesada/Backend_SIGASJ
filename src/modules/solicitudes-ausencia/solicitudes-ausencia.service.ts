@@ -158,7 +158,10 @@ export class SolicitudesAusenciaService {
       );
 
     if (creada) {
-      await this.avisarAdministradorasSolicitudPendiente(solicitud, colaborador);
+      await this.avisarAdministradorasSolicitudPendiente(
+        solicitud,
+        colaborador,
+      );
     }
 
     return toSolicitudAusenciaFontaneroResponse(solicitud);
@@ -229,7 +232,8 @@ export class SolicitudesAusenciaService {
         fechaInicio: input.fechaInicio,
         fechaFin: input.fechaFin,
         motivo: input.motivo,
-        correoNotificacion: input.correoNotificacion?.trim().toLowerCase() || null,
+        correoNotificacion:
+          input.correoNotificacion?.trim().toLowerCase() || null,
         observaciones: null,
         estado: EstadoSolicitudAusencia.PENDIENTE,
         jotformSubmissionId: input.jotformSubmissionId,

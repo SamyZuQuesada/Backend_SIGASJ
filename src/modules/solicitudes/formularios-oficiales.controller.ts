@@ -162,7 +162,8 @@ export class FormulariosOficialesController {
 
   @Get('tipos/:slug/formulario-oficial')
   @ApiOperation({
-    summary: 'Alias de descarga de PDF oficial bajo ruta /tipos/:slug (Público)',
+    summary:
+      'Alias de descarga de PDF oficial bajo ruta /tipos/:slug (Público)',
   })
   async descargarFormularioPublicoAlias(
     @Param('slug') slug: string,

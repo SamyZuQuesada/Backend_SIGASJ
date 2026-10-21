@@ -144,7 +144,9 @@ describe('GET /api/v1/rrhh/vacaciones (balance e historial)', () => {
       expect(res).toEqual({
         colaboradorId: carlos.id,
         totalMovimientos: 4,
-        diasAcumulados: 20,        diasAjusteNeto: 0,        diasDisfrutados: 8,
+        diasAcumulados: 20,
+        diasAjusteNeto: 0,
+        diasDisfrutados: 8,
         diasDisponibles: 12,
         colaborador: {
           id: carlos.id,
@@ -172,7 +174,9 @@ describe('GET /api/v1/rrhh/vacaciones (balance e historial)', () => {
       const res = await balance(sinMovimientos.id);
       expect(res).toMatchObject({
         totalMovimientos: 0,
-        diasAcumulados: 0,        diasAjusteNeto: 0,        diasDisfrutados: 0,
+        diasAcumulados: 0,
+        diasAjusteNeto: 0,
+        diasDisfrutados: 0,
         diasDisponibles: 0,
       });
     });

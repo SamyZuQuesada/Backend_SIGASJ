@@ -23,7 +23,9 @@ import { SolicitudArregloPago } from './solicitud-arreglo-pago.entity';
  * respectivas entidades de detalle.
  */
 @Entity('Solicitud')
-@Index('UQ_Solicitud_codigoSeguimiento', ['codigoSeguimiento'], { unique: true })
+@Index('UQ_Solicitud_codigoSeguimiento', ['codigoSeguimiento'], {
+  unique: true,
+})
 @Index('IX_Solicitud_tipoSolicitudId', ['tipoSolicitudId'])
 @Index('IX_Solicitud_estado', ['estado'])
 @Index('IX_Solicitud_fechaIngreso', ['fechaIngreso'])
@@ -37,7 +39,8 @@ export class Solicitud {
 
   @ApiProperty({
     example: 1,
-    description: 'Identificador del tipo de trámite oficial al que pertenece la solicitud',
+    description:
+      'Identificador del tipo de trámite oficial al que pertenece la solicitud',
   })
   @Column({ type: 'int' })
   tipoSolicitudId: number;
@@ -76,7 +79,8 @@ export class Solicitud {
 
   @ApiProperty({
     example: '2026-10-20T10:30:00.000Z',
-    description: 'Fecha y hora oficial en que el ciudadano ingresó la solicitud',
+    description:
+      'Fecha y hora oficial en que el ciudadano ingresó la solicitud',
   })
   @Column({ type: 'datetime' })
   fechaIngreso: Date;
@@ -89,11 +93,15 @@ export class Solicitud {
   @DeleteDateColumn({ nullable: true })
   deletedAt?: Date | null;
 
-  @ApiProperty({ description: 'Fecha y hora de creación del registro en base de datos' })
+  @ApiProperty({
+    description: 'Fecha y hora de creación del registro en base de datos',
+  })
   @CreateDateColumn()
   createdAt: Date;
 
-  @ApiProperty({ description: 'Fecha y hora de última actualización del registro' })
+  @ApiProperty({
+    description: 'Fecha y hora de última actualización del registro',
+  })
   @UpdateDateColumn()
   updatedAt: Date;
 

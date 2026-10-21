@@ -68,7 +68,8 @@ export class SolicitudesController {
 
   @Get('seguimiento/:codigoSeguimiento')
   @ApiOperation({
-    summary: 'Consultar avance de solicitud por código de seguimiento (Público)',
+    summary:
+      'Consultar avance de solicitud por código de seguimiento (Público)',
     description:
       'Permite a los ciudadanos consultar el estado y avance de su trámite mediante su código único (Card 8).',
   })

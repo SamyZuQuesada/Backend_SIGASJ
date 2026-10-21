@@ -94,7 +94,9 @@ describe('FormulariosOficialesService', () => {
     formularioRepo = {
       find: jest.fn(),
       findOne: jest.fn(),
-      save: jest.fn().mockImplementation((val) => Promise.resolve({ id: 10, ...val })),
+      save: jest
+        .fn()
+        .mockImplementation((val) => Promise.resolve({ id: 10, ...val })),
       create: jest.fn().mockImplementation((val) => val),
     };
 
@@ -276,9 +278,9 @@ describe('FormulariosOficialesService', () => {
         slug: 'tramite-no-oficial',
       });
 
-      await expect(
-        service.subirOReemplazarPdf(7, fileValido),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.subirOReemplazarPdf(7, fileValido)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -301,7 +303,9 @@ describe('FormulariosOficialesService', () => {
 
       await expect(
         service.obtenerStreamDescargaPublica('arreglo-pago'),
-      ).rejects.toThrow('El formulario oficial todavía no se encuentra disponible.');
+      ).rejects.toThrow(
+        'El formulario oficial todavía no se encuentra disponible.',
+      );
     });
 
     it('debe retornar el stream con headers correctos si el archivo existe físicamente', async () => {
@@ -326,7 +330,8 @@ describe('FormulariosOficialesService', () => {
       });
 
       try {
-        const result = await service.obtenerStreamDescargaPublica('arreglo-pago');
+        const result =
+          await service.obtenerStreamDescargaPublica('arreglo-pago');
         expect(result.streamableFile).toBeDefined();
         expect(result.filename).toBe('arreglo-descarga.pdf');
         result.streamableFile.getStream().destroy();

@@ -32,14 +32,16 @@ import { Solicitud } from './solicitud.entity';
 export class SolicitudArregloPago {
   @ApiProperty({
     example: 1,
-    description: 'Identificador único numérico del registro de detalle de arreglo de pago',
+    description:
+      'Identificador único numérico del registro de detalle de arreglo de pago',
   })
   @PrimaryGeneratedColumn()
   id: number;
 
   @ApiProperty({
     example: 1,
-    description: 'Identificador de la solicitud cabecera vinculada (relación 1:1)',
+    description:
+      'Identificador de la solicitud cabecera vinculada (relación 1:1)',
   })
   @Column({ type: 'int', unique: true })
   solicitudId: number;
@@ -56,7 +58,8 @@ export class SolicitudArregloPago {
 
   @ApiProperty({
     example: 'Juan Carlos Rodríguez Mora',
-    description: 'Nombre completo de la persona solicitante que asume el compromiso del arreglo',
+    description:
+      'Nombre completo de la persona solicitante que asume el compromiso del arreglo',
     maxLength: 150,
   })
   @Column({ type: 'varchar', length: 150 })
@@ -64,7 +67,8 @@ export class SolicitudArregloPago {
 
   @ApiProperty({
     example: '1-1234-0567',
-    description: 'Cédula física, jurídica o documento de residencia (DIMEX) del solicitante',
+    description:
+      'Cédula física, jurídica o documento de residencia (DIMEX) del solicitante',
     maxLength: 30,
   })
   @Column({ type: 'varchar', length: 30 })
@@ -72,7 +76,8 @@ export class SolicitudArregloPago {
 
   @ApiProperty({
     example: 'San Juan, 200 metros norte de la plaza de deportes',
-    description: 'Lugar de residencia y dirección oficial según el formulario físico ("Vecino de")',
+    description:
+      'Lugar de residencia y dirección oficial según el formulario físico ("Vecino de")',
     maxLength: 200,
   })
   @Column({ type: 'varchar', length: 200 })
@@ -80,7 +85,8 @@ export class SolicitudArregloPago {
 
   @ApiProperty({
     example: '8888-1234',
-    description: 'Número de teléfono de contacto para notificaciones del trámite',
+    description:
+      'Número de teléfono de contacto para notificaciones del trámite',
     maxLength: 30,
   })
   @Column({ type: 'varchar', length: 30 })
@@ -88,7 +94,8 @@ export class SolicitudArregloPago {
 
   @ApiProperty({
     example: 'CTA-45892',
-    description: 'Número de cuenta, contrato o NIS del servicio de agua registrado ante la ASADA',
+    description:
+      'Número de cuenta, contrato o NIS del servicio de agua registrado ante la ASADA',
     maxLength: 50,
   })
   @Column({ type: 'varchar', length: 50 })
@@ -96,7 +103,8 @@ export class SolicitudArregloPago {
 
   @ApiProperty({
     example: 25000.0,
-    description: 'Monto en colones ofrecido o cancelado como prima inicial al formalizar el arreglo',
+    description:
+      'Monto en colones ofrecido o cancelado como prima inicial al formalizar el arreglo',
   })
   @Column({
     type: 'decimal',
@@ -112,7 +120,8 @@ export class SolicitudArregloPago {
   @ApiProperty({
     example: PlazoArregloPago.MESES_6,
     enum: PlazoArregloPago,
-    description: 'Plazo seleccionado para saldar el monto adeudado (admite únicamente opciones oficiales)',
+    description:
+      'Plazo seleccionado para saldar el monto adeudado (admite únicamente opciones oficiales)',
   })
   @Column({ type: 'varchar', length: 50 })
   plazoSeleccionado: PlazoArregloPago | string;
@@ -130,14 +139,19 @@ export class SolicitudArregloPago {
   @CreateDateColumn()
   createdAt: Date;
 
-  @ApiProperty({ description: 'Fecha y hora de última actualización del registro' })
+  @ApiProperty({
+    description: 'Fecha y hora de última actualización del registro',
+  })
   @UpdateDateColumn()
   updatedAt: Date;
 
   @BeforeInsert()
   @BeforeUpdate()
   validarCampos(): void {
-    if (this.plazoSeleccionado && !isPlazoArregloPagoValido(this.plazoSeleccionado)) {
+    if (
+      this.plazoSeleccionado &&
+      !isPlazoArregloPagoValido(this.plazoSeleccionado)
+    ) {
       throw new BadRequestException(
         `El plazo '${this.plazoSeleccionado}' no es válido. Opciones permitidas: ${Object.values(PlazoArregloPago).join(', ')}`,
       );

@@ -125,13 +125,7 @@ describe('SQL Server — fontanero solicitudes-ausencia (PBI 6.5.3)', () => {
           OUTPUT INSERTED.id
           VALUES (@0, @1, @2, @3, 'Fontanero', 1, @4)
         `,
-          [
-            sufijo.toUpperCase(),
-            MARCA,
-            cedula,
-            correo,
-            usuarioId,
-          ],
+          [sufijo.toUpperCase(), MARCA, cedula, correo, usuarioId],
         );
         const colaboradorId = Number(colaborador.id);
         const token = jwtService.sign({

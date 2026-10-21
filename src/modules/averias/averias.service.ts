@@ -96,6 +96,7 @@ import {
 } from './historial-averias.registro';
 import { NotificacionesAveriasService } from '../notificaciones/notificaciones-averias.service';
 import { SmsAveriasService } from '../notificaciones/sms-averias.service';
+import { NotificacionCorreoAveriaService } from './notificacion-correo-averia.service';
 
 const REGISTRO_OK = 'Avería registrada correctamente.';
 const REGISTRO_ERROR = 'No se pudo registrar la avería. Intente nuevamente.';
@@ -677,6 +678,8 @@ export class AveriasService {
     private readonly smsAverias?: SmsAveriasService,
     @Optional()
     private readonly historialAverias?: HistorialAveriasService,
+    @Optional()
+    private readonly correoAverias?: NotificacionCorreoAveriaService,
   ) {}
 
   private idResponsable(user?: AuthenticatedUser): number | null {
@@ -790,8 +793,16 @@ export class AveriasService {
       await this.smsAverias?.prepararPendiente(averia);
     }
     if (averia.estado === EstadoAveria.RESUELTA) {
-      await this.smsAverias?.prepararResuelta(averia);
+      await this.emitirNotificacionesReparacionExitosa(averia);
     }
+  }
+
+  /** SMS + correo al reportante; fallos no revierten la resolución. */
+  private async emitirNotificacionesReparacionExitosa(
+    averia: Averia,
+  ): Promise<void> {
+    await this.smsAverias?.prepararResuelta(averia);
+    await this.correoAverias?.notificarReparacionExitosa(averia);
   }
 
   /**
@@ -1972,7 +1983,7 @@ export class AveriasService {
         );
 
         await this.emitirEventosAveria(async () => {
-          await this.smsAverias?.prepararResuelta(saved);
+          await this.emitirNotificacionesReparacionExitosa(saved);
         });
 
         const observaciones = await this.listObservacionesDeAveria(saved.id);
