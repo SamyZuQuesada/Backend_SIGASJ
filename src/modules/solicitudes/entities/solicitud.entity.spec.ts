@@ -1,7 +1,13 @@
 import { EstadoSolicitud } from '../../../common/enums/estado-solicitud.enum';
 import { PlazoArregloPago } from '../../../common/enums/plazo-arreglo-pago.enum';
+import { TipoDocumentoSolicitud } from '../../../common/enums/tipo-documento-solicitud.enum';
 import { TipoSolicitudSlug } from '../../../common/enums/tipo-solicitud-slug.enum';
+import { DocumentoSolicitud } from './documento-solicitud.entity';
+import { SolicitudAfiliacion } from './solicitud-afiliacion.entity';
 import { SolicitudArregloPago } from './solicitud-arreglo-pago.entity';
+import { SolicitudCambioTitular } from './solicitud-cambio-titular.entity';
+import { SolicitudDisponibilidadServicios } from './solicitud-disponibilidad-servicios.entity';
+import { SolicitudInfraestructuraLinderos } from './solicitud-infraestructura-linderos.entity';
 import { Solicitud } from './solicitud.entity';
 import { TipoSolicitud } from './tipo-solicitud.entity';
 
@@ -97,18 +103,28 @@ describe('Solicitud Entity (Encabezado central)', () => {
     solicitud1.detalleArregloPago = detalleArreglo;
 
     const solicitud2 = new Solicitud();
-    solicitud2.detalleCambioTitular = { nuevoTitularCedula: '112340567' };
+    const detalleCambio = new SolicitudCambioTitular();
+    detalleCambio.identificacionSolicitante = '1-1234-0567';
+    detalleCambio.nis = 'NIS-987654';
+    solicitud2.detalleCambioTitular = detalleCambio;
 
     const solicitud3 = new Solicitud();
-    solicitud3.detalleInfraestructuraLinderos = { frenteMetros: 15 };
+    const detalleInfra = new SolicitudInfraestructuraLinderos();
+    detalleInfra.nis = 'NIS-77881';
+    detalleInfra.proposito = 'Reunión de fincas';
+    solicitud3.detalleInfraestructuraLinderos = detalleInfra;
 
     const solicitud4 = new Solicitud();
-    solicitud4.detalleAfiliacion = { tipoAbonado: 'DOMICILIAR' };
+    const detalleAfiliacion = new SolicitudAfiliacion();
+    detalleAfiliacion.nombre = 'María Elena Rodríguez Vargas';
+    detalleAfiliacion.numeroAbonado = '45892';
+    solicitud4.detalleAfiliacion = detalleAfiliacion;
 
     const solicitud5 = new Solicitud();
-    solicitud5.detalleDisponibilidadServicios = {
-      usoPropiedad: 'HABITACIONAL',
-    };
+    const detalleDisponibilidad = new SolicitudDisponibilidadServicios();
+    detalleDisponibilidad.proposito = 'Fraccionamiento';
+    detalleDisponibilidad.autorizacionInspeccion = true;
+    solicitud5.detalleDisponibilidadServicios = detalleDisponibilidad;
 
     const solicitud6 = new Solicitud();
     solicitud6.detalleServicioExistente = { numeroNIS: '987654' };
@@ -121,11 +137,13 @@ describe('Solicitud Entity (Encabezado central)', () => {
     expect(solicitud6.detalleServicioExistente).toBeDefined();
   });
 
-  it('debe tener preparadas las relaciones con documentos e historial', () => {
+  it('debe tener la relación OneToMany con DocumentoSolicitud e historial', () => {
     const solicitud = new Solicitud();
-    solicitud.documentos = [
-      { id: 1, nombreArchivo: 'cedula.pdf', tipoDocumento: 'CEDULA' },
-    ];
+    const documento = new DocumentoSolicitud();
+    documento.id = 1;
+    documento.nombreOriginal = 'cedula.pdf';
+    documento.tipoDocumento = TipoDocumentoSolicitud.IDENTIFICACION;
+    solicitud.documentos = [documento];
     solicitud.historial = [
       {
         id: 1,

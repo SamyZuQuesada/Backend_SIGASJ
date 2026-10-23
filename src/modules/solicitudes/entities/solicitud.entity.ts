@@ -8,13 +8,19 @@ import {
   Index,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   OneToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { EstadoSolicitud } from '../../../common/enums/estado-solicitud.enum';
+import { DocumentoSolicitud } from './documento-solicitud.entity';
 import { TipoSolicitud } from './tipo-solicitud.entity';
+import { SolicitudAfiliacion } from './solicitud-afiliacion.entity';
 import { SolicitudArregloPago } from './solicitud-arreglo-pago.entity';
+import { SolicitudCambioTitular } from './solicitud-cambio-titular.entity';
+import { SolicitudDisponibilidadServicios } from './solicitud-disponibilidad-servicios.entity';
+import { SolicitudInfraestructuraLinderos } from './solicitud-infraestructura-linderos.entity';
 
 /**
  * Entidad principal (encabezado común) para cualquier trámite o solicitud digital en SIGASJ.
@@ -106,12 +112,13 @@ export class Solicitud {
   updatedAt: Date;
 
   /* =========================================================================
-   * PREPARACIÓN DE RELACIONES CON DOCUMENTOS E HISTORIAL:
+   * RELACIÓN CON DOCUMENTOS E HISTORIAL:
    * =========================================================================
-   * Permite adjuntar requisitos/documentos oficiales y auditar la trazabilidad
-   * de cambios de estado durante la gestión del trámite.
+   * Adjuntos ciudadanos (DocumentoSolicitud) y preparación de historial.
    * ========================================================================= */
-  documentos?: any[];
+  @OneToMany(() => DocumentoSolicitud, (documento) => documento.solicitud)
+  documentos?: DocumentoSolicitud[];
+
   historial?: any[];
 
   /* =========================================================================
@@ -131,10 +138,32 @@ export class Solicitud {
   )
   detalleArregloPago?: SolicitudArregloPago;
 
-  detalleCambioTitular?: any;
-  detalleInfraestructuraLinderos?: any;
-  detalleAfiliacion?: any;
-  detalleDisponibilidadServicios?: any;
+  @OneToOne(
+    () => SolicitudCambioTitular,
+    (cambioTitular) => cambioTitular.solicitud,
+    { cascade: true },
+  )
+  detalleCambioTitular?: SolicitudCambioTitular;
+
+  @OneToOne(
+    () => SolicitudInfraestructuraLinderos,
+    (infra) => infra.solicitud,
+    { cascade: true },
+  )
+  detalleInfraestructuraLinderos?: SolicitudInfraestructuraLinderos;
+
+  @OneToOne(() => SolicitudAfiliacion, (afiliacion) => afiliacion.solicitud, {
+    cascade: true,
+  })
+  detalleAfiliacion?: SolicitudAfiliacion;
+
+  @OneToOne(
+    () => SolicitudDisponibilidadServicios,
+    (disponibilidad) => disponibilidad.solicitud,
+    { cascade: true },
+  )
+  detalleDisponibilidadServicios?: SolicitudDisponibilidadServicios;
+
   detalleServicioExistente?: any;
 
   @BeforeInsert()
