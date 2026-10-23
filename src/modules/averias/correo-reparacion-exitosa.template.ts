@@ -23,9 +23,7 @@ export const construirTextoReparacionExitosa = (
     saludo,
     '',
     `La reparación de su avería ${datos.codigoSeguimiento} fue completada exitosamente.`,
-    datos.ubicacion?.trim()
-      ? `Ubicación: ${datos.ubicacion.trim()}.`
-      : null,
+    datos.ubicacion?.trim() ? `Ubicación: ${datos.ubicacion.trim()}.` : null,
     datos.sectorComunidad?.trim()
       ? `Sector: ${datos.sectorComunidad.trim()}.`
       : null,

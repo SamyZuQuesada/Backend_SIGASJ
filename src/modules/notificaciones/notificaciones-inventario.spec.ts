@@ -52,7 +52,8 @@ describe('NotificacionesAveriasService — eventos de inventario', () => {
         expect.objectContaining({
           tipo: TipoNotificacionAveria.SOLICITUD_MATERIALES_PENDIENTE_ADMINISTRADORA,
           titulo: 'Nueva solicitud de materiales',
-          mensaje: 'El fontanero Juan Pérez registró una solicitud de materiales.',
+          mensaje:
+            'El fontanero Juan Pérez registró una solicitud de materiales.',
           idSolicitudMateriales: 15,
           idUsuarioDestinatario: 1,
         }),
@@ -62,7 +63,8 @@ describe('NotificacionesAveriasService — eventos de inventario', () => {
         expect.objectContaining({
           tipo: TipoNotificacionAveria.SOLICITUD_MATERIALES_PENDIENTE_ADMINISTRADORA,
           titulo: 'Nueva solicitud de materiales',
-          mensaje: 'El fontanero Juan Pérez registró una solicitud de materiales.',
+          mensaje:
+            'El fontanero Juan Pérez registró una solicitud de materiales.',
           idSolicitudMateriales: 15,
           idUsuarioDestinatario: 2,
         }),
@@ -81,10 +83,7 @@ describe('NotificacionesAveriasService — eventos de inventario', () => {
         mockManager,
       );
 
-      expect(registrar).toHaveBeenCalledWith(
-        expect.anything(),
-        mockManager,
-      );
+      expect(registrar).toHaveBeenCalledWith(expect.anything(), mockManager);
     });
   });
 
@@ -215,7 +214,8 @@ describe('NotificacionesAveriasService — eventos de inventario', () => {
         expect.objectContaining({
           tipo: TipoNotificacionAveria.ALERTA_REPOSICION_ADMINISTRADORA,
           titulo: 'Alerta de reposición',
-          mensaje: 'El material Tubo PVC alcanzó el nivel mínimo de existencias.',
+          mensaje:
+            'El material Tubo PVC alcanzó el nivel mínimo de existencias.',
           idReposicion: 5,
           idUsuarioDestinatario: 1,
         }),
@@ -246,7 +246,9 @@ describe('NotificacionesAveriasService — eventos de inventario', () => {
 
       expect(resultado).toBeNull();
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('se requiere exactamente una referencia principal'),
+        expect.stringContaining(
+          'se requiere exactamente una referencia principal',
+        ),
       );
     });
 
@@ -269,7 +271,9 @@ describe('NotificacionesAveriasService — eventos de inventario', () => {
 
       expect(resultado).toBeNull();
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('se requiere exactamente una referencia principal'),
+        expect.stringContaining(
+          'se requiere exactamente una referencia principal',
+        ),
       );
     });
   });

@@ -15,9 +15,7 @@ import {
  * Mantiene la regla de exactamente una referencia principal por notificación.
  * Añade índices de consulta y unicidad.
  */
-export class ExtendNotificacionForInventario1724686130000
-  implements MigrationInterface
-{
+export class ExtendNotificacionForInventario1724686130000 implements MigrationInterface {
   name = 'ExtendNotificacionForInventario1724686130000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -156,7 +154,9 @@ export class ExtendNotificacionForInventario1724686130000
       }
 
       if (
-        !after.indices.some((i) => i.name === 'IX_NotificacionAveria_idReposicion')
+        !after.indices.some(
+          (i) => i.name === 'IX_NotificacionAveria_idReposicion',
+        )
       ) {
         await queryRunner.createIndex(
           'NotificacionAveria',
@@ -370,7 +370,10 @@ export class ExtendNotificacionForInventario1724686130000
         await queryRunner.dropColumn('NotificacionAveria', 'idReposicion');
       }
       if (table.findColumnByName('idSalidaInventario')) {
-        await queryRunner.dropColumn('NotificacionAveria', 'idSalidaInventario');
+        await queryRunner.dropColumn(
+          'NotificacionAveria',
+          'idSalidaInventario',
+        );
       }
       if (table.findColumnByName('idSolicitudMateriales')) {
         await queryRunner.dropColumn(

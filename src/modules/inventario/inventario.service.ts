@@ -187,49 +187,53 @@ export class InventarioService {
       }
 
       const idCat = dto.idCategoria ?? dto.categoriaId;
-      let categoriaValida: CategoriaMaterial | null = null;
-      if (typeof idCat === 'number') {
-        const categoria = await withDbRetry(() =>
-          this.categoriaRepository.findOne({
-            where: { id: idCat },
-          }),
+      if (typeof idCat !== 'number' || !Number.isInteger(idCat) || idCat < 1) {
+        throw new BadRequestException(
+          'La categoría del material es obligatoria',
         );
+      }
 
-        if (!categoria) {
-          throw new NotFoundException(`La categoría con ID ${idCat} no existe`);
-        }
+      const categoria = await withDbRetry(() =>
+        this.categoriaRepository.findOne({
+          where: { id: idCat },
+        }),
+      );
 
-        if (!categoria.activo) {
-          throw new BadRequestException(
-            'No se puede asignar una categoría inactiva a un nuevo material',
-          );
-        }
+      if (!categoria) {
+        throw new NotFoundException(`La categoría con ID ${idCat} no existe`);
+      }
 
-        categoriaValida = categoria;
+      if (!categoria.activo) {
+        throw new BadRequestException(
+          'No se puede asignar una categoría inactiva a un nuevo material',
+        );
       }
 
       const idProv = dto.idProveedor ?? dto.proveedorId;
-      let proveedorValido: Proveedor | null = null;
-      if (typeof idProv === 'number') {
-        const proveedor = await withDbRetry(() =>
-          this.proveedorRepository.findOne({
-            where: { id: idProv },
-          }),
+      if (
+        typeof idProv !== 'number' ||
+        !Number.isInteger(idProv) ||
+        idProv < 1
+      ) {
+        throw new BadRequestException(
+          'El proveedor del material es obligatorio',
         );
+      }
 
-        if (!proveedor) {
-          throw new NotFoundException(
-            `El proveedor con ID ${idProv} no existe`,
-          );
-        }
+      const proveedor = await withDbRetry(() =>
+        this.proveedorRepository.findOne({
+          where: { id: idProv },
+        }),
+      );
 
-        if (!proveedor.activo) {
-          throw new BadRequestException(
-            'No se puede asignar un proveedor inactivo a un nuevo material',
-          );
-        }
+      if (!proveedor) {
+        throw new NotFoundException(`El proveedor con ID ${idProv} no existe`);
+      }
 
-        proveedorValido = proveedor;
+      if (!proveedor.activo) {
+        throw new BadRequestException(
+          'No se puede asignar un proveedor inactivo a un nuevo material',
+        );
       }
 
       const material = this.materialRepository.create({
@@ -240,10 +244,10 @@ export class InventarioService {
         stockMinimo: dto.stockMinimo ?? 0,
         stockActual: 0, // No genera entrada de inventario
         activo: true,
-        idCategoria: categoriaValida ? categoriaValida.id : null,
-        categoria: categoriaValida,
-        idProveedor: proveedorValido ? proveedorValido.id : null,
-        proveedor: proveedorValido,
+        idCategoria: categoria.id,
+        categoria,
+        idProveedor: proveedor.id,
+        proveedor,
       });
 
       return await withDbRetry(() => this.materialRepository.save(material));
@@ -410,9 +414,12 @@ export class InventarioService {
 
     if (idCat !== undefined) {
       if (idCat === null) {
-        material.idCategoria = null;
-        material.categoria = null;
-      } else if (material.idCategoria !== idCat) {
+        throw new BadRequestException(
+          'La categoría del material es obligatoria; no se puede desvincular',
+        );
+      }
+
+      if (material.idCategoria !== idCat) {
         const categoria = await withDbRetry(() =>
           this.categoriaRepository.findOne({
             where: { id: idCat },
@@ -439,9 +446,12 @@ export class InventarioService {
 
     if (idProv !== undefined) {
       if (idProv === null) {
-        material.idProveedor = null;
-        material.proveedor = null;
-      } else if (material.idProveedor !== idProv) {
+        throw new BadRequestException(
+          'El proveedor del material es obligatorio; no se puede desvincular',
+        );
+      }
+
+      if (material.idProveedor !== idProv) {
         const proveedor = await withDbRetry(() =>
           this.proveedorRepository.findOne({
             where: { id: idProv },
@@ -1311,9 +1321,11 @@ export class InventarioService {
             if (this.notificacionesService) {
               let usuarioResponsable: Usuario | null = null;
               try {
-                usuarioResponsable = await manager.getRepository(Usuario).findOne({
-                  where: { idUsuario },
-                });
+                usuarioResponsable = await manager
+                  .getRepository(Usuario)
+                  .findOne({
+                    where: { idUsuario },
+                  });
               } catch {
                 // fallback
               }

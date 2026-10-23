@@ -1113,8 +1113,13 @@ describe('InventarioController — Endpoints de Materiales', () => {
       expect(body.id).toBe(1);
     });
 
-    it('permite desvincular la categoría enviando idCategoria: null', async () => {
+    it('propaga el rechazo al desvincular categoría con idCategoria: null', async () => {
       const token = signAs(Role.ADMINISTRADORA);
+      updateServiceSpy.mockRejectedValueOnce(
+        new BadRequestException(
+          'La categoría del material es obligatoria; no se puede desvincular',
+        ),
+      );
 
       const response = await request(app.getHttpServer())
         .patch('/api/v1/inventario/materiales/1')
@@ -1123,7 +1128,7 @@ describe('InventarioController — Endpoints de Materiales', () => {
           idCategoria: null,
         });
 
-      expect(response.status).toBe(HttpStatus.OK);
+      expect(response.status).toBe(HttpStatus.BAD_REQUEST);
       expect(updateServiceSpy).toHaveBeenCalledWith(
         1,
         expect.objectContaining({

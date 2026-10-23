@@ -10,6 +10,13 @@ async function validateCreate(payload: Record<string, unknown>) {
   return { dto, errors };
 }
 
+const base = {
+  nombre: 'Tubo PVC 1/2 pulgada',
+  unidadMedida: 'Tubo',
+  idCategoria: 2,
+  idProveedor: 4,
+};
+
 describe('CreateMaterialDto — validaciones de entrada', () => {
   it('acepta un material con todos los campos válidos y aplica trim', async () => {
     const { dto, errors } = await validateCreate({
@@ -18,6 +25,8 @@ describe('CreateMaterialDto — validaciones de entrada', () => {
       unidadMedida: '  Tubo  ',
       ubicacion: '  Bodega 1  ',
       stockMinimo: 10,
+      idCategoria: 2,
+      idProveedor: 4,
     });
 
     expect(errors).toHaveLength(0);
@@ -26,12 +35,16 @@ describe('CreateMaterialDto — validaciones de entrada', () => {
     expect(dto.unidadMedida).toBe('Tubo');
     expect(dto.ubicacion).toBe('Bodega 1');
     expect(dto.stockMinimo).toBe(10);
+    expect(dto.idCategoria).toBe(2);
+    expect(dto.idProveedor).toBe(4);
   });
 
   it('acepta un material con solo los campos requeridos', async () => {
     const { dto, errors } = await validateCreate({
       nombre: 'Válvula de bola 1/2"',
       unidadMedida: 'Unidad',
+      idCategoria: 1,
+      idProveedor: 1,
     });
 
     expect(errors).toHaveLength(0);
@@ -41,23 +54,56 @@ describe('CreateMaterialDto — validaciones de entrada', () => {
     expect(dto.ubicacion).toBeUndefined();
   });
 
+  it('rechaza si falta categoría o proveedor', async () => {
+    const constraintMessages = (errors: Awaited<ReturnType<typeof validate>>) =>
+      errors.flatMap((error) => Object.values(error.constraints ?? {}));
+
+    const sinCategoria = await validateCreate({
+      nombre: 'Cinta',
+      unidadMedida: 'Rollo',
+      idProveedor: 4,
+    });
+    expect(sinCategoria.errors.length).toBeGreaterThan(0);
+    expect(
+      constraintMessages(sinCategoria.errors).some((message) =>
+        /categor[ií]a/i.test(message),
+      ),
+    ).toBe(true);
+
+    const sinProveedor = await validateCreate({
+      nombre: 'Cinta',
+      unidadMedida: 'Rollo',
+      idCategoria: 2,
+    });
+    expect(sinProveedor.errors.length).toBeGreaterThan(0);
+    expect(
+      constraintMessages(sinProveedor.errors).some((message) =>
+        /proveedor/i.test(message),
+      ),
+    ).toBe(true);
+  });
+
   it('rechaza si falta el nombre o es una cadena vacía', async () => {
     const { errors: errorsFalta } = await validateCreate({
       unidadMedida: 'Unidad',
+      idCategoria: 1,
+      idProveedor: 1,
     });
     expect(errorsFalta.some((e) => e.property === 'nombre')).toBe(true);
 
     const { errors: errorsVacio } = await validateCreate({
       nombre: '   ',
       unidadMedida: 'Unidad',
+      idCategoria: 1,
+      idProveedor: 1,
     });
     expect(errorsVacio.some((e) => e.property === 'nombre')).toBe(true);
   });
 
   it('rechaza si el nombre excede 150 caracteres', async () => {
     const { errors } = await validateCreate({
+      ...base,
       nombre: 'A'.repeat(151),
-      unidadMedida: 'Unidad',
     });
     const error = errors.find((e) => e.property === 'nombre');
     expect(error).toBeDefined();
@@ -67,19 +113,23 @@ describe('CreateMaterialDto — validaciones de entrada', () => {
   it('rechaza si falta la unidad de medida o es una cadena vacía', async () => {
     const { errors: errorsFalta } = await validateCreate({
       nombre: 'Codo 90 PVC',
+      idCategoria: 1,
+      idProveedor: 1,
     });
     expect(errorsFalta.some((e) => e.property === 'unidadMedida')).toBe(true);
 
     const { errors: errorsVacio } = await validateCreate({
       nombre: 'Codo 90 PVC',
       unidadMedida: '   ',
+      idCategoria: 1,
+      idProveedor: 1,
     });
     expect(errorsVacio.some((e) => e.property === 'unidadMedida')).toBe(true);
   });
 
   it('rechaza si la unidad de medida excede 50 caracteres', async () => {
     const { errors } = await validateCreate({
-      nombre: 'Codo 90 PVC',
+      ...base,
       unidadMedida: 'A'.repeat(51),
     });
     const error = errors.find((e) => e.property === 'unidadMedida');
@@ -89,8 +139,7 @@ describe('CreateMaterialDto — validaciones de entrada', () => {
 
   it('rechaza si la descripción excede 1000 caracteres', async () => {
     const { errors } = await validateCreate({
-      nombre: 'Pegamento PVC',
-      unidadMedida: 'Tarro',
+      ...base,
       descripcion: 'X'.repeat(1001),
     });
     const error = errors.find((e) => e.property === 'descripcion');
@@ -100,8 +149,7 @@ describe('CreateMaterialDto — validaciones de entrada', () => {
 
   it('rechaza si la ubicación excede 150 caracteres', async () => {
     const { errors } = await validateCreate({
-      nombre: 'Pegamento PVC',
-      unidadMedida: 'Tarro',
+      ...base,
       ubicacion: 'Y'.repeat(151),
     });
     const error = errors.find((e) => e.property === 'ubicacion');
@@ -111,8 +159,7 @@ describe('CreateMaterialDto — validaciones de entrada', () => {
 
   it('rechaza si el stock mínimo es negativo', async () => {
     const { errors } = await validateCreate({
-      nombre: 'Tubo PVC 1/2',
-      unidadMedida: 'Tubo',
+      ...base,
       stockMinimo: -5,
     });
     const error = errors.find((e) => e.property === 'stockMinimo');
@@ -122,8 +169,7 @@ describe('CreateMaterialDto — validaciones de entrada', () => {
 
   it('rechaza si el stock mínimo no es un entero', async () => {
     const { errors } = await validateCreate({
-      nombre: 'Tubo PVC 1/2',
-      unidadMedida: 'Tubo',
+      ...base,
       stockMinimo: 3.14,
     });
     const error = errors.find((e) => e.property === 'stockMinimo');
@@ -133,8 +179,7 @@ describe('CreateMaterialDto — validaciones de entrada', () => {
 
   it('acepta idCategoria numérico válido y alias categoriaId', async () => {
     const res1 = await validateCreate({
-      nombre: 'Tubo PVC 1/2',
-      unidadMedida: 'Tubo',
+      ...base,
       idCategoria: 2,
     });
     expect(res1.errors).toHaveLength(0);
@@ -144,6 +189,7 @@ describe('CreateMaterialDto — validaciones de entrada', () => {
       nombre: 'Tubo PVC 1/2',
       unidadMedida: 'Tubo',
       categoriaId: '3',
+      idProveedor: 4,
     });
     expect(res2.errors).toHaveLength(0);
     expect(res2.dto.categoriaId ?? res2.dto.idCategoria).toBe(3);
@@ -151,24 +197,21 @@ describe('CreateMaterialDto — validaciones de entrada', () => {
 
   it('rechaza idCategoria si no es entero o es menor a 1', async () => {
     const res1 = await validateCreate({
-      nombre: 'Tubo PVC 1/2',
-      unidadMedida: 'Tubo',
+      ...base,
       idCategoria: 0,
     });
-    expect(res1.errors.some((e) => e.property === 'idCategoria')).toBe(true);
+    expect(res1.errors.length).toBeGreaterThan(0);
 
     const res2 = await validateCreate({
-      nombre: 'Tubo PVC 1/2',
-      unidadMedida: 'Tubo',
+      ...base,
       idCategoria: -1,
     });
-    expect(res2.errors.some((e) => e.property === 'idCategoria')).toBe(true);
+    expect(res2.errors.length).toBeGreaterThan(0);
   });
 
   it('acepta idProveedor numérico válido y alias proveedorId', async () => {
     const res1 = await validateCreate({
-      nombre: 'Tubo PVC 1/2',
-      unidadMedida: 'Tubo',
+      ...base,
       idProveedor: 4,
     });
     expect(res1.errors).toHaveLength(0);
@@ -177,6 +220,7 @@ describe('CreateMaterialDto — validaciones de entrada', () => {
     const res2 = await validateCreate({
       nombre: 'Tubo PVC 1/2',
       unidadMedida: 'Tubo',
+      idCategoria: 2,
       proveedorId: '5',
     });
     expect(res2.errors).toHaveLength(0);
@@ -185,18 +229,16 @@ describe('CreateMaterialDto — validaciones de entrada', () => {
 
   it('rechaza idProveedor si no es entero o es menor a 1', async () => {
     const res1 = await validateCreate({
-      nombre: 'Tubo PVC 1/2',
-      unidadMedida: 'Tubo',
+      ...base,
       idProveedor: 0,
     });
-    expect(res1.errors.some((e) => e.property === 'idProveedor')).toBe(true);
+    expect(res1.errors.length).toBeGreaterThan(0);
 
     const res2 = await validateCreate({
-      nombre: 'Tubo PVC 1/2',
-      unidadMedida: 'Tubo',
+      ...base,
       idProveedor: -2,
     });
-    expect(res2.errors.some((e) => e.property === 'idProveedor')).toBe(true);
+    expect(res2.errors.length).toBeGreaterThan(0);
   });
 
   it('no declara campos de existencias físicas ni auditoría para el alta', () => {

@@ -66,12 +66,14 @@ export class SolicitudesAusenciaController {
     return this.solicitudesService.findAll(query);
   }
 
+  /** PBI 6.5.4 — detalle administrativo (solo ADMINISTRADORA). */
   @Get(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA)
   @ApiOperation({
     summary: 'Detalle de solicitud (incluye saldo si es vacaciones)',
   })
+  @ApiResponse({ status: 403, description: 'Rol distinto de ADMINISTRADORA' })
   @ApiResponse({ status: 404, description: 'No existe' })
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.solicitudesService.findOneDetalle(id);

@@ -4,9 +4,11 @@ import {
   StreamableFile,
 } from '@nestjs/common';
 import {
+  copyFileSync,
   createReadStream,
   existsSync,
   mkdirSync,
+  renameSync,
   unlinkSync,
   writeFileSync,
 } from 'fs';
@@ -556,4 +558,163 @@ export function getMovimientoDocumentFilePath(
   else if (ext === '.webp') mimeType = 'image/webp';
 
   return { absolutePath: filePath, mimeType };
+}
+
+/* =========================================================================
+ * DOCUMENTOS DE SOLICITUDES DIGITALES PÚBLICAS
+ * ========================================================================= */
+
+export type SolicitudDocumentFile = {
+  originalname: string;
+  mimetype: string;
+  size: number;
+  buffer: Buffer;
+};
+
+export const MAX_SOLICITUD_DOCUMENT_BYTES = 10 * 1024 * 1024;
+
+const SOLICITUD_DOCUMENT_MIME_TYPES: Record<string, string> = {
+  'application/pdf': '.pdf',
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+};
+
+const SOLICITUD_DOCUMENT_EXTENSIONS: Record<string, string[]> = {
+  'application/pdf': ['.pdf'],
+  'image/jpeg': ['.jpg', '.jpeg'],
+  'image/png': ['.png'],
+};
+
+export function validateSolicitudDocument(
+  file: SolicitudDocumentFile | undefined,
+): asserts file is SolicitudDocumentFile {
+  if (!file?.buffer || file.buffer.length === 0) {
+    throw new BadRequestException('Debe adjuntar un archivo.');
+  }
+
+  if (!file.originalname || file.originalname.length > 255) {
+    throw new BadRequestException(
+      'El nombre original del archivo no es válido o excede 255 caracteres.',
+    );
+  }
+
+  const expectedExtension = SOLICITUD_DOCUMENT_MIME_TYPES[file.mimetype];
+  const suppliedExtension = extname(file.originalname).toLowerCase();
+  const allowedExtensions = SOLICITUD_DOCUMENT_EXTENSIONS[file.mimetype];
+
+  if (!expectedExtension || !allowedExtensions?.includes(suppliedExtension)) {
+    throw new BadRequestException(
+      'Solo se permiten archivos PDF, JPG o PNG con una extensión válida.',
+    );
+  }
+
+  if (!Number.isSafeInteger(file.size) || file.size <= 0) {
+    throw new BadRequestException('El tamaño del archivo no es válido.');
+  }
+
+  if (file.size !== file.buffer.length) {
+    throw new BadRequestException(
+      'El tamaño declarado del archivo no coincide con su contenido.',
+    );
+  }
+
+  if (file.size > MAX_SOLICITUD_DOCUMENT_BYTES) {
+    throw new BadRequestException('El archivo no puede superar 10 MB.');
+  }
+
+  if (!hasExpectedSignature(file.mimetype, file.buffer)) {
+    throw new BadRequestException(
+      'El contenido del archivo no coincide con su formato declarado.',
+    );
+  }
+}
+
+/**
+ * Guarda un adjunto pendiente de reclamo en
+ * uploads/solicitudes/pendientes/<timestamp>-<uuid>.<ext>.
+ */
+export function saveSolicitudDocumentPending(file: SolicitudDocumentFile): {
+  rutaReferenciaArchivo: string;
+  filename: string;
+  absolutePath: string;
+} {
+  validateSolicitudDocument(file);
+  const extension = SOLICITUD_DOCUMENT_MIME_TYPES[file.mimetype];
+  const folder = join(UPLOAD_ROOT, 'solicitudes', 'pendientes');
+  mkdirSync(folder, { recursive: true });
+
+  const filename = `${Date.now()}-${randomUUID()}${extension}`;
+  const absolutePath = join(folder, filename);
+  writeFileSync(absolutePath, file.buffer);
+
+  return {
+    rutaReferenciaArchivo: `/uploads/solicitudes/pendientes/${filename}`,
+    filename,
+    absolutePath,
+  };
+}
+
+/**
+ * Mueve un adjunto pendiente a la carpeta definitiva de la solicitud.
+ */
+export function linkSolicitudDocumentFile(
+  solicitudId: number,
+  pendingRutaReferenciaArchivo: string,
+): { rutaReferenciaArchivo: string; filename: string } {
+  const pendingPrefix = '/uploads/solicitudes/pendientes/';
+  if (!pendingRutaReferenciaArchivo.startsWith(pendingPrefix)) {
+    throw new BadRequestException(
+      'La ruta del documento pendiente no es válida.',
+    );
+  }
+
+  const pendingName = basename(
+    pendingRutaReferenciaArchivo.substring(pendingPrefix.length),
+  );
+  if (
+    !pendingName ||
+    pendingName.includes('..') ||
+    pendingName !== pendingRutaReferenciaArchivo.substring(pendingPrefix.length)
+  ) {
+    throw new BadRequestException('Nombre de archivo pendiente inválido.');
+  }
+
+  const sourcePath = join(
+    UPLOAD_ROOT,
+    'solicitudes',
+    'pendientes',
+    pendingName,
+  );
+  if (!existsSync(sourcePath)) {
+    throw new NotFoundException(
+      'El archivo del documento no existe en el almacenamiento.',
+    );
+  }
+
+  const targetFolder = join(UPLOAD_ROOT, 'solicitudes', String(solicitudId));
+  mkdirSync(targetFolder, { recursive: true });
+  const targetPath = join(targetFolder, pendingName);
+
+  try {
+    renameSync(sourcePath, targetPath);
+  } catch {
+    copyFileSync(sourcePath, targetPath);
+    if (existsSync(sourcePath)) unlinkSync(sourcePath);
+  }
+
+  return {
+    rutaReferenciaArchivo: `/uploads/solicitudes/${solicitudId}/${pendingName}`,
+    filename: pendingName,
+  };
+}
+
+export function deleteSolicitudDocumentFile(
+  rutaReferenciaArchivo: string,
+): void {
+  if (!rutaReferenciaArchivo.startsWith('/uploads/solicitudes/')) return;
+  const relative = rutaReferenciaArchivo.substring('/uploads/'.length);
+  const absolutePath = join(UPLOAD_ROOT, ...relative.split('/'));
+  const normalizedRoot = join(UPLOAD_ROOT, 'solicitudes');
+  if (!absolutePath.startsWith(normalizedRoot)) return;
+  if (existsSync(absolutePath)) unlinkSync(absolutePath);
 }
