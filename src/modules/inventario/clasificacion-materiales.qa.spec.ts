@@ -310,6 +310,7 @@ describe('Backlog 3.2: Clasificación de Materiales — QA Integral, Integració
     let catValvulasId: number;
     let catAccesoriosId: number;
     let catInactivaId: number;
+    let proveedorId: number;
     let materialId: number;
 
     beforeAll(async () => {
@@ -345,6 +346,12 @@ describe('Backlog 3.2: Clasificación de Materiales — QA Integral, Integració
         .patch(`/api/v1/inventario/categorias/${catInactivaId}/estado`)
         .set('Authorization', `Bearer ${token}`)
         .send({ activo: false });
+
+      const resProveedor = await request(app.getHttpServer())
+        .post('/api/v1/inventario/proveedores')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ nombre: 'Proveedor QA Clasificación' });
+      proveedorId = (resProveedor.body as { id: number }).id;
     });
 
     it('registra un material asociándole una categoría activa válida (idCategoria)', async () => {
@@ -358,6 +365,7 @@ describe('Backlog 3.2: Clasificación de Materiales — QA Integral, Integració
           unidadMedida: 'Unidad',
           stockMinimo: 5,
           idCategoria: catValvulasId,
+          idProveedor: proveedorId,
         });
 
       expect(response.status).toBe(HttpStatus.CREATED);
@@ -381,6 +389,7 @@ describe('Backlog 3.2: Clasificación de Materiales — QA Integral, Integració
           unidadMedida: 'Unidad',
           stockMinimo: 10,
           categoriaId: catAccesoriosId,
+          idProveedor: proveedorId,
         });
 
       expect(response.status).toBe(HttpStatus.CREATED);
@@ -429,7 +438,7 @@ describe('Backlog 3.2: Clasificación de Materiales — QA Integral, Integració
       expect(body.categoria?.nombre).toBe('Accesorios');
     });
 
-    it('permite desvincular un material de su categoría enviando idCategoria: null', async () => {
+    it('rechaza desvincular un material de su categoría enviando idCategoria: null', async () => {
       const token = signAs(Role.ADMINISTRADORA);
 
       const response = await request(app.getHttpServer())
@@ -439,10 +448,7 @@ describe('Backlog 3.2: Clasificación de Materiales — QA Integral, Integració
           idCategoria: null,
         });
 
-      expect(response.status).toBe(HttpStatus.OK);
-      const body = response.body as MaterialResponseBody;
-      expect(body.idCategoria).toBeNull();
-      expect(body.categoria).toBeNull();
+      expect(response.status).toBe(HttpStatus.BAD_REQUEST);
     });
 
     it('rechaza con 404 Not Found al intentar asignar una categoría inexistente', async () => {
@@ -455,6 +461,7 @@ describe('Backlog 3.2: Clasificación de Materiales — QA Integral, Integració
           nombre: 'Material con Categoria Fantasma',
           unidadMedida: 'Unidad',
           idCategoria: 888888,
+          idProveedor: proveedorId,
         });
       expect(resPost.status).toBe(HttpStatus.NOT_FOUND);
 
@@ -477,6 +484,7 @@ describe('Backlog 3.2: Clasificación de Materiales — QA Integral, Integració
           nombre: 'Material con Categoria Inactiva',
           unidadMedida: 'Unidad',
           idCategoria: catInactivaId,
+          idProveedor: proveedorId,
         });
 
       expect(response.status).toBe(HttpStatus.BAD_REQUEST);

@@ -363,13 +363,29 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
   });
 
   describe('create', () => {
+    const categoriaActiva = {
+      id: 2,
+      nombre: 'Tubería',
+      activo: true,
+    } as CategoriaMaterial;
+    const proveedorActivo = {
+      id: 4,
+      nombre: 'Ferretería Central',
+      activo: true,
+    } as Proveedor;
+
     it('debe registrar un material exitosamente con stockActual = 0 y activo = true', async () => {
+      catRepoFindOneSpy.mockResolvedValueOnce(categoriaActiva);
+      provRepoFindOneSpy.mockResolvedValueOnce(proveedorActivo);
+
       const dto: CreateMaterialDto = {
         nombre: 'Tubo PVC 1/2 pulgada',
         descripcion: 'Tubo de presión para agua potable',
         unidadMedida: 'Tubo',
         ubicacion: 'Bodega Principal',
         stockMinimo: 10,
+        idCategoria: 2,
+        idProveedor: 4,
       };
 
       const result = await service.create(dto);
@@ -387,10 +403,10 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
         stockMinimo: 10,
         stockActual: 0, // No genera entrada física
         activo: true,
-        idCategoria: null,
-        categoria: null,
-        idProveedor: null,
-        proveedor: null,
+        idCategoria: 2,
+        categoria: categoriaActiva,
+        idProveedor: 4,
+        proveedor: proveedorActivo,
       });
       expect(result.id).toBe(1);
       expect(result.stockActual).toBe(0);
@@ -398,9 +414,14 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
     });
 
     it('debe aplicar default stockMinimo = 0 si no se especifica', async () => {
+      catRepoFindOneSpy.mockResolvedValueOnce(categoriaActiva);
+      provRepoFindOneSpy.mockResolvedValueOnce(proveedorActivo);
+
       const dto: CreateMaterialDto = {
         nombre: 'Cinta teflón',
         unidadMedida: 'Rollo',
+        idCategoria: 2,
+        idProveedor: 4,
       };
 
       const result = await service.create(dto);
@@ -411,10 +432,31 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
           stockMinimo: 0,
           stockActual: 0,
           activo: true,
+          idCategoria: 2,
+          idProveedor: 4,
         }),
       );
       expect(result.stockMinimo).toBe(0);
       expect(result.stockActual).toBe(0);
+    });
+
+    it('rechaza el alta sin categoría o sin proveedor', async () => {
+      await expect(
+        service.create({
+          nombre: 'Cinta',
+          unidadMedida: 'Rollo',
+          idProveedor: 4,
+        }),
+      ).rejects.toThrow('La categoría del material es obligatoria');
+
+      catRepoFindOneSpy.mockResolvedValueOnce(categoriaActiva);
+      await expect(
+        service.create({
+          nombre: 'Cinta',
+          unidadMedida: 'Rollo',
+          idCategoria: 2,
+        }),
+      ).rejects.toThrow('El proveedor del material es obligatorio');
     });
 
     it('debe lanzar ConflictException si ya existe un material con el mismo nombre', async () => {
@@ -426,6 +468,8 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
       const dto: CreateMaterialDto = {
         nombre: '  Tubo PVC 1/2 pulgada  ',
         unidadMedida: 'Tubo',
+        idCategoria: 2,
+        idProveedor: 4,
       };
 
       await expect(service.create(dto)).rejects.toThrow(
@@ -435,6 +479,8 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
     });
 
     it('debe lanzar InternalServerErrorException ante fallos inesperados de persistencia', async () => {
+      catRepoFindOneSpy.mockResolvedValueOnce(categoriaActiva);
+      provRepoFindOneSpy.mockResolvedValueOnce(proveedorActivo);
       repoSaveSpy.mockRejectedValueOnce(
         new Error('Conexión con BD interrumpida'),
       );
@@ -442,6 +488,8 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
       const dto: CreateMaterialDto = {
         nombre: 'Material con fallo',
         unidadMedida: 'Unidad',
+        idCategoria: 2,
+        idProveedor: 4,
       };
 
       await expect(service.create(dto)).rejects.toThrow(
@@ -450,7 +498,7 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
     });
 
     it('debe asignar exitosamente una categoría activa existente al crear', async () => {
-      const categoriaActiva: CategoriaMaterial = {
+      const categoriaActivaLocal: CategoriaMaterial = {
         id: 3,
         nombre: 'Tuberías',
         descripcion: 'Tubos y tuberías',
@@ -459,12 +507,14 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
         updatedAt: new Date(),
         validar: jest.fn(),
       };
-      catRepoFindOneSpy.mockResolvedValueOnce(categoriaActiva);
+      catRepoFindOneSpy.mockResolvedValueOnce(categoriaActivaLocal);
+      provRepoFindOneSpy.mockResolvedValueOnce(proveedorActivo);
 
       const dto: CreateMaterialDto = {
         nombre: 'Tubo PEAD 1 pulgada',
         unidadMedida: 'Tubo',
         idCategoria: 3,
+        idProveedor: 4,
       };
 
       const result = await service.create(dto);
@@ -474,7 +524,8 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
         expect.objectContaining({
           nombre: 'Tubo PEAD 1 pulgada',
           idCategoria: 3,
-          categoria: categoriaActiva,
+          categoria: categoriaActivaLocal,
+          idProveedor: 4,
         }),
       );
       expect(result.idCategoria).toBe(3);
@@ -487,6 +538,7 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
         nombre: 'Tubo PEAD 1 pulgada',
         unidadMedida: 'Tubo',
         idCategoria: 999,
+        idProveedor: 4,
       };
 
       await expect(service.create(dto)).rejects.toThrow(
@@ -506,6 +558,7 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
         nombre: 'Tubo Especial',
         unidadMedida: 'Tubo',
         idCategoria: 4,
+        idProveedor: 4,
       };
 
       await expect(service.create(dto)).rejects.toThrow(
@@ -515,7 +568,7 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
     });
 
     it('debe asignar exitosamente un proveedor activo existente al crear', async () => {
-      const proveedorActivo: Proveedor = {
+      const proveedorActivoLocal: Proveedor = {
         id: 7,
         nombre: 'Ferretería Central',
         razonSocial: null,
@@ -529,11 +582,13 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
         updatedAt: new Date(),
         validar: jest.fn(),
       };
-      provRepoFindOneSpy.mockResolvedValueOnce(proveedorActivo);
+      catRepoFindOneSpy.mockResolvedValueOnce(categoriaActiva);
+      provRepoFindOneSpy.mockResolvedValueOnce(proveedorActivoLocal);
 
       const dto: CreateMaterialDto = {
         nombre: 'Tubo PVC 1/2 pulgada',
         unidadMedida: 'Tubo',
+        idCategoria: 2,
         idProveedor: 7,
       };
 
@@ -544,18 +599,21 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
         expect.objectContaining({
           nombre: 'Tubo PVC 1/2 pulgada',
           idProveedor: 7,
-          proveedor: proveedorActivo,
+          proveedor: proveedorActivoLocal,
+          idCategoria: 2,
         }),
       );
       expect(result.idProveedor).toBe(7);
     });
 
     it('debe lanzar NotFoundException si el proveedor asignado al crear no existe', async () => {
+      catRepoFindOneSpy.mockResolvedValueOnce(categoriaActiva);
       provRepoFindOneSpy.mockResolvedValueOnce(null);
 
       const dto: CreateMaterialDto = {
         nombre: 'Tubo PVC 1/2 pulgada',
         unidadMedida: 'Tubo',
+        idCategoria: 2,
         idProveedor: 999,
       };
 
@@ -566,6 +624,7 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
     });
 
     it('debe lanzar BadRequestException si el proveedor asignado al crear se encuentra inactivo', async () => {
+      catRepoFindOneSpy.mockResolvedValueOnce(categoriaActiva);
       provRepoFindOneSpy.mockResolvedValueOnce({
         id: 8,
         nombre: 'Proveedor Antiguo',
@@ -575,6 +634,7 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
       const dto: CreateMaterialDto = {
         nombre: 'Tubo PVC 1/2 pulgada',
         unidadMedida: 'Tubo',
+        idCategoria: 2,
         idProveedor: 8,
       };
 
@@ -929,24 +989,17 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
       expect(result.idCategoria).toBe(2);
     });
 
-    it('debe desvincular la categoría si idCategoria se envía como null', async () => {
+    it('rechaza desvincular la categoría si idCategoria se envía como null', async () => {
       repoFindOneSpy.mockResolvedValueOnce({
         ...existingMaterial,
         idCategoria: 3,
       });
 
       const dto: UpdateMaterialDto = { idCategoria: null };
-      const result = await service.update(5, dto);
-
-      expect(catRepoFindOneSpy).not.toHaveBeenCalled();
-      expect(repoSaveSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          id: 5,
-          idCategoria: null,
-          categoria: null,
-        }),
+      await expect(service.update(5, dto)).rejects.toThrow(
+        'La categoría del material es obligatoria; no se puede desvincular',
       );
-      expect(result.idCategoria).toBeNull();
+      expect(repoSaveSpy).not.toHaveBeenCalled();
     });
 
     it('debe lanzar NotFoundException si la nueva categoría a asignar no existe', async () => {
@@ -1038,24 +1091,17 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
       expect(result.idProveedor).toBe(2);
     });
 
-    it('debe desvincular el proveedor si idProveedor se envía como null', async () => {
+    it('rechaza desvincular el proveedor si idProveedor se envía como null', async () => {
       repoFindOneSpy.mockResolvedValueOnce({
         ...existingMaterial,
         idProveedor: 3,
       });
 
       const dto: UpdateMaterialDto = { idProveedor: null };
-      const result = await service.update(5, dto);
-
-      expect(provRepoFindOneSpy).not.toHaveBeenCalled();
-      expect(repoSaveSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          id: 5,
-          idProveedor: null,
-          proveedor: null,
-        }),
+      await expect(service.update(5, dto)).rejects.toThrow(
+        'El proveedor del material es obligatorio; no se puede desvincular',
       );
-      expect(result.idProveedor).toBeNull();
+      expect(repoSaveSpy).not.toHaveBeenCalled();
     });
 
     it('debe lanzar NotFoundException si el nuevo proveedor a asignar no existe', async () => {

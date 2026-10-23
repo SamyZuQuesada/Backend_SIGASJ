@@ -751,7 +751,7 @@ describe('SolicitudesAusencia (épica 6.5)', () => {
         .expect(401);
     });
 
-    it('FONTANERO y SECRETARIA: 403 en listado/aprobar/rechazar', async () => {
+    it('FONTANERO y SECRETARIA: 403 en listado/detalle/aprobar/rechazar', async () => {
       const { colaborador, token: fontToken } = await crearFontaneroVinculado();
       const sol = await crearSolicitudDirecta(colaborador.id, 'rol-403');
 
@@ -773,6 +773,10 @@ describe('SolicitudesAusencia (épica 6.5)', () => {
       for (const token of [fontToken, secToken]) {
         await request(app.getHttpServer())
           .get(RRHH)
+          .set('Authorization', `Bearer ${token}`)
+          .expect(403);
+        await request(app.getHttpServer())
+          .get(`${RRHH}/${sol.id}`)
           .set('Authorization', `Bearer ${token}`)
           .expect(403);
         await aprobar(sol.id, token).expect(403);

@@ -113,7 +113,7 @@ export class UpdateMaterialDto {
   @ApiPropertyOptional({
     example: 1,
     description:
-      'Identificador de la categoría asignada (número entero positivo o null para desvincular)',
+      'Identificador de la categoría asignada (número entero positivo; no se admite null)',
   })
   @Transform((params: TransformFnParams) => {
     const raw = rawValue(params);
@@ -142,7 +142,7 @@ export class UpdateMaterialDto {
   @ApiPropertyOptional({
     example: 1,
     description:
-      'Alias de idCategoria para compatibilidad con clientes frontend (opcional o null para desvincular)',
+      'Alias de idCategoria para compatibilidad con clientes frontend',
   })
   @Transform((params: TransformFnParams) => {
     const raw = rawValue(params);
@@ -171,7 +171,7 @@ export class UpdateMaterialDto {
   @ApiPropertyOptional({
     example: 1,
     description:
-      'Identificador del proveedor asignado (número entero positivo o null para desvincular)',
+      'Identificador del proveedor asignado (número entero positivo; no se admite null)',
   })
   @Transform((params: TransformFnParams) => {
     const raw = rawValue(params);
@@ -200,7 +200,7 @@ export class UpdateMaterialDto {
   @ApiPropertyOptional({
     example: 1,
     description:
-      'Alias de idProveedor para compatibilidad con clientes frontend (opcional o null para desvincular)',
+      'Alias de idProveedor para compatibilidad con clientes frontend',
   })
   @Transform((params: TransformFnParams) => {
     const raw = rawValue(params);

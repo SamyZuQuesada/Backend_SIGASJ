@@ -19,8 +19,6 @@ import { ContenidoPublicoModule } from './modules/contenido-publico/contenido-pu
 import { ComunicadosModule } from './modules/comunicados/comunicados.module';
 import { AveriasModule } from './modules/averias/averias.module';
 import { SolicitudesModule } from './modules/solicitudes/solicitudes.module';
-import { LecturasModule } from './modules/lecturas/lecturas.module';
-import { ConsumosModule } from './modules/consumos/consumos.module';
 import { InventarioModule } from './modules/inventario/inventario.module';
 import { ActividadesFontaneroModule } from './modules/actividades-fontanero/actividades-fontanero.module';
 import { ProyectosModule } from './modules/proyectos/proyectos.module';
@@ -58,8 +56,6 @@ import { AppService } from './app.service';
     ComunicadosModule,
     AveriasModule,
     SolicitudesModule,
-    LecturasModule,
-    ConsumosModule,
     InventarioModule,
     ActividadesFontaneroModule,
     ProyectosModule,

@@ -7,7 +7,12 @@ import {
   IsString,
   MaxLength,
   Min,
+  Validate,
 } from 'class-validator';
+import {
+  MaterialCategoriaRequeridaConstraint,
+  MaterialProveedorRequeridoConstraint,
+} from './material-categoria-proveedor.constraint';
 
 const rawValue = ({ value, obj, key }: TransformFnParams): unknown => {
   if (obj && typeof obj === 'object' && key in obj) {
@@ -36,6 +41,14 @@ const trimOptionalString = (params: TransformFnParams): unknown => {
 };
 
 export class CreateMaterialDto {
+  /**
+   * Ancla para validadores de clase (categoría/proveedor obligatorios vía alias).
+   * No forma parte del contrato HTTP.
+   */
+  @Validate(MaterialCategoriaRequeridaConstraint)
+  @Validate(MaterialProveedorRequeridoConstraint)
+  private readonly _requiereClasificacion?: undefined;
+
   @ApiProperty({
     example: 'Tubo PVC 1/2 pulgada',
     maxLength: 150,
@@ -99,10 +112,10 @@ export class CreateMaterialDto {
   @Min(0, { message: 'El stock mínimo no puede ser negativo' })
   stockMinimo?: number;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     example: 1,
     description:
-      'Identificador de la categoría para clasificar el material en bodega (opcional)',
+      'Identificador de la categoría para clasificar el material en bodega (obligatorio; también se acepta el alias categoriaId)',
   })
   @Transform((params: TransformFnParams) => {
     const raw = rawValue(params);
@@ -121,12 +134,12 @@ export class CreateMaterialDto {
   @Min(1, {
     message: 'El identificador de categoría debe ser mayor a cero',
   })
-  idCategoria?: number | null;
+  idCategoria?: number;
 
   @ApiPropertyOptional({
     example: 1,
     description:
-      'Alias de idCategoria para compatibilidad con clientes frontend (opcional)',
+      'Alias de idCategoria para compatibilidad con clientes frontend',
   })
   @Transform((params: TransformFnParams) => {
     const raw = rawValue(params);
@@ -145,12 +158,12 @@ export class CreateMaterialDto {
   @Min(1, {
     message: 'El identificador de categoría debe ser mayor a cero',
   })
-  categoriaId?: number | null;
+  categoriaId?: number;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     example: 1,
     description:
-      'Identificador del proveedor para asociar al material en bodega (opcional)',
+      'Identificador del proveedor asociado al material (obligatorio; también se acepta el alias proveedorId)',
   })
   @Transform((params: TransformFnParams) => {
     const raw = rawValue(params);
@@ -169,12 +182,12 @@ export class CreateMaterialDto {
   @Min(1, {
     message: 'El identificador de proveedor debe ser mayor a cero',
   })
-  idProveedor?: number | null;
+  idProveedor?: number;
 
   @ApiPropertyOptional({
     example: 1,
     description:
-      'Alias de idProveedor para compatibilidad con clientes frontend (opcional)',
+      'Alias de idProveedor para compatibilidad con clientes frontend',
   })
   @Transform((params: TransformFnParams) => {
     const raw = rawValue(params);
@@ -193,5 +206,5 @@ export class CreateMaterialDto {
   @Min(1, {
     message: 'El identificador de proveedor debe ser mayor a cero',
   })
-  proveedorId?: number | null;
+  proveedorId?: number;
 }

@@ -164,7 +164,7 @@ export class NotificacionesAveriasService {
         ? manager.getRepository(NotificacionAveria)
         : this.notificacionRepository;
 
-    const existente = await notifRepo.findOne({ where: where as any });
+    const existente = await notifRepo.findOne({ where: where });
     if (existente) {
       return existente;
     }
@@ -182,7 +182,7 @@ export class NotificacionesAveriasService {
       return await this.insertarNotificacion(payload, manager);
     } catch (error) {
       if (isUniqueViolation(error)) {
-        return notifRepo.findOne({ where: where as any });
+        return notifRepo.findOne({ where: where });
       }
       throw error;
     }
@@ -219,7 +219,10 @@ export class NotificacionesAveriasService {
       fechaLectura: null,
     };
 
-    if (externalManager && typeof externalManager.getRepository === 'function') {
+    if (
+      externalManager &&
+      typeof externalManager.getRepository === 'function'
+    ) {
       const notifRepo = externalManager.getRepository(NotificacionAveria);
       const created = notifRepo.create(data);
       const saved = await notifRepo.save(created);
@@ -394,8 +397,7 @@ export class NotificacionesAveriasService {
     manager?: EntityManager,
   ): Promise<void> {
     const codigo =
-      solicitud.codigo?.trim() ||
-      `SM-${String(solicitud.id).padStart(4, '0')}`;
+      solicitud.codigo?.trim() || `SM-${String(solicitud.id).padStart(4, '0')}`;
     const titulo = 'Solicitud de materiales aprobada';
     const mensaje = `Su solicitud de materiales ${codigo} fue aprobada.`;
 
@@ -417,8 +419,7 @@ export class NotificacionesAveriasService {
     manager?: EntityManager,
   ): Promise<void> {
     const codigo =
-      solicitud.codigo?.trim() ||
-      `SM-${String(solicitud.id).padStart(4, '0')}`;
+      solicitud.codigo?.trim() || `SM-${String(solicitud.id).padStart(4, '0')}`;
     const titulo = 'Solicitud de materiales rechazada';
     const motivoTexto = motivoRechazo?.trim()
       ? ` Motivo: ${motivoRechazo.trim()}.`

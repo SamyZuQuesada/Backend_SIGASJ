@@ -41,6 +41,16 @@ describe('QA Criterios de Aceptación — Relación Material con Proveedores', (
     validar: jest.fn(),
   };
 
+  const mockCategoriaActiva: CategoriaMaterial = {
+    id: 1,
+    nombre: 'Tubería',
+    descripcion: null,
+    activo: true,
+    createdAt: new Date('2026-09-01T00:00:00Z'),
+    updatedAt: new Date('2026-09-01T00:00:00Z'),
+    validar: jest.fn(),
+  };
+
   const mockProveedorInactivo: Proveedor = {
     id: 20,
     nombre: 'Proveedor Antiguo Inactivo',
@@ -168,6 +178,7 @@ describe('QA Criterios de Aceptación — Relación Material con Proveedores', (
   beforeEach(() => {
     jest.clearAllMocks();
     currentRole = Role.ADMINISTRADORA;
+    mockCategoriaRepository.findOne.mockResolvedValue(mockCategoriaActiva);
   });
 
   describe('1. Registro de materiales con proveedores', () => {
@@ -184,6 +195,7 @@ describe('QA Criterios de Aceptación — Relación Material con Proveedores', (
         nombre: 'Tubo PVC 1/2" SDR 13.5',
         unidadMedida: 'Tubo',
         stockMinimo: 10,
+        idCategoria: 1,
         idProveedor: 10,
       };
 
@@ -197,7 +209,7 @@ describe('QA Criterios de Aceptación — Relación Material con Proveedores', (
       expect(result.stockActual).toBe(0);
     });
 
-    it('permite registrar material sin proveedor (relación opcional)', async () => {
+    it('rechaza registrar material sin proveedor', async () => {
       mockMaterialRepository.createQueryBuilder.mockReturnValue({
         where: jest.fn().mockReturnThis(),
         getOne: jest.fn().mockResolvedValue(null),
@@ -206,13 +218,13 @@ describe('QA Criterios de Aceptación — Relación Material con Proveedores', (
       const dto: CreateMaterialDto = {
         nombre: 'Cinta Teflón 1/2"',
         unidadMedida: 'Rollo',
+        idCategoria: 1,
       };
 
-      const result = await service.create(dto);
-
+      await expect(service.create(dto)).rejects.toThrow(
+        'El proveedor del material es obligatorio',
+      );
       expect(mockProveedorRepository.findOne).not.toHaveBeenCalled();
-      expect(result.idProveedor).toBeNull();
-      expect(result.proveedor).toBeNull();
     });
 
     it('rechaza con NotFoundException si el proveedor asignado no existe', async () => {
@@ -225,6 +237,7 @@ describe('QA Criterios de Aceptación — Relación Material con Proveedores', (
       const dto: CreateMaterialDto = {
         nombre: 'Válvula de compuerta 2"',
         unidadMedida: 'Unidad',
+        idCategoria: 1,
         idProveedor: 999,
       };
 
@@ -246,6 +259,7 @@ describe('QA Criterios de Aceptación — Relación Material con Proveedores', (
       const dto: CreateMaterialDto = {
         nombre: 'Abrazadera 2 pulg',
         unidadMedida: 'Unidad',
+        idCategoria: 1,
         idProveedor: 20,
       };
 
@@ -268,6 +282,7 @@ describe('QA Criterios de Aceptación — Relación Material con Proveedores', (
       const dto: CreateMaterialDto = {
         nombre: 'Tubo PEAD 1/2"',
         unidadMedida: 'Metro',
+        idCategoria: 1,
         proveedorId: 10,
       };
 
@@ -324,7 +339,7 @@ describe('QA Criterios de Aceptación — Relación Material con Proveedores', (
       expect(result.proveedor).toEqual(nuevoProveedorActivo);
     });
 
-    it('permite desvincular el proveedor de un material enviando idProveedor: null', async () => {
+    it('rechaza desvincular el proveedor enviando idProveedor: null', async () => {
       const existingMaterial: Material = {
         id: 50,
         nombre: 'Válvula 1/2"',
@@ -347,11 +362,9 @@ describe('QA Criterios de Aceptación — Relación Material con Proveedores', (
         idProveedor: null,
       };
 
-      const result = await service.update(50, updateDto);
-
-      expect(mockProveedorRepository.findOne).not.toHaveBeenCalled();
-      expect(result.idProveedor).toBeNull();
-      expect(result.proveedor).toBeNull();
+      await expect(service.update(50, updateDto)).rejects.toThrow(
+        'El proveedor del material es obligatorio; no se puede desvincular',
+      );
     });
 
     it('rechaza si se intenta cambiar a un proveedor inactivo', async () => {
@@ -517,6 +530,7 @@ describe('QA Criterios de Aceptación — Relación Material con Proveedores', (
         .send({
           nombre: 'Tubo PVC 3/4"',
           unidadMedida: 'Tubo',
+          idCategoria: 1,
           idProveedor: 10,
         })
         .expect(201);
@@ -524,7 +538,7 @@ describe('QA Criterios de Aceptación — Relación Material con Proveedores', (
       expect(response.body.idProveedor).toBe(10);
     });
 
-    it('permite desvincular proveedor vía PUT /api/v1/inventario/materiales/:id enviando idProveedor: null', async () => {
+    it('rechaza desvincular proveedor vía PUT enviando idProveedor: null', async () => {
       const existingMaterial: Material = {
         id: 15,
         nombre: 'Tubo PVC 3/4"',
@@ -548,14 +562,12 @@ describe('QA Criterios de Aceptación — Relación Material con Proveedores', (
         getOne: jest.fn().mockResolvedValue(null),
       });
 
-      const response = await request(app.getHttpServer())
+      await request(app.getHttpServer())
         .put('/api/v1/inventario/materiales/15')
         .send({
           idProveedor: null,
         })
-        .expect(200);
-
-      expect(response.body.idProveedor).toBeNull();
+        .expect(400);
     });
 
     it('rechaza si FONTANERO o SECRETARIA intentan crear material con proveedor (403 Forbidden)', async () => {
