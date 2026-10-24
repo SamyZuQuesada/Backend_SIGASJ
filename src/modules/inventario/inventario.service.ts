@@ -137,24 +137,18 @@ export class InventarioService {
     private readonly movimientoRepository: Repository<MovimientoInventario>,
     @InjectRepository(DocumentoMovimientoInventario)
     private readonly documentoMovimientoRepository: Repository<DocumentoMovimientoInventario>,
-    @Optional()
     @InjectRepository(SolicitudMaterial)
-    private readonly solicitudMaterialRepository?: Repository<SolicitudMaterial>,
-    @Optional()
+    private readonly solicitudMaterialRepository: Repository<SolicitudMaterial>,
     @InjectRepository(DetalleSolicitudMaterial)
-    private readonly detalleSolicitudRepository?: Repository<DetalleSolicitudMaterial>,
-    @Optional()
+    private readonly detalleSolicitudRepository: Repository<DetalleSolicitudMaterial>,
     @InjectRepository(Averia)
-    private readonly averiaRepository?: Repository<Averia>,
-    @Optional()
+    private readonly averiaRepository: Repository<Averia>,
     @InjectRepository(AlertaReposicion)
-    private readonly alertaReposicionRepository?: Repository<AlertaReposicion>,
-    @Optional()
+    private readonly alertaReposicionRepository: Repository<AlertaReposicion>,
     @InjectRepository(ReposicionMaterial)
-    private readonly reposicionMaterialRepository?: Repository<ReposicionMaterial>,
-    @Optional()
+    private readonly reposicionMaterialRepository: Repository<ReposicionMaterial>,
     @InjectRepository(DetalleReposicionMaterial)
-    private readonly detalleReposicionRepository?: Repository<DetalleReposicionMaterial>,
+    private readonly detalleReposicionRepository: Repository<DetalleReposicionMaterial>,
     @Optional()
     private readonly notificacionesService?: NotificacionesAveriasService,
   ) {}
@@ -1085,11 +1079,6 @@ export class InventarioService {
 
             material.stockActual = stockActual;
             await materialRepo.save(material);
-            if (typeof materialRepo.update === 'function') {
-              await materialRepo.update(material.id, {
-                stockActual,
-              });
-            }
 
             const materialPersistido = await materialRepo.findOne({
               where: { id: material.id },
@@ -1107,6 +1096,7 @@ export class InventarioService {
               idMaterial: material.id,
               idUsuario,
               idProveedor: proveedor ? proveedor.id : idProveedor || null,
+              precioUnitario: dto.precioUnitario ?? null,
             });
 
             const movimientoGuardado = await movimientoRepo.save(movimiento);
@@ -1279,11 +1269,6 @@ export class InventarioService {
 
             material.stockActual = stockActual;
             await materialRepo.save(material);
-            if (typeof materialRepo.update === 'function') {
-              await materialRepo.update(material.id, {
-                stockActual,
-              });
-            }
 
             // Reconsultar directamente desde la base de datos dentro de la transacción para devolver el stock realmente persistido
             const materialPersistido = await materialRepo.findOne({
@@ -1306,6 +1291,16 @@ export class InventarioService {
             });
 
             const movimientoGuardado = await movimientoRepo.save(movimiento);
+
+            if (movimientoGuardado.idSolicitud) {
+              try {
+                await manager.query(
+                  `UPDATE SolicitudMaterial SET estado = 'DESPACHADA' WHERE idSolicitud = ${movimientoGuardado.idSolicitud} AND estado = 'APROBADA'`,
+                );
+              } catch {
+                // Si la tabla no existe o el campo no aplica, no bloquear la salida
+              }
+            }
 
             if (movimientoGuardado.idAveria) {
               await registrarEventoHistorialEnManager(manager, {
@@ -2523,6 +2518,40 @@ export class InventarioService {
           TipoMovimientoInventario.SALIDA,
         );
 
+        const valorResult = await this.crearQueryMaterialesReporte(query)
+          .select(
+            'SUM(material.stockActual * material.precioUnitario)',
+            'valor',
+          )
+          .andWhere('material.precioUnitario IS NOT NULL')
+          .getRawOne<{ valor: string | null }>();
+        const valorTotalInventario =
+          valorResult?.valor != null ? Number(valorResult.valor) : null;
+
+        const hoy = new Date();
+        const fechaLimite90 = new Date();
+        fechaLimite90.setDate(fechaLimite90.getDate() + 90);
+
+        const materialesPorVencer = await this.crearQueryMaterialesReporte(
+          query,
+        )
+          .andWhere('material.fechaVencimiento IS NOT NULL')
+          .andWhere('material.fechaVencimiento >= :hoy', { hoy })
+          .andWhere('material.fechaVencimiento <= :fechaLimite90', {
+            fechaLimite90,
+          })
+          .getCount();
+
+        const proximosVencer = await this.crearQueryMaterialesReporte(query)
+          .andWhere('material.fechaVencimiento IS NOT NULL')
+          .andWhere('material.fechaVencimiento >= :hoy2', { hoy2: hoy })
+          .andWhere('material.fechaVencimiento <= :fechaLimite902', {
+            fechaLimite902: fechaLimite90,
+          })
+          .orderBy('material.fechaVencimiento', 'ASC')
+          .take(10)
+          .getMany();
+
         const porCategoriaQb = this.materialRepository
           .createQueryBuilder('material')
           .leftJoin('material.categoria', 'categoria')
@@ -2574,6 +2603,8 @@ export class InventarioService {
             materialesStockBajo,
             entradasRegistradas,
             salidasRegistradas,
+            valorTotalInventario,
+            materialesPorVencer,
           },
           porCategoria: porCategoriaRows.map((row) => ({
             idCategoria:
@@ -2601,6 +2632,13 @@ export class InventarioService {
           movimientos: movimientos.map((movimiento) =>
             this.mapMovimientoInventarioAdmin(movimiento),
           ),
+          proximosVencer: proximosVencer.map((m) => ({
+            id: m.id,
+            nombre: m.nombre,
+            fechaVencimiento: m.fechaVencimiento,
+            stockActual: m.stockActual,
+            unidadMedida: m.unidadMedida,
+          })),
         };
       });
     } catch (error) {
@@ -3347,9 +3385,7 @@ export class InventarioService {
     id: number,
     user: AuthenticatedUser,
   ): Promise<Record<string, unknown>> {
-    const solicitudRepo =
-      this.solicitudMaterialRepository ??
-      this.materialRepository.manager.getRepository(SolicitudMaterial);
+    const solicitudRepo = this.solicitudMaterialRepository;
 
     return withDbRetry(async () => {
       const solicitud = await solicitudRepo.findOne({
@@ -3385,9 +3421,7 @@ export class InventarioService {
     user: AuthenticatedUser,
     motivoRechazo?: string,
   ): Promise<Record<string, unknown>> {
-    const solicitudRepo =
-      this.solicitudMaterialRepository ??
-      this.materialRepository.manager.getRepository(SolicitudMaterial);
+    const solicitudRepo = this.solicitudMaterialRepository;
 
     return withDbRetry(async () => {
       const solicitud = await solicitudRepo.findOne({
@@ -3412,6 +3446,50 @@ export class InventarioService {
         EstadoSolicitudMaterial.RECHAZADA,
         motivoRechazo,
       );
+    });
+  }
+
+  /**
+   * Cancela una solicitud PENDIENTE por parte del fontanero que la registró.
+   * Solo el propietario puede cancelarla y únicamente si aún no fue revisada.
+   */
+  async cancelarSolicitudMaterialFontanero(
+    id: number,
+    user: AuthenticatedUser,
+  ): Promise<Record<string, unknown>> {
+    const idFontanero = Number(user.userId);
+    const solicitudRepo = this.solicitudMaterialRepository;
+
+    return withDbRetry(async () => {
+      const solicitud = await solicitudRepo.findOne({ where: { id } });
+
+      if (!solicitud) {
+        throw new NotFoundException(
+          `Solicitud de material con ID ${id} no encontrada`,
+        );
+      }
+
+      if (Number(solicitud.idFontanero) !== idFontanero) {
+        throw new ForbiddenException(
+          'No tiene permiso para cancelar esta solicitud de materiales',
+        );
+      }
+
+      if (solicitud.estado !== EstadoSolicitudMaterial.PENDIENTE) {
+        throw new BadRequestException(
+          `Solo se puede cancelar una solicitud en estado PENDIENTE. Estado actual: ${solicitud.estado}`,
+        );
+      }
+
+      solicitud.estado = EstadoSolicitudMaterial.CANCELADA;
+      await solicitudRepo.save(solicitud);
+
+      return {
+        id: solicitud.id,
+        codigo: solicitud.codigo ?? null,
+        estado: solicitud.estado,
+        mensaje: 'La solicitud fue cancelada correctamente.',
+      };
     });
   }
 

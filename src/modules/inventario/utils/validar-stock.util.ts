@@ -154,27 +154,6 @@ export function validarStockDisponible(
 
   const stockFinal = stockActual - cantidad;
 
-  if (stockFinal < stockMinimo) {
-    const retiroMaximo = Math.max(0, stockActual - stockMinimo);
-    return {
-      esValido: false,
-      disponible: false,
-      materialId: material.id,
-      idMaterial: material.id,
-      materialNombre: material.nombre,
-      nombreMaterial: material.nombre,
-      stockActual,
-      cantidadSolicitada: cantidad,
-      stockFinal: stockActual,
-      stockResultante: stockActual,
-      stockMinimo,
-      alcanzaStockMinimo: true,
-      esBajoMinimo: true,
-      esAgotamientoTotal: false,
-      mensaje: `La salida dejaría el material por debajo del stock mínimo. Puede retirar como máximo ${retiroMaximo} unidades.`,
-    };
-  }
-
   const alcanzaStockMinimo = stockFinal <= stockMinimo;
   const esAgotamientoTotal = stockFinal === 0;
 
