@@ -21,6 +21,7 @@ import { SolicitudArregloPago } from './solicitud-arreglo-pago.entity';
 import { SolicitudCambioTitular } from './solicitud-cambio-titular.entity';
 import { SolicitudDisponibilidadServicios } from './solicitud-disponibilidad-servicios.entity';
 import { SolicitudInfraestructuraLinderos } from './solicitud-infraestructura-linderos.entity';
+import { SolicitudConstanciaServicio } from './solicitud-constancia-servicio.entity';
 
 /**
  * Entidad principal (encabezado común) para cualquier trámite o solicitud digital en SIGASJ.
@@ -164,7 +165,14 @@ export class Solicitud {
   )
   detalleDisponibilidadServicios?: SolicitudDisponibilidadServicios;
 
-  detalleServicioExistente?: any;
+  @OneToOne(
+    () => SolicitudConstanciaServicio,
+    (constancia) => constancia.solicitud,
+    { cascade: true },
+  )
+  detalleConstanciaServicio?: SolicitudConstanciaServicio;
+
+  detalleServicioExistente?: SolicitudConstanciaServicio | any;
 
   @BeforeInsert()
   establecerValoresPorDefecto(): void {

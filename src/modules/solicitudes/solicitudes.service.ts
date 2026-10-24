@@ -31,6 +31,11 @@ import {
 } from '../../common/enums/proposito-disponibilidad-servicios.enum';
 import { PropositoInfraestructuraLinderosConfirmado } from '../../common/enums/proposito-infraestructura-linderos.enum';
 import {
+  isMotivoConstanciaServicioValido,
+  isMotivoOtro,
+  MOTIVOS_CONSTANCIA_SERVICIO,
+} from '../../common/enums/motivo-constancia-servicio.enum';
+import {
   deleteSolicitudDocumentFile,
   linkSolicitudDocumentFile,
   saveSolicitudDocumentPending,
@@ -41,6 +46,7 @@ import { CreateSolicitudArregloPagoDto } from './dto/create-solicitud-arreglo-pa
 import { CreateSolicitudCambioTitularDto } from './dto/create-solicitud-cambio-titular.dto';
 import { CreateSolicitudDisponibilidadServiciosDto } from './dto/create-solicitud-disponibilidad-servicios.dto';
 import { CreateSolicitudInfraestructuraLinderosDto } from './dto/create-solicitud-infraestructura-linderos.dto';
+import { CreateSolicitudConstanciaServicioDto } from './dto/create-solicitud-constancia-servicio.dto';
 import { DocumentoSolicitudReferenciaDto } from './dto/documento-solicitud-referencia.dto';
 import { QuerySolicitudesDto } from './dto/query-solicitudes.dto';
 import { SolicitudPendienteDto } from './dto/solicitud-pendiente.dto';
@@ -51,6 +57,7 @@ import { SolicitudArregloPago } from './entities/solicitud-arreglo-pago.entity';
 import { SolicitudCambioTitular } from './entities/solicitud-cambio-titular.entity';
 import { SolicitudDisponibilidadServicios } from './entities/solicitud-disponibilidad-servicios.entity';
 import { SolicitudInfraestructuraLinderos } from './entities/solicitud-infraestructura-linderos.entity';
+import { SolicitudConstanciaServicio } from './entities/solicitud-constancia-servicio.entity';
 import { SolicitudServicio } from './entities/solicitud-servicio.entity';
 import { Solicitud } from './entities/solicitud.entity';
 import { TipoSolicitud } from './entities/tipo-solicitud.entity';
@@ -756,6 +763,165 @@ export class SolicitudesService {
 
       this.logger.log(
         `Solicitud de Disponibilidad de Servicios registrada con código ${resultado.codigoSeguimiento}`,
+      );
+
+      return resultado;
+    } catch (error) {
+      for (const path of linkedPaths) {
+        try {
+          deleteSolicitudDocumentFile(path);
+        } catch {
+          // Conservar error original; limpieza best-effort.
+        }
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Valida reglas de negocio para Constancia de Servicio Existente:
+   * - Motivo válido según catálogo oficial.
+   * - Exige descripción en `otroMotivo` cuando se utiliza la opción "Otro".
+   * - Medios de notificación no idénticos.
+   */
+  validarConstanciaServicio(dto: CreateSolicitudConstanciaServicioDto): void {
+    if (!isMotivoConstanciaServicioValido(dto.motivo)) {
+      throw new BadRequestException(
+        `El motivo '${dto.motivo}' no es válido. Opciones permitidas: ${MOTIVOS_CONSTANCIA_SERVICIO.join(', ')}`,
+      );
+    }
+
+    if (isMotivoOtro(dto.motivo)) {
+      if (!dto.otroMotivo || !dto.otroMotivo.trim()) {
+        throw new BadRequestException(
+          'Debe especificar el motivo en otroMotivo cuando selecciona la opción "Otro".',
+        );
+      }
+    }
+
+    if (
+      dto.medioNotificacionSecundario &&
+      dto.medioNotificacionPrincipal.toLowerCase() ===
+        dto.medioNotificacionSecundario.toLowerCase()
+    ) {
+      throw new BadRequestException(
+        'El medio de notificación secundario no puede ser idéntico al principal.',
+      );
+    }
+  }
+
+  /**
+   * Registra una solicitud pública de Constancia de Servicio Existente.
+   * Crea cabecera `Solicitud` + detalle `SolicitudConstanciaServicio` en una sola transacción.
+   * Estado, tipo, código y timestamps se asignan internamente (no desde el body).
+   * Maneja documentos adjuntos pendientes opcionales si se envían referencias.
+   */
+  async crearSolicitudConstanciaServicio(
+    dto: CreateSolicitudConstanciaServicioDto,
+  ): Promise<Solicitud> {
+    this.validarConstanciaServicio(dto);
+
+    let documentosPendientes: DocumentoSolicitud[] = [];
+    if (dto.documentos && dto.documentos.length > 0) {
+      documentosPendientes = await this.resolverDocumentosPendientes(
+        dto.documentos,
+      );
+    }
+
+    let tipo: TipoSolicitud | null = null;
+    if (this.tiposSolicitudService) {
+      tipo = await this.tiposSolicitudService.findBySlug(
+        TipoSolicitudSlug.SERVICIO_EXISTENTE,
+      );
+    } else if (this.tipoSolicitudRepository) {
+      tipo = await this.tipoSolicitudRepo.findOne({
+        where: { slug: TipoSolicitudSlug.SERVICIO_EXISTENTE },
+      });
+    }
+
+    const tipoSolicitudId = tipo ? tipo.id : 6;
+    const codigoSeguimiento = await this.generarCodigoSeguimiento();
+    const linkedPaths: string[] = [];
+
+    try {
+      const resultado = await this.solicitudRepo.manager.transaction(
+        async (manager) => {
+          const solicitudRepo = manager.getRepository(Solicitud);
+          const detalleRepo = manager.getRepository(
+            SolicitudConstanciaServicio,
+          );
+          const documentoRepo = manager.getRepository(DocumentoSolicitud);
+
+          const nuevaSolicitud = solicitudRepo.create({
+            tipoSolicitudId,
+            codigoSeguimiento,
+            estado: EstadoSolicitud.PENDIENTE,
+            fechaIngreso: new Date(),
+          });
+          const solicitudGuardada = await solicitudRepo.save(nuevaSolicitud);
+
+          const nuevoDetalle = detalleRepo.create({
+            solicitudId: solicitudGuardada.id,
+            tipoServicio: dto.tipoServicio,
+            nis: dto.nis,
+            propietarioInmueble: dto.propietarioInmueble,
+            nombreSolicitante: dto.nombreSolicitante,
+            identificacionSolicitante: dto.identificacionSolicitante,
+            correoElectronico: dto.correoElectronico,
+            telefono: dto.telefono,
+            folioReal: dto.folioReal?.trim() ? dto.folioReal.trim() : null,
+            planoCatastrado: dto.planoCatastrado?.trim()
+              ? dto.planoCatastrado.trim()
+              : null,
+            planoAgrimensura: dto.planoAgrimensura?.trim()
+              ? dto.planoAgrimensura.trim()
+              : null,
+            naturalezaInmueble: dto.naturalezaInmueble,
+            calidadTitular: dto.calidadTitular,
+            provincia: dto.provincia,
+            canton: dto.canton,
+            distrito: dto.distrito,
+            direccionExacta: dto.direccionExacta,
+            motivo: dto.motivo,
+            otroMotivo: isMotivoOtro(dto.motivo)
+              ? dto.otroMotivo?.trim() ?? null
+              : null,
+            tramitePorRealizar: dto.tramitePorRealizar?.trim()
+              ? dto.tramitePorRealizar.trim()
+              : null,
+            medioNotificacionPrincipal: dto.medioNotificacionPrincipal,
+            medioNotificacionSecundario:
+              dto.medioNotificacionSecundario ?? null,
+            firma: dto.firma?.trim() ? dto.firma.trim() : null,
+          });
+          const detalleGuardado = await detalleRepo.save(nuevoDetalle);
+
+          const documentosVinculados: DocumentoSolicitud[] = [];
+          for (const pendiente of documentosPendientes) {
+            const linked = linkSolicitudDocumentFile(
+              solicitudGuardada.id,
+              pendiente.rutaReferenciaArchivo,
+            );
+            linkedPaths.push(linked.rutaReferenciaArchivo);
+            pendiente.solicitudId = solicitudGuardada.id;
+            pendiente.rutaReferenciaArchivo = linked.rutaReferenciaArchivo;
+            // Token consumido: evita reutilizar el mismo adjunto en otra solicitud.
+            pendiente.tokenReclamo = `used:${pendiente.id}:${randomUUID().replace(/-/g, '').slice(0, 16)}`;
+            documentosVinculados.push(await documentoRepo.save(pendiente));
+          }
+
+          solicitudGuardada.detalleConstanciaServicio = detalleGuardado;
+          solicitudGuardada.detalleServicioExistente = detalleGuardado;
+          solicitudGuardada.documentos = documentosVinculados;
+          if (tipo) {
+            solicitudGuardada.tipoSolicitud = tipo;
+          }
+          return solicitudGuardada;
+        },
+      );
+
+      this.logger.log(
+        `Solicitud de Constancia de Servicio Existente registrada con código ${resultado.codigoSeguimiento}`,
       );
 
       return resultado;

@@ -15,6 +15,8 @@ import { CreateSolicitudArregloPagoDto } from './dto/create-solicitud-arreglo-pa
 import { CreateSolicitudCambioTitularDto } from './dto/create-solicitud-cambio-titular.dto';
 import { CreateSolicitudDisponibilidadServiciosDto } from './dto/create-solicitud-disponibilidad-servicios.dto';
 import { CreateSolicitudInfraestructuraLinderosDto } from './dto/create-solicitud-infraestructura-linderos.dto';
+import { CreateSolicitudConstanciaServicioDto } from './dto/create-solicitud-constancia-servicio.dto';
+import { MotivoConstanciaServicio } from '../../common/enums/motivo-constancia-servicio.enum';
 import { Solicitud } from './entities/solicitud.entity';
 import { SolicitudesController } from './solicitudes.controller';
 import { SolicitudesService } from './solicitudes.service';
@@ -73,6 +75,9 @@ describe('SolicitudesController', () => {
               .fn()
               .mockResolvedValue(mockSolicitud),
             crearSolicitudDisponibilidadServicios: jest
+              .fn()
+              .mockResolvedValue(mockSolicitud),
+            crearSolicitudConstanciaServicio: jest
               .fn()
               .mockResolvedValue(mockSolicitud),
           },
@@ -214,6 +219,35 @@ describe('SolicitudesController', () => {
       jest.mocked(service.crearSolicitudDisponibilidadServicios),
     ).toHaveBeenCalledWith(dto);
     expect(result).toEqual(mockSolicitud);
+  });
+
+  it('crearServicioExistente y crearConstanciaServicio deben delegar el registro en el servicio', async () => {
+    const dto: CreateSolicitudConstanciaServicioDto = {
+      tipoServicio: 'Domiciliar',
+      nis: 'NIS-45892',
+      propietarioInmueble: 'María Elena Rodríguez',
+      nombreSolicitante: 'Carlos Mora',
+      identificacionSolicitante: '1-1234-0567',
+      correoElectronico: 'carlos@ejemplo.com',
+      telefono: '8888-1234',
+      naturalezaInmueble: NaturalezaInmuebleCambioTitular.INSCRITO,
+      calidadTitular: CalidadTitularCambioTitular.PROPIETARIO,
+      provincia: 'San José',
+      canton: 'Pérez Zeledón',
+      distrito: 'San Isidro',
+      direccionExacta: '100 m norte',
+      motivo: MotivoConstanciaServicio.BONO_VIVIENDA,
+      medioNotificacionPrincipal: MedioNotificacionCambioTitular.CORREO,
+    };
+
+    const res1 = await controller.crearServicioExistente(dto);
+    expect(
+      jest.mocked(service.crearSolicitudConstanciaServicio),
+    ).toHaveBeenCalledWith(dto);
+    expect(res1).toEqual(mockSolicitud);
+
+    const res2 = await controller.crearConstanciaServicio(dto);
+    expect(res2).toEqual(mockSolicitud);
   });
 
   it('findByCodigoSeguimiento debe consultar la solicitud por código público', async () => {

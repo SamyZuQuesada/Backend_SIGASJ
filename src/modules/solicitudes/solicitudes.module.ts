@@ -10,6 +10,7 @@ import { SolicitudArregloPago } from './entities/solicitud-arreglo-pago.entity';
 import { SolicitudCambioTitular } from './entities/solicitud-cambio-titular.entity';
 import { SolicitudDisponibilidadServicios } from './entities/solicitud-disponibilidad-servicios.entity';
 import { SolicitudInfraestructuraLinderos } from './entities/solicitud-infraestructura-linderos.entity';
+import { SolicitudConstanciaServicio } from './entities/solicitud-constancia-servicio.entity';
 import { TipoSolicitud } from './entities/tipo-solicitud.entity';
 
 import { FormulariosOficialesController } from './formularios-oficiales.controller';
@@ -30,6 +31,7 @@ import { TiposSolicitudService } from './tipos-solicitud.service';
       SolicitudInfraestructuraLinderos,
       SolicitudAfiliacion,
       SolicitudDisponibilidadServicios,
+      SolicitudConstanciaServicio,
       DocumentoSolicitud,
       FormularioOficial,
     ]),

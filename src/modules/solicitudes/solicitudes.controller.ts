@@ -35,6 +35,7 @@ import { CreateSolicitudArregloPagoDto } from './dto/create-solicitud-arreglo-pa
 import { CreateSolicitudCambioTitularDto } from './dto/create-solicitud-cambio-titular.dto';
 import { CreateSolicitudDisponibilidadServiciosDto } from './dto/create-solicitud-disponibilidad-servicios.dto';
 import { CreateSolicitudInfraestructuraLinderosDto } from './dto/create-solicitud-infraestructura-linderos.dto';
+import { CreateSolicitudConstanciaServicioDto } from './dto/create-solicitud-constancia-servicio.dto';
 import { QuerySolicitudesDto } from './dto/query-solicitudes.dto';
 
 import { SolicitudesAprobadaPendientesResponseDto } from './dto/solicitudes-aprobada-pendientes-response.dto';
@@ -203,6 +204,54 @@ export class SolicitudesController {
     @Body() dto: CreateSolicitudDisponibilidadServiciosDto,
   ): Promise<Solicitud> {
     return this.solicitudesService.crearSolicitudDisponibilidadServicios(dto);
+  }
+
+  @Post('servicio-existente')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Registrar Constancia de Servicio Existente (Público)',
+    description:
+      'Recibe los datos del formulario de Constancia de Servicio Existente. Valida tipo de servicio, NIS, solicitante, propietario, inmueble, ubicación, motivo (exigiendo descripción para "Otro"), trámite por realizar y medios de notificación. Genera la Solicitud con su detalle relacionado.',
+  })
+  @ApiResponse({
+    status: 201,
+    description:
+      'Solicitud de constancia de servicio existente registrada con éxito',
+    type: Solicitud,
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Datos inválidos, motivo no permitido, descripción de otroMotivo faltante o campos obligatorios ausentes',
+  })
+  crearServicioExistente(
+    @Body() dto: CreateSolicitudConstanciaServicioDto,
+  ): Promise<Solicitud> {
+    return this.solicitudesService.crearSolicitudConstanciaServicio(dto);
+  }
+
+  @Post('constancia-servicio')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary:
+      'Registrar Constancia de Servicio Existente (Alias ruta constancia-servicio)',
+    description:
+      'Alias amigable para registrar la solicitud de constancia de servicio existente.',
+  })
+  @ApiResponse({
+    status: 201,
+    description:
+      'Solicitud de constancia de servicio existente registrada con éxito',
+    type: Solicitud,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Datos inválidos',
+  })
+  crearConstanciaServicio(
+    @Body() dto: CreateSolicitudConstanciaServicioDto,
+  ): Promise<Solicitud> {
+    return this.solicitudesService.crearSolicitudConstanciaServicio(dto);
   }
 
   @Get('aprobadas-pendientes')
