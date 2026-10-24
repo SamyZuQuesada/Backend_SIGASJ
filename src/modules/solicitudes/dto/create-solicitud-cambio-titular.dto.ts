@@ -1,12 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
+  IsArray,
   IsEnum,
   IsNotEmpty,
   IsOptional,
   IsString,
   MaxLength,
+  ValidateNested,
 } from 'class-validator';
+import { DocumentoSolicitudReferenciaDto } from './documento-solicitud-referencia.dto';
 import {
   CALIDADES_TITULAR_CAMBIO_TITULAR,
   CalidadTitularCambioTitular,
@@ -221,4 +224,15 @@ export class CreateSolicitudCambioTitularDto {
   @IsOptional()
   @IsString({ message: 'La firma debe ser una cadena de texto' })
   firma?: string;
+
+  @ApiPropertyOptional({
+    type: () => [DocumentoSolicitudReferenciaDto],
+    description:
+      'Referencias a documentos adjuntos cargados previamente (upload + token)',
+  })
+  @IsOptional()
+  @IsArray({ message: 'Los documentos deben ser un arreglo' })
+  @ValidateNested({ each: true })
+  @Type(() => DocumentoSolicitudReferenciaDto)
+  documentos?: DocumentoSolicitudReferenciaDto[];
 }

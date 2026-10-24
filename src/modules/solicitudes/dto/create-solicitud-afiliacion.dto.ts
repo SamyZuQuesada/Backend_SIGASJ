@@ -1,13 +1,16 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
+  IsArray,
   IsDateString,
   IsEmail,
   IsNotEmpty,
   IsOptional,
   IsString,
   MaxLength,
+  ValidateNested,
 } from 'class-validator';
+import { DocumentoSolicitudReferenciaDto } from './documento-solicitud-referencia.dto';
 
 const trimString = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
@@ -291,4 +294,15 @@ export class CreateSolicitudAfiliacionDto {
     message: 'La firma del recomendante 2 debe ser una cadena de texto',
   })
   recomendacion2Firma?: string;
+
+  @ApiPropertyOptional({
+    type: () => [DocumentoSolicitudReferenciaDto],
+    description:
+      'Referencias a documentos adjuntos cargados previamente (upload + token)',
+  })
+  @IsOptional()
+  @IsArray({ message: 'Los documentos deben ser un arreglo' })
+  @ValidateNested({ each: true })
+  @Type(() => DocumentoSolicitudReferenciaDto)
+  documentos?: DocumentoSolicitudReferenciaDto[];
 }

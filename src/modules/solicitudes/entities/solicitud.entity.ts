@@ -1,6 +1,9 @@
+import { BadRequestException } from '@nestjs/common';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  AfterLoad,
   BeforeInsert,
+  BeforeUpdate,
   Column,
   CreateDateColumn,
   DeleteDateColumn,
@@ -14,7 +17,12 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { EstadoSolicitud } from '../../../common/enums/estado-solicitud.enum';
+import {
+  formatearCodigoSeguimiento,
+  normalizarCodigoSeguimiento,
+} from '../utils/codigo-seguimiento.util';
 import { DocumentoSolicitud } from './documento-solicitud.entity';
+import { HistorialSolicitud } from './historial-solicitud.entity';
 import { TipoSolicitud } from './tipo-solicitud.entity';
 import { SolicitudAfiliacion } from './solicitud-afiliacion.entity';
 import { SolicitudArregloPago } from './solicitud-arreglo-pago.entity';
@@ -63,12 +71,12 @@ export class Solicitud {
   tipoSolicitud: TipoSolicitud;
 
   @ApiProperty({
-    example: 'SOL-2026-ABCD12',
+    example: 'SOL-2026-A82K91',
     description:
       'Código alfanumérico único para el seguimiento público del avance del trámite (Card 8)',
     maxLength: 50,
   })
-  @Column({ type: 'varchar', length: 50, unique: true })
+  @Column({ type: 'varchar', length: 50, unique: true, update: false })
   codigoSeguimiento: string;
 
   @ApiProperty({
@@ -120,7 +128,10 @@ export class Solicitud {
   @OneToMany(() => DocumentoSolicitud, (documento) => documento.solicitud)
   documentos?: DocumentoSolicitud[];
 
-  historial?: any[];
+  @OneToMany(() => HistorialSolicitud, (historial) => historial.solicitud, {
+    cascade: true,
+  })
+  historial?: HistorialSolicitud[];
 
   /* =========================================================================
    * PREPARACIÓN DE RELACIONES CON DETALLES DE LOS SEIS FORMULARIOS OFICIALES:
@@ -172,7 +183,20 @@ export class Solicitud {
   )
   detalleConstanciaServicio?: SolicitudConstanciaServicio;
 
-  detalleServicioExistente?: SolicitudConstanciaServicio | any;
+  get detalleServicioExistente(): SolicitudConstanciaServicio | undefined {
+    return this.detalleConstanciaServicio;
+  }
+
+  set detalleServicioExistente(value: SolicitudConstanciaServicio | undefined) {
+    this.detalleConstanciaServicio = value;
+  }
+
+  private _codigoSeguimientoOriginal?: string;
+
+  @AfterLoad()
+  capturarCodigoOriginal(): void {
+    this._codigoSeguimientoOriginal = this.codigoSeguimiento;
+  }
 
   @BeforeInsert()
   establecerValoresPorDefecto(): void {
@@ -183,7 +207,29 @@ export class Solicitud {
       this.fechaIngreso = new Date();
     }
     if (this.codigoSeguimiento) {
-      this.codigoSeguimiento = this.codigoSeguimiento.trim().toUpperCase();
+      this.codigoSeguimiento = normalizarCodigoSeguimiento(
+        this.codigoSeguimiento,
+      );
+    } else {
+      const year =
+        this.fechaIngreso?.getFullYear?.() || new Date().getFullYear();
+      this.codigoSeguimiento = formatearCodigoSeguimiento(year);
+    }
+    this._codigoSeguimientoOriginal = this.codigoSeguimiento;
+  }
+
+  @BeforeUpdate()
+  validarInmutabilidadCodigo(): void {
+    if (
+      this._codigoSeguimientoOriginal &&
+      this.codigoSeguimiento &&
+      normalizarCodigoSeguimiento(this.codigoSeguimiento) !==
+        normalizarCodigoSeguimiento(this._codigoSeguimientoOriginal)
+    ) {
+      throw new BadRequestException(
+        'El código de seguimiento de una solicitud es inmutable y no puede ser modificado',
+      );
     }
   }
 }
+

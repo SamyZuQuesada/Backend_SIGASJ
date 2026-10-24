@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { DocumentoSolicitud } from './entities/documento-solicitud.entity';
 import { FormularioOficial } from './entities/formulario-oficial.entity';
+import { HistorialSolicitud } from './entities/historial-solicitud.entity';
 import { SolicitudServicio } from './entities/solicitud-servicio.entity';
 import { Solicitud } from './entities/solicitud.entity';
 import { SolicitudAfiliacion } from './entities/solicitud-afiliacion.entity';
@@ -33,6 +34,7 @@ import { TiposSolicitudService } from './tipos-solicitud.service';
       SolicitudDisponibilidadServicios,
       SolicitudConstanciaServicio,
       DocumentoSolicitud,
+      HistorialSolicitud,
       FormularioOficial,
     ]),
   ],

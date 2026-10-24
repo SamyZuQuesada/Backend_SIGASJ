@@ -32,13 +32,36 @@ export class CreateDocumentoSolicitudTable1724686170000 implements MigrationInte
           { name: 'solicitudId', type: 'int', isNullable: true },
           { name: 'tipoDocumento', type: 'varchar', length: '40' },
           { name: 'nombreOriginal', type: 'varchar', length: '255' },
+          {
+            name: 'nombreInterno',
+            type: 'varchar',
+            length: '255',
+            isNullable: true,
+          },
+          {
+            name: 'mimeType',
+            type: 'varchar',
+            length: '100',
+            isNullable: true,
+          },
           { name: 'tipoArchivo', type: 'varchar', length: '100' },
+          {
+            name: 'tamano',
+            type: 'int',
+            isNullable: true,
+          },
+          { name: 'tamanio', type: 'int' },
+          {
+            name: 'ubicacion',
+            type: 'varchar',
+            length: '500',
+            isNullable: true,
+          },
           {
             name: 'rutaReferenciaArchivo',
             type: 'varchar',
             length: '500',
           },
-          { name: 'tamanio', type: 'int' },
           { name: 'tokenReclamo', type: 'varchar', length: '64' },
           {
             name: 'fechaCarga',
@@ -86,6 +109,14 @@ export class CreateDocumentoSolicitudTable1724686170000 implements MigrationInte
         name: 'UQ_DocumentoSolicitud_tokenReclamo',
         columnNames: ['tokenReclamo'],
         isUnique: true,
+      }),
+    );
+
+    await queryRunner.createIndex(
+      'DocumentoSolicitud',
+      new TableIndex({
+        name: 'IX_DocumentoSolicitud_nombreInterno',
+        columnNames: ['nombreInterno'],
       }),
     );
   }

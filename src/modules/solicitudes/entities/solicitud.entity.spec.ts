@@ -69,6 +69,38 @@ describe('Solicitud Entity (Encabezado central)', () => {
     expect(solicitud.codigoSeguimiento).toBe('SOL-2026-XYZ99');
   });
 
+  it('debe auto-generar un código alfanumérico seguro en BeforeInsert si la solicitud no lo posee', () => {
+    const solicitud = new Solicitud();
+    solicitud.establecerValoresPorDefecto();
+
+    expect(solicitud.codigoSeguimiento).toBeDefined();
+    expect(solicitud.codigoSeguimiento).toMatch(/^SOL-\d{4}-[A-Z0-9]{6}$/);
+  });
+
+  it('debe impedir la modificación de codigoSeguimiento en BeforeUpdate (inmutabilidad y estabilidad)', () => {
+    const solicitud = new Solicitud();
+    solicitud.codigoSeguimiento = 'SOL-2026-A82K91';
+    solicitud.capturarCodigoOriginal();
+
+    // Intentar alterar el código
+    solicitud.codigoSeguimiento = 'SOL-2026-HACK99';
+
+    expect(() => solicitud.validarInmutabilidadCodigo()).toThrow(
+      'El código de seguimiento de una solicitud es inmutable y no puede ser modificado',
+    );
+  });
+
+  it('debe permitir la actualización de otros campos en BeforeUpdate si el código permanece estable', () => {
+    const solicitud = new Solicitud();
+    solicitud.codigoSeguimiento = 'SOL-2026-A82K91';
+    solicitud.capturarCodigoOriginal();
+
+    // El estado cambia pero el código se mantiene intacto
+    solicitud.estado = EstadoSolicitud.APROBADA;
+
+    expect(() => solicitud.validarInmutabilidadCodigo()).not.toThrow();
+  });
+
   it('debe permitir almacenar y actualizar el estado actual de la solicitud', () => {
     const solicitud = new Solicitud();
     solicitud.estado = EstadoSolicitud.PENDIENTE;
