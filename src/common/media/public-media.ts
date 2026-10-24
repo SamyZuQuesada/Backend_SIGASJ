@@ -375,18 +375,35 @@ export function saveActividadDocument(
   const filename = `${Date.now()}-${randomUUID()}${extension}`;
   writeFileSync(join(folder, filename), file.buffer);
 
-  const rutaReferenciaArchivo = `/api/v1/fontanero/actividades/${actividadId}/documentos/${filename}`;
+  const rutaReferenciaArchivo = `/uploads/actividades-fontanero/${actividadId}/${filename}`;
   return { rutaReferenciaArchivo, filename };
+}
+
+function actividadDocumentFilename(
+  actividadId: number,
+  rutaReferenciaArchivo: string,
+): string | null {
+  const prefixes = [
+    `/uploads/actividades-fontanero/${actividadId}/`,
+    `/api/v1/uploads/actividades-fontanero/${actividadId}/`,
+    `/api/v1/fontanero/actividades/${actividadId}/documentos/`,
+  ];
+  const prefix = prefixes.find((value) =>
+    rutaReferenciaArchivo.startsWith(value),
+  );
+  if (!prefix) return null;
+  return rutaReferenciaArchivo.substring(prefix.length);
 }
 
 export function deleteActividadDocument(
   actividadId: number,
   rutaReferenciaArchivo: string,
 ): void {
-  const prefix = `/api/v1/fontanero/actividades/${actividadId}/documentos/`;
-  if (!rutaReferenciaArchivo.startsWith(prefix)) return;
-
-  const filename = rutaReferenciaArchivo.substring(prefix.length);
+  const filename = actividadDocumentFilename(
+    actividadId,
+    rutaReferenciaArchivo,
+  );
+  if (!filename) return;
   const safeName = basename(filename);
   if (!safeName || safeName !== filename || safeName.includes('..')) return;
 

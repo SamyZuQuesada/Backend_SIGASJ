@@ -9,10 +9,42 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
   Min,
+  Validate,
+  ValidatorConstraint,
+  type ValidationArguments,
+  type ValidatorConstraintInterface,
 } from 'class-validator';
 import { IsFechaActividadValida } from '../../../common/validators/is-fecha-actividad-valida.validator';
+
+const HORA_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+@ValidatorConstraint({ name: 'periodoActividadValido', async: false })
+class PeriodoActividadValidoConstraint implements ValidatorConstraintInterface {
+  validate(_: unknown, args: ValidationArguments) {
+    const dto = args.object as CreateActividadDto;
+    const inicio = dto.fechaActividad?.trim();
+    const fin = dto.fechaFin?.trim();
+    const horaInicio = dto.horaInicio?.trim();
+    const horaFin = dto.horaFin?.trim();
+    if (!inicio || !fin || !horaInicio || !horaFin) {
+      return true;
+    }
+    if (fin < inicio) {
+      return false;
+    }
+    if (fin === inicio && horaFin <= horaInicio) {
+      return false;
+    }
+    return true;
+  }
+
+  defaultMessage() {
+    return 'La finalización no puede ser anterior al inicio de la actividad';
+  }
+}
 
 const rawValue = ({ value, obj, key }: TransformFnParams): unknown => {
   if (obj && typeof obj === 'object' && key in obj) {
@@ -24,6 +56,15 @@ const rawValue = ({ value, obj, key }: TransformFnParams): unknown => {
 const trimString = (params: TransformFnParams): unknown => {
   const raw = rawValue(params);
   return typeof raw === 'string' ? raw.trim() : raw;
+};
+
+const normalizeHora = (params: TransformFnParams): unknown => {
+  const raw = trimString(params);
+  if (typeof raw !== 'string') {
+    return raw;
+  }
+  const match = /^([01]\d|2[0-3]):[0-5]\d/.exec(raw);
+  return match ? raw.slice(0, 5) : raw;
 };
 
 const trimOptionalString = (params: TransformFnParams): unknown => {
@@ -48,11 +89,31 @@ const parseOptionalJsonObject = (params: TransformFnParams): unknown => {
   }
 };
 
+const toInt = (params: TransformFnParams): unknown => {
+  const raw = rawValue(params);
+  if (typeof raw === 'number') return raw;
+  if (typeof raw === 'string' && /^\d+$/.test(raw.trim())) {
+    return Number.parseInt(raw.trim(), 10);
+  }
+  return raw;
+};
+
+const toOptionalNumber = (params: TransformFnParams): unknown => {
+  const raw = rawValue(params);
+  if (raw === undefined || raw === null || raw === '') return undefined;
+  if (typeof raw === 'number') return raw;
+  if (typeof raw === 'string' && raw.trim() !== '' && Number.isFinite(Number(raw))) {
+    return Number(raw);
+  }
+  return raw;
+};
+
 export class CreateActividadDto {
   @ApiProperty({
     example: 1,
     description: 'ID del tipo de actividad del catálogo',
   })
+  @Transform(toInt)
   @IsInt({ message: 'El tipo de actividad debe ser un número entero' })
   @Min(1, { message: 'El tipo de actividad es obligatorio' })
   tipoActividadId: number;
@@ -68,6 +129,40 @@ export class CreateActividadDto {
   )
   @IsFechaActividadValida()
   fechaActividad: string;
+
+  @ApiProperty({
+    example: '07:30',
+    description: 'Hora de inicio de la actividad (HH:mm)',
+  })
+  @Transform(normalizeHora)
+  @IsNotEmpty({ message: 'La hora de inicio es obligatoria' })
+  @Matches(HORA_PATTERN, {
+    message: 'La hora de inicio debe tener formato HH:mm',
+  })
+  horaInicio: string;
+
+  @ApiProperty({
+    example: '2026-09-08',
+    description: 'Fecha en que finaliza la actividad (YYYY-MM-DD)',
+  })
+  @Transform(trimString)
+  @IsDateString(
+    {},
+    { message: 'La fecha de finalización debe tener formato YYYY-MM-DD' },
+  )
+  fechaFin: string;
+
+  @ApiProperty({
+    example: '16:00',
+    description: 'Hora de finalización de la actividad (HH:mm)',
+  })
+  @Transform(normalizeHora)
+  @IsNotEmpty({ message: 'La hora de finalización es obligatoria' })
+  @Matches(HORA_PATTERN, {
+    message: 'La hora de finalización debe tener formato HH:mm',
+  })
+  @Validate(PeriodoActividadValidoConstraint)
+  horaFin: string;
 
   @ApiProperty({ example: 'Reparación de tubería', maxLength: 200 })
   @Transform(trimString)
@@ -112,11 +207,13 @@ export class CreateActividadDto {
   @ApiPropertyOptional({
     description: 'Presión medida en PSI/bar para toma de presión',
   })
+  @Transform(toOptionalNumber)
   @IsOptional()
   @IsNumber({}, { message: 'La presión medida debe ser un número' })
   presionMedida?: number;
 
   @ApiPropertyOptional({ description: 'Caudal medido para control operativo' })
+  @Transform(toOptionalNumber)
   @IsOptional()
   @IsNumber({}, { message: 'El caudal debe ser un número' })
   caudal?: number;
@@ -124,6 +221,7 @@ export class CreateActividadDto {
   @ApiPropertyOptional({
     description: 'Cantidad de cloro medida para control de cloros',
   })
+  @Transform(toOptionalNumber)
   @IsOptional()
   @IsNumber({}, { message: 'La cantidad de cloro debe ser un número' })
   cantidadCloro?: number;

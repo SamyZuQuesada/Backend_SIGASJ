@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, type TransformFnParams } from 'class-transformer';
 import {
   IsArray,
+  IsInt,
   IsNotEmpty,
   IsNumber,
   IsObject,
@@ -32,6 +33,29 @@ const trimOptionalString = (params: TransformFnParams): unknown => {
   }
   const trimmed = raw.trim();
   return trimmed === '' ? undefined : trimmed;
+};
+
+const toOptionalNumber = (params: TransformFnParams): unknown => {
+  const raw = rawValue(params);
+  if (raw === undefined || raw === null || raw === '') return undefined;
+  if (typeof raw === 'number') return raw;
+  if (typeof raw === 'string' && raw.trim() !== '' && Number.isFinite(Number(raw))) {
+    return Number(raw);
+  }
+  return raw;
+};
+
+const toIdArray = (params: TransformFnParams): unknown => {
+  const raw = rawValue(params);
+  if (raw === undefined || raw === null || raw === '') {
+    return undefined;
+  }
+  const values = Array.isArray(raw) ? raw : [raw];
+  return values
+    .map((value) =>
+      typeof value === 'number' ? value : Number.parseInt(String(value), 10),
+    )
+    .filter((value) => Number.isInteger(value) && value > 0);
 };
 
 export class CorregirActividadDto {
@@ -69,11 +93,13 @@ export class CorregirActividadDto {
     description: 'Presión medida en PSI/bar para toma de presión',
   })
   @IsOptional()
+  @Transform(toOptionalNumber)
   @IsNumber({}, { message: 'La presión medida debe ser un número' })
   presionMedida?: number;
 
   @ApiPropertyOptional({ description: 'Caudal medido para control operativo' })
   @IsOptional()
+  @Transform(toOptionalNumber)
   @IsNumber({}, { message: 'El caudal debe ser un número' })
   caudal?: number;
 
@@ -81,6 +107,7 @@ export class CorregirActividadDto {
     description: 'Cantidad de cloro medida para control de cloros',
   })
   @IsOptional()
+  @Transform(toOptionalNumber)
   @IsNumber({}, { message: 'La cantidad de cloro debe ser un número' })
   cantidadCloro?: number;
 
@@ -105,4 +132,14 @@ export class CorregirActividadDto {
   @IsOptional()
   @IsArray({ message: 'Los documentos deben ser una lista' })
   documentos?: string[];
+
+  @ApiPropertyOptional({
+    description: 'Identificadores de evidencias a eliminar al corregir',
+    type: [Number],
+  })
+  @Transform(toIdArray)
+  @IsOptional()
+  @IsArray({ message: 'Las evidencias a eliminar deben ser una lista' })
+  @IsInt({ each: true, message: 'Cada evidencia a eliminar debe ser un identificador' })
+  documentosEliminarIds?: number[];
 }

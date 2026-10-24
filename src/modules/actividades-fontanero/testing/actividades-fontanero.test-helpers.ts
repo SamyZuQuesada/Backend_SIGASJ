@@ -45,6 +45,7 @@ const CATALOGO_TIPOS: Array<{
     descripcion:
       'Registro de incapacidad o periodo de vacaciones del fontanero.',
     orden: 6,
+    activo: false,
   },
 ];
 
@@ -75,6 +76,9 @@ export const buildValidCreateActividadPayload = (
 ) => ({
   tipoActividadId,
   fechaActividad: '2026-09-07',
+  horaInicio: '07:30',
+  fechaFin: '2026-09-07',
+  horaFin: '16:00',
   titulo: 'Reparación de tubería en Calle Principal',
   descripcion: 'Se reemplazó tramo dañado de 2 metros',
   ubicacion: 'Calle Principal, San Juan',

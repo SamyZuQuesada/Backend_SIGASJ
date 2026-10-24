@@ -14,6 +14,7 @@ import { Role } from '../../common/enums/role.enum';
 import { TipoActividadFontaneroCodigo } from '../../common/enums/tipo-actividad-fontanero-codigo.enum';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import {
+  MAX_ACTIVIDAD_DOCUMENT_FILES,
   deleteActividadDocument,
   saveActividadDocument,
   validateActividadDocument,
@@ -28,6 +29,7 @@ import { QueryResumenActividadesDto } from './dto/query-resumen-actividades.dto'
 import { RevisarActividadDto } from './dto/revisar-actividad.dto';
 import { SolicitarCorreccionDto } from './dto/solicitar-correccion.dto';
 import { ACTIVIDADES_MSG } from './actividades-fontanero.messages';
+import { esTipoActividadOfrecidoEnRegistro } from './tipo-actividad-fontanero.catalogo';
 import { validarDatosEspecificosActividad } from './validators/datos-especificos-actividad.validator';
 import { ActividadFontanero } from './entities/actividad-fontanero.entity';
 import { DocumentoActividadFontanero } from './entities/documento-actividad-fontanero.entity';
@@ -40,6 +42,9 @@ export type ActividadFontaneroResponse = {
   tipoActividadNombre: string;
   tipoActividadCodigo?: string;
   fechaActividad: string;
+  horaInicio?: string | null;
+  fechaFin?: string | null;
+  horaFin?: string | null;
   fechaRegistro?: Date;
   titulo: string;
   descripcion: string | null;
@@ -159,15 +164,18 @@ export class ActividadesFontaneroService {
       where: { activo: true },
       order: { orden: 'ASC', id: 'ASC' },
     });
+    const ofrecidos = tipos.filter((tipo) =>
+      esTipoActividadOfrecidoEnRegistro(tipo.codigo),
+    );
 
     return {
-      data: tipos.map((tipo) => ({
+      data: ofrecidos.map((tipo) => ({
         id: tipo.id,
         codigo: tipo.codigo,
         nombre: tipo.nombre,
         orden: tipo.orden,
       })),
-      total: tipos.length,
+      total: ofrecidos.length,
     };
   }
 
@@ -405,6 +413,7 @@ export class ActividadesFontaneroService {
     id: number,
     dto: CorregirActividadDto,
     user: AuthenticatedUser,
+    files: ActividadDocumentFile[] = [],
   ): Promise<ActividadFontaneroResponse> {
     const actividad = await this.requireOwnedActividad(id, user.userId);
 
@@ -412,7 +421,44 @@ export class ActividadesFontaneroService {
       throw new ForbiddenException(ACTIVIDADES_MSG.forbidden);
     }
 
+    if (files.length > MAX_ACTIVIDAD_DOCUMENT_FILES) {
+      throw new BadRequestException(ACTIVIDADES_MSG.documentoLimiteCantidad);
+    }
+    for (const file of files) validateActividadDocument(file);
+
+    const horarioPrevio = this.horarioDesdeDatos(actividad.datosEspecificos);
+    const documentosPrevios = actividad.datosEspecificos?.documentos;
     const datosEspecificos = this.extractDatosEspecificos(dto);
+    if (horarioPrevio.horaInicio) {
+      datosEspecificos.horaInicio = horarioPrevio.horaInicio;
+    }
+    if (horarioPrevio.fechaFin) {
+      datosEspecificos.fechaFin = horarioPrevio.fechaFin;
+    }
+    if (horarioPrevio.horaFin) {
+      datosEspecificos.horaFin = horarioPrevio.horaFin;
+    }
+    const previos = [...(actividad.documentos ?? [])];
+    const eliminarIds = new Set(dto.documentosEliminarIds ?? []);
+    const aEliminar = previos.filter((documento) =>
+      eliminarIds.has(documento.id),
+    );
+    const aConservar = previos.filter(
+      (documento) => !eliminarIds.has(documento.id),
+    );
+
+    if (aConservar.length + files.length > MAX_ACTIVIDAD_DOCUMENT_FILES) {
+      throw new BadRequestException(ACTIVIDADES_MSG.documentoLimiteCantidad);
+    }
+
+    if (files.length > 0 || aEliminar.length > 0) {
+      datosEspecificos.documentos = [
+        ...aConservar.map((documento) => documento.nombreOriginal),
+        ...files.map((file) => file.originalname),
+      ];
+    } else if (documentosPrevios !== undefined) {
+      datosEspecificos.documentos = documentosPrevios;
+    }
     if (actividad.tipoActividad) {
       const erroresEspecificos = validarDatosEspecificosActividad({
         codigo: actividad.tipoActividad.codigo,
@@ -433,7 +479,41 @@ export class ActividadesFontaneroService {
     actividad.observacionCorreccion = null;
 
     const saved = await this.actividadRepository.save(actividad);
-    return this.toFontaneroResponse(saved);
+    const writtenDocuments: Array<{ rutaReferenciaArchivo: string }> = [];
+
+    try {
+      for (const file of files) {
+        const { rutaReferenciaArchivo } = saveActividadDocument(
+          saved.id,
+          file,
+        );
+        writtenDocuments.push({ rutaReferenciaArchivo });
+        const document = this.documentoRepository.create({
+          nombreOriginal: file.originalname,
+          tipoArchivo: file.mimetype,
+          rutaReferenciaArchivo,
+          tamanio: file.size,
+          actividad: saved,
+        });
+        await this.documentoRepository.save(document);
+      }
+
+      for (const previo of aEliminar) {
+        await this.documentoRepository.remove(previo);
+        deleteActividadDocument(saved.id, previo.rutaReferenciaArchivo);
+      }
+    } catch (error) {
+      for (const document of writtenDocuments) {
+        try {
+          deleteActividadDocument(saved.id, document.rutaReferenciaArchivo);
+        } catch {
+          /* compensación best-effort */
+        }
+      }
+      throw error;
+    }
+
+    return this.toFontaneroResponse(await this.requireActividad(saved.id));
   }
 
   async listarAdmin(
@@ -810,7 +890,7 @@ export class ActividadesFontaneroService {
       }
 
       const saved = await this.actividadRepository.save(actividad);
-      return this.toAdminResponse(saved);
+      return this.toAdminResponse(await this.requireActividad(saved.id));
     });
   }
 
@@ -826,7 +906,7 @@ export class ActividadesFontaneroService {
       actividad.revisadoPorId = user.userId;
 
       const saved = await this.actividadRepository.save(actividad);
-      return this.toAdminResponse(saved);
+      return this.toAdminResponse(await this.requireActividad(saved.id));
     });
   }
 
@@ -857,7 +937,11 @@ export class ActividadesFontaneroService {
     return withDbRetry(async () => {
       const actividad = await this.actividadRepository.findOne({
         where: { id },
-        relations: { tipoActividad: true },
+        relations: {
+          tipoActividad: true,
+          documentos: true,
+          fontanero: true,
+        },
       });
       if (!actividad) {
         throw new NotFoundException(ACTIVIDADES_MSG.actividadNotFound);
@@ -891,7 +975,37 @@ export class ActividadesFontaneroService {
     if (dto.resultadoVisita !== undefined)
       datos.resultadoVisita = dto.resultadoVisita;
     if (dto.documentos !== undefined) datos.documentos = dto.documentos;
+    if ('horaInicio' in dto && dto.horaInicio) {
+      datos.horaInicio = dto.horaInicio;
+    }
+    if ('fechaFin' in dto && dto.fechaFin) {
+      datos.fechaFin = dto.fechaFin;
+    }
+    if ('horaFin' in dto && dto.horaFin) {
+      datos.horaFin = dto.horaFin;
+    }
     return datos;
+  }
+
+  private horarioDesdeDatos(datos: Record<string, unknown> | null | undefined) {
+    const source = datos ?? {};
+    const asText = (value: unknown): string | null =>
+      typeof value === 'string' && value.trim() ? value.trim() : null;
+    return {
+      horaInicio: asText(source.horaInicio),
+      fechaFin: asText(source.fechaFin),
+      horaFin: asText(source.horaFin),
+    };
+  }
+
+  private datosSinHorario(
+    datos: Record<string, unknown> | null | undefined,
+  ): Record<string, unknown> | null {
+    if (!datos) {
+      return null;
+    }
+    const { horaInicio: _h1, fechaFin: _f, horaFin: _h2, ...rest } = datos;
+    return Object.keys(rest).length > 0 ? rest : null;
   }
 
   private toFontaneroResponse(
@@ -906,18 +1020,23 @@ export class ActividadesFontaneroService {
         ? 'REVISADA'
         : 'PENDIENTE');
 
+    const horario = this.horarioDesdeDatos(actividad.datosEspecificos);
+
     return {
       id: actividad.id,
       tipoActividadId: tipo?.id ?? 0,
       tipoActividadNombre: tipo?.nombre ?? actividad.titulo ?? 'Sin tipo',
       tipoActividadCodigo: tipo?.codigo,
       fechaActividad: actividad.fechaActividad ?? '',
+      horaInicio: horario.horaInicio,
+      fechaFin: horario.fechaFin,
+      horaFin: horario.horaFin,
       fechaRegistro: actividad.createdAt,
       titulo: actividad.titulo,
       descripcion: actividad.descripcion ?? null,
       ubicacion: actividad.ubicacion ?? null,
       observaciones: actividad.observaciones ?? null,
-      datosEspecificos: actividad.datosEspecificos ?? null,
+      datosEspecificos: this.datosSinHorario(actividad.datosEspecificos),
       estado: actividad.estado,
       estadoRevision,
       observacionCorreccion: actividad.observacionCorreccion ?? null,
