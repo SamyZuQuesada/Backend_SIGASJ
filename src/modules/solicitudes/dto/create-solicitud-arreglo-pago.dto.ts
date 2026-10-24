@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  IsArray,
   IsEnum,
   IsNotEmpty,
   IsNumber,
@@ -8,11 +9,13 @@ import {
   IsString,
   MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator';
 import {
   PlazoArregloPago,
   PLAZOS_ARREGLO_PAGO_PERMITIDOS,
 } from '../../../common/enums/plazo-arreglo-pago.enum';
+import { DocumentoSolicitudReferenciaDto } from './documento-solicitud-referencia.dto';
 
 /**
  * DTO para la recepción y validación del formulario oficial de Solicitud de Arreglo de Pago Domiciliar.
@@ -116,4 +119,15 @@ export class CreateSolicitudArregloPagoDto {
   @IsOptional()
   @IsString({ message: 'La firma debe ser una cadena de texto' })
   firma?: string;
+
+  @ApiPropertyOptional({
+    type: () => [DocumentoSolicitudReferenciaDto],
+    description:
+      'Referencias a documentos adjuntos cargados previamente (upload + token)',
+  })
+  @IsOptional()
+  @IsArray({ message: 'Los documentos deben ser un arreglo' })
+  @ValidateNested({ each: true })
+  @Type(() => DocumentoSolicitudReferenciaDto)
+  documentos?: DocumentoSolicitudReferenciaDto[];
 }

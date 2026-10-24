@@ -9,6 +9,7 @@ import {
   ParseIntPipe,
   Post,
   Query,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -19,9 +20,11 @@ import {
   ApiBody,
   ApiConsumes,
   ApiOperation,
+  ApiParam,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/enums/role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -288,17 +291,103 @@ export class SolicitudesController {
     return this.solicitudesService.findByCodigoSeguimiento(codigoSeguimiento);
   }
 
+  @Get([':solicitudId/documentos/:documentoId/descargar', ':solicitudId/documentos/:documentoId'])
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA, Role.FONTANERO)
+  @ApiOperation({
+    summary:
+      'Descargar o visualizar archivo binario de un documento de solicitud (Protegido)',
+    description:
+      'Transmite el contenido binario del archivo adjunto especificado, validando pertenencia a la solicitud, permisos y existencia física.',
+  })
+  @ApiParam({
+    name: 'solicitudId',
+    type: Number,
+    description: 'ID de la solicitud asociada',
+    example: 15,
+  })
+  @ApiParam({
+    name: 'documentoId',
+    type: Number,
+    description: 'ID del documento adjunto',
+    example: 40,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Contenido binario del archivo adjunto',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'No autenticado (401)',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'No autorizado (403)',
+  })
+  @ApiResponse({
+    status: 404,
+    description:
+      'Solicitud o documento inexistente, o documento no perteneciente a la solicitud (404)',
+  })
+  async descargarDocumento(
+    @Param('solicitudId', ParseIntPipe) solicitudId: number,
+    @Param('documentoId', ParseIntPipe) documentoId: number,
+    @Res() response: Response,
+  ) {
+    const documento = await this.solicitudesService.obtenerDocumento(
+      solicitudId,
+      documentoId,
+    );
+
+    response.setHeader('Content-Type', documento.mimeType);
+    response.setHeader(
+      'Content-Disposition',
+      `inline; filename*=UTF-8''${encodeURIComponent(documento.nombreOriginal)}`,
+    );
+
+    return response.sendFile(documento.rutaAbsoluta);
+  }
+
+  @Get(':id/detalle')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA, Role.FONTANERO)
+  @ApiOperation({
+    summary:
+      'Obtener toda la información necesaria para revisar una solicitud específica (Detalle administrativo)',
+    description:
+      'Reconoce el tipo de formulario y devuelve la información base, detalle específico, documentos identificados, estado, historial y campos de uso de la ASADA.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Información completa de la solicitud para revisión',
+    type: Solicitud,
+  })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
+  @ApiResponse({ status: 403, description: 'No autorizado' })
+  @ApiResponse({ status: 404, description: 'Solicitud no encontrada' })
+  obtenerDetalle(@Param('id', ParseIntPipe) id: number): Promise<Solicitud> {
+    return this.solicitudesService.obtenerDetalle(id);
+  }
+
   @Get(':id')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMINISTRADORA, Role.SECRETARIA, Role.FONTANERO)
   @ApiOperation({
-    summary: 'Consultar solicitud por ID interno',
+    summary: 'Consultar detalle de solicitud por ID interno (Protegido)',
+    description:
+      'Devuelve la información completa requerida para revisar la solicitud (tipo de formulario, detalle específico, documentos, historial y estado).',
   })
   @ApiResponse({
     status: 200,
+    description: 'Información de la solicitud obtenida correctamente',
     type: Solicitud,
   })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
+  @ApiResponse({ status: 403, description: 'No autorizado' })
+  @ApiResponse({ status: 404, description: 'Solicitud no encontrada' })
   findById(@Param('id', ParseIntPipe) id: number): Promise<Solicitud> {
     return this.solicitudesService.findById(id);
   }
@@ -306,13 +395,26 @@ export class SolicitudesController {
   @Get()
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA, Role.FONTANERO)
   @ApiOperation({
-    summary: 'Listar solicitudes digitales con filtros administrativos',
+    summary:
+      'Listar solicitudes digitales con filtros administrativos (Protegido)',
+    description:
+      'Consulta paginada de solicitudes con filtros por código, tipo, estado, rango de fechas e identificación. Ordenado cronológicamente y optimizado para omitir archivos pesados.',
   })
-  findAll(
-    @Query() query: QuerySolicitudesDto,
-  ): Promise<{ solicitudes: Solicitud[]; total: number }> {
+  @ApiResponse({
+    status: 200,
+    description: 'Listado paginado de solicitudes obtenido correctamente',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'No autenticado',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'No autorizado (solo personal administrativo)',
+  })
+  findAll(@Query() query: QuerySolicitudesDto) {
     return this.solicitudesService.findAll(query);
   }
 }

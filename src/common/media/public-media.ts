@@ -12,7 +12,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'fs';
-import { basename, extname, join } from 'path';
+import { basename, extname, join, resolve } from 'path';
 import { randomUUID } from 'crypto';
 
 export type PublicMediaFolder =
@@ -602,6 +602,91 @@ const SOLICITUD_DOCUMENT_EXTENSIONS: Record<string, string[]> = {
   'image/png': ['.png'],
 };
 
+const DANGEROUS_EXTENSIONS = new Set([
+  '.exe',
+  '.bat',
+  '.cmd',
+  '.sh',
+  '.bash',
+  '.ps1',
+  '.msi',
+  '.vbs',
+  '.vbe',
+  '.js',
+  '.jse',
+  '.wsf',
+  '.wsh',
+  '.scr',
+  '.dll',
+  '.com',
+  '.pif',
+  '.application',
+  '.gadget',
+  '.hta',
+  '.cpl',
+  '.msc',
+  '.jar',
+  '.apk',
+  '.bin',
+  '.app',
+  '.deb',
+  '.rpm',
+  '.php',
+  '.phtml',
+  '.py',
+  '.rb',
+  '.pl',
+  '.cgi',
+]);
+
+const EXECUTABLE_SIGNATURES: Array<{
+  name: string;
+  match: (buffer: Buffer) => boolean;
+}> = [
+  // DOS / Windows PE executable ('MZ')
+  {
+    name: 'Windows/DOS Executable',
+    match: (b) => b.length >= 2 && b[0] === 0x4d && b[1] === 0x5a,
+  },
+  // Linux ELF executable
+  {
+    name: 'Linux ELF Executable',
+    match: (b) =>
+      b.length >= 4 &&
+      b[0] === 0x7f &&
+      b[1] === 0x45 &&
+      b[2] === 0x4c &&
+      b[3] === 0x46,
+  },
+  // Mach-O executable
+  {
+    name: 'Mach-O Executable',
+    match: (b) =>
+      b.length >= 4 &&
+      ((b[0] === 0xfe &&
+        b[1] === 0xed &&
+        b[2] === 0xfa &&
+        (b[3] === 0xce || b[3] === 0xcf)) ||
+        (b[0] === 0xce && b[1] === 0xfa && b[2] === 0xed && b[3] === 0xfe) ||
+        (b[0] === 0xcf && b[1] === 0xfa && b[2] === 0xed && b[3] === 0xfe)),
+  },
+  // Java class bytecode
+  {
+    name: 'Java Bytecode',
+    match: (b) =>
+      b.length >= 4 &&
+      b[0] === 0xca &&
+      b[1] === 0xfe &&
+      b[2] === 0xba &&
+      b[3] === 0xbe,
+  },
+  // Shell script with shebang ('#!')
+  {
+    name: 'Script',
+    match: (b) => b.length >= 2 && b[0] === 0x23 && b[1] === 0x21,
+  },
+];
+
 export function validateSolicitudDocument(
   file: SolicitudDocumentFile | undefined,
 ): asserts file is SolicitudDocumentFile {
@@ -615,8 +700,32 @@ export function validateSolicitudDocument(
     );
   }
 
+  // Prevención de path traversal y caracteres peligrosos en el nombre de archivo
+  if (
+    file.originalname.includes('..') ||
+    file.originalname.includes('/') ||
+    file.originalname.includes('\\') ||
+    file.originalname.includes('\0')
+  ) {
+    throw new BadRequestException(
+      'El nombre original del archivo contiene caracteres o secuencias no permitidas.',
+    );
+  }
+
+  // Detección y rechazo de ejecutables o doble extensión maliciosa
+  const lowerOriginal = file.originalname.toLowerCase();
+  const nameSegments = lowerOriginal.split('.');
+  for (let i = 1; i < nameSegments.length; i++) {
+    const segmentExt = `.${nameSegments[i]}`;
+    if (DANGEROUS_EXTENSIONS.has(segmentExt)) {
+      throw new BadRequestException(
+        'No se permiten archivos ejecutables o con extensiones potencialmente peligrosas.',
+      );
+    }
+  }
+
   const expectedExtension = SOLICITUD_DOCUMENT_MIME_TYPES[file.mimetype];
-  const suppliedExtension = extname(file.originalname).toLowerCase();
+  const suppliedExtension = extname(lowerOriginal);
   const allowedExtensions = SOLICITUD_DOCUMENT_EXTENSIONS[file.mimetype];
 
   if (!expectedExtension || !allowedExtensions?.includes(suppliedExtension)) {
@@ -639,6 +748,16 @@ export function validateSolicitudDocument(
     throw new BadRequestException('El archivo no puede superar 10 MB.');
   }
 
+  // Rechazo de firmas de ejecutables (incluso si se disfraza la extensión)
+  for (const sig of EXECUTABLE_SIGNATURES) {
+    if (sig.match(file.buffer)) {
+      throw new BadRequestException(
+        'El contenido del archivo corresponde a un formato ejecutable no permitido.',
+      );
+    }
+  }
+
+  // Validación estricta del MIME real contra los magic bytes del contenido
   if (!hasExpectedSignature(file.mimetype, file.buffer)) {
     throw new BadRequestException(
       'El contenido del archivo no coincide con su formato declarado.',
@@ -649,6 +768,7 @@ export function validateSolicitudDocument(
 /**
  * Guarda un adjunto pendiente de reclamo en
  * uploads/solicitudes/pendientes/<timestamp>-<uuid>.<ext>.
+ * Evita colisiones y sobrescrituras usando timestamp + UUID.
  */
 export function saveSolicitudDocumentPending(file: SolicitudDocumentFile): {
   rutaReferenciaArchivo: string;
@@ -656,12 +776,29 @@ export function saveSolicitudDocumentPending(file: SolicitudDocumentFile): {
   absolutePath: string;
 } {
   validateSolicitudDocument(file);
-  const extension = SOLICITUD_DOCUMENT_MIME_TYPES[file.mimetype];
+  const suppliedExt = extname(file.originalname).toLowerCase();
+  const extension =
+    suppliedExt === '.jpeg'
+      ? '.jpeg'
+      : SOLICITUD_DOCUMENT_MIME_TYPES[file.mimetype];
   const folder = join(UPLOAD_ROOT, 'solicitudes', 'pendientes');
   mkdirSync(folder, { recursive: true });
 
-  const filename = `${Date.now()}-${randomUUID()}${extension}`;
-  const absolutePath = join(folder, filename);
+  // Generación de nombre interno único garantizando ausencia de sobrescrituras
+  let filename = `${Date.now()}-${randomUUID()}${extension}`;
+  let absolutePath = join(folder, filename);
+  while (existsSync(absolutePath)) {
+    filename = `${Date.now()}-${randomUUID()}${extension}`;
+    absolutePath = join(folder, filename);
+  }
+
+  // Verificación estricta contra path traversal
+  const resolvedFolder = resolve(folder);
+  const resolvedPath = resolve(absolutePath);
+  if (!resolvedPath.startsWith(resolvedFolder)) {
+    throw new BadRequestException('Ruta de almacenamiento no permitida.');
+  }
+
   writeFileSync(absolutePath, file.buffer);
 
   return {
@@ -673,13 +810,21 @@ export function saveSolicitudDocumentPending(file: SolicitudDocumentFile): {
 
 /**
  * Mueve un adjunto pendiente a la carpeta definitiva de la solicitud.
+ * Protege contra path traversal y sobrescrituras.
  */
 export function linkSolicitudDocumentFile(
   solicitudId: number,
   pendingRutaReferenciaArchivo: string,
 ): { rutaReferenciaArchivo: string; filename: string } {
+  if (!Number.isSafeInteger(solicitudId) || solicitudId <= 0) {
+    throw new BadRequestException('ID de solicitud no válido.');
+  }
+
   const pendingPrefix = '/uploads/solicitudes/pendientes/';
-  if (!pendingRutaReferenciaArchivo.startsWith(pendingPrefix)) {
+  if (
+    !pendingRutaReferenciaArchivo ||
+    !pendingRutaReferenciaArchivo.startsWith(pendingPrefix)
+  ) {
     throw new BadRequestException(
       'La ruta del documento pendiente no es válida.',
     );
@@ -691,17 +836,20 @@ export function linkSolicitudDocumentFile(
   if (
     !pendingName ||
     pendingName.includes('..') ||
+    pendingName.includes('/') ||
+    pendingName.includes('\\') ||
     pendingName !== pendingRutaReferenciaArchivo.substring(pendingPrefix.length)
   ) {
     throw new BadRequestException('Nombre de archivo pendiente inválido.');
   }
 
-  const sourcePath = join(
-    UPLOAD_ROOT,
-    'solicitudes',
-    'pendientes',
-    pendingName,
-  );
+  const folderPendientes = join(UPLOAD_ROOT, 'solicitudes', 'pendientes');
+  const sourcePath = join(folderPendientes, pendingName);
+
+  if (!resolve(sourcePath).startsWith(resolve(folderPendientes))) {
+    throw new BadRequestException('Ruta de origen no permitida.');
+  }
+
   if (!existsSync(sourcePath)) {
     throw new NotFoundException(
       'El archivo del documento no existe en el almacenamiento.',
@@ -710,7 +858,20 @@ export function linkSolicitudDocumentFile(
 
   const targetFolder = join(UPLOAD_ROOT, 'solicitudes', String(solicitudId));
   mkdirSync(targetFolder, { recursive: true });
-  const targetPath = join(targetFolder, pendingName);
+
+  // Evitar sobrescrituras en destino si ya existiese un archivo con ese nombre
+  let targetName = pendingName;
+  let targetPath = join(targetFolder, targetName);
+  if (existsSync(targetPath)) {
+    const ext = extname(pendingName);
+    const base = basename(pendingName, ext);
+    targetName = `${base}-${randomUUID().slice(0, 8)}${ext}`;
+    targetPath = join(targetFolder, targetName);
+  }
+
+  if (!resolve(targetPath).startsWith(resolve(targetFolder))) {
+    throw new BadRequestException('Ruta de destino no permitida.');
+  }
 
   try {
     renameSync(sourcePath, targetPath);
@@ -720,18 +881,28 @@ export function linkSolicitudDocumentFile(
   }
 
   return {
-    rutaReferenciaArchivo: `/uploads/solicitudes/${solicitudId}/${pendingName}`,
-    filename: pendingName,
+    rutaReferenciaArchivo: `/uploads/solicitudes/${solicitudId}/${targetName}`,
+    filename: targetName,
   };
 }
 
 export function deleteSolicitudDocumentFile(
   rutaReferenciaArchivo: string,
 ): void {
-  if (!rutaReferenciaArchivo.startsWith('/uploads/solicitudes/')) return;
+  if (
+    !rutaReferenciaArchivo ||
+    !rutaReferenciaArchivo.startsWith('/uploads/solicitudes/')
+  ) {
+    return;
+  }
   const relative = rutaReferenciaArchivo.substring('/uploads/'.length);
   const absolutePath = join(UPLOAD_ROOT, ...relative.split('/'));
   const normalizedRoot = join(UPLOAD_ROOT, 'solicitudes');
-  if (!absolutePath.startsWith(normalizedRoot)) return;
-  if (existsSync(absolutePath)) unlinkSync(absolutePath);
+  if (!resolve(absolutePath).startsWith(resolve(normalizedRoot))) {
+    return;
+  }
+  if (existsSync(absolutePath)) {
+    unlinkSync(absolutePath);
+  }
 }
+

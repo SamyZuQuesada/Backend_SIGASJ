@@ -21,6 +21,7 @@ import { CreateSolicitudInfraestructuraLinderosDto } from './dto/create-solicitu
 import { CreateSolicitudConstanciaServicioDto } from './dto/create-solicitud-constancia-servicio.dto';
 import { MotivoConstanciaServicio } from '../../common/enums/motivo-constancia-servicio.enum';
 import { DocumentoSolicitud } from './entities/documento-solicitud.entity';
+import { HistorialSolicitud } from './entities/historial-solicitud.entity';
 import { SolicitudAfiliacion } from './entities/solicitud-afiliacion.entity';
 import { SolicitudArregloPago } from './entities/solicitud-arreglo-pago.entity';
 import { SolicitudCambioTitular } from './entities/solicitud-cambio-titular.entity';
@@ -42,7 +43,19 @@ jest.mock('../../common/media/public-media', () => ({
     }),
   ),
   deleteSolicitudDocumentFile: jest.fn(),
-  saveSolicitudDocumentPending: jest.fn(),
+  saveSolicitudDocumentPending: jest.fn((file) => {
+    if (!file?.buffer?.toString()?.startsWith('%PDF-')) {
+      throw new BadRequestException(
+        'El contenido del archivo no coincide con su formato declarado.',
+      );
+    }
+    const filename = `1729789123-uuid-${file.originalname}`;
+    return {
+      rutaReferenciaArchivo: `/uploads/solicitudes/pendientes/${filename}`,
+      filename,
+      absolutePath: `/tmp/${filename}`,
+    };
+  }),
   MAX_SOLICITUD_DOCUMENT_BYTES: 10 * 1024 * 1024,
 }));
 
@@ -68,6 +81,9 @@ describe('SolicitudesService', () => {
   let findDocumentos: jest.Mock;
   let saveDocumento: jest.Mock;
   let createDocumento: jest.Mock;
+  let findHistorial: jest.Mock;
+  let saveHistorial: jest.Mock;
+  let createHistorial: jest.Mock;
 
   const docsInfraReunion = [
     {
@@ -162,6 +178,13 @@ describe('SolicitudesService', () => {
       .mockImplementation((doc: unknown) => Promise.resolve(doc));
     createDocumento = jest.fn().mockImplementation((doc: unknown) => doc);
     findBySlugTipo = jest.fn().mockResolvedValue(mockSolicitud.tipoSolicitud);
+    findHistorial = jest.fn().mockResolvedValue([]);
+    saveHistorial = jest
+      .fn()
+      .mockImplementation((hist: unknown) => Promise.resolve({ id: 1, ...(hist as object) }));
+    createHistorial = jest
+      .fn()
+      .mockImplementation((hist: unknown) => ({ id: 1, ...(hist as object) }));
     transactionMock = jest.fn();
 
     const module: TestingModule = await Test.createTestingModule({
@@ -231,6 +254,14 @@ describe('SolicitudesService', () => {
             find: findDocumentos,
             save: saveDocumento,
             create: createDocumento,
+          },
+        },
+        {
+          provide: getRepositoryToken(HistorialSolicitud),
+          useValue: {
+            find: findHistorial,
+            save: saveHistorial,
+            create: createHistorial,
           },
         },
 
@@ -1427,6 +1458,65 @@ describe('SolicitudesService', () => {
       expect(result.solicitudes).toEqual([]);
       expect(result.mensaje).toBe(
         'No hay solicitudes aprobadas pendientes de registro.',
+      );
+    });
+  });
+
+  describe('subirDocumentoSolicitud (Seguridad y Metadatos)', () => {
+    const validPdfFile = {
+      originalname: 'cedula.pdf',
+      mimetype: 'application/pdf',
+      size: 14,
+      buffer: Buffer.from('%PDF-1.7 prueba'),
+    };
+
+    it('sube documento legítimo, genera nombreInterno único y registra metadatos sin exponer rutas del SO', async () => {
+      saveDocumento.mockImplementation((doc: any) =>
+        Promise.resolve({
+          ...doc,
+          id: 77,
+          fechaCarga: new Date('2026-10-24T12:00:00Z'),
+        }),
+      );
+
+      const res = await service.subirDocumentoSolicitud(
+        validPdfFile,
+        TipoDocumentoSolicitud.IDENTIFICACION,
+      );
+
+      expect(res.id).toBe(77);
+      expect(res.nombreOriginal).toBe('cedula.pdf');
+      expect(res.nombreInterno).toBeDefined();
+      expect(res.nombreInterno).toContain('cedula.pdf');
+      expect(res.mimeType).toBe('application/pdf');
+      expect(res.tamano).toBe(14);
+      expect(res.ubicacion).toBe(`/uploads/solicitudes/pendientes/${res.nombreInterno}`);
+      expect(res.ubicacion).not.toContain('C:');
+      expect(res.tokenReclamo).toBeDefined();
+      expect(res.fechaCarga).toBeInstanceOf(Date);
+    });
+
+    it('rechaza si el tipo de documento no es válido', async () => {
+      await expect(
+        service.subirDocumentoSolicitud(validPdfFile, 'tipo-inexistente'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rechaza archivo con formato o firma inválida', async () => {
+      const corruptFile = {
+        originalname: 'falso.pdf',
+        mimetype: 'application/pdf',
+        size: 15,
+        buffer: Buffer.from('No soy un pdf!!'),
+      };
+
+      await expect(
+        service.subirDocumentoSolicitud(
+          corruptFile,
+          TipoDocumentoSolicitud.IDENTIFICACION,
+        ),
+      ).rejects.toThrow(
+        'El contenido del archivo no coincide con su formato declarado.',
       );
     });
   });

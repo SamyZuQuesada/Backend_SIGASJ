@@ -80,6 +80,19 @@ describe('SolicitudesController', () => {
             crearSolicitudConstanciaServicio: jest
               .fn()
               .mockResolvedValue(mockSolicitud),
+            subirDocumentoSolicitud: jest.fn().mockResolvedValue({
+              id: 1,
+              tipoDocumento: 'identificacion',
+              nombreOriginal: 'cedula.pdf',
+              nombreInterno: '123-cedula.pdf',
+              mimeType: 'application/pdf',
+              tipoArchivo: 'application/pdf',
+              tamano: 1024,
+              tamanio: 1024,
+              ubicacion: '/uploads/solicitudes/pendientes/123-cedula.pdf',
+              tokenReclamo: 'tok123',
+              fechaCarga: new Date(),
+            }),
           },
         },
       ],
@@ -269,5 +282,31 @@ describe('SolicitudesController', () => {
     const result = await controller.findAll(query);
     expect(jest.mocked(service.findAll)).toHaveBeenCalledWith(query);
     expect(result.solicitudes).toHaveLength(1);
+  });
+
+  describe('subirDocumento', () => {
+    it('debe delegar la subida segura al servicio cuando el archivo y tipo son válidos', async () => {
+      const mockFile = {
+        originalname: 'cedula.pdf',
+        mimetype: 'application/pdf',
+        size: 1024,
+        buffer: Buffer.from('%PDF-1.7'),
+      };
+
+      const res = await controller.subirDocumento(mockFile, 'identificacion');
+
+      expect(jest.mocked(service.subirDocumentoSolicitud)).toHaveBeenCalledWith(
+        mockFile,
+        'identificacion',
+      );
+      expect(res.id).toBe(1);
+      expect(res.nombreOriginal).toBe('cedula.pdf');
+    });
+
+    it('debe lanzar BadRequestException si no se adjunta archivo', () => {
+      expect(() =>
+        controller.subirDocumento(undefined, 'identificacion'),
+      ).toThrow('Debe adjuntar un archivo.');
+    });
   });
 });
