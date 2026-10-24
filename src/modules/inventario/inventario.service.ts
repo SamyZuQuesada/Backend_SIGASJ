@@ -242,6 +242,8 @@ export class InventarioService {
         categoria,
         idProveedor: proveedor.id,
         proveedor,
+        precioUnitario: dto.precioUnitario ?? null,
+        fechaVencimiento: dto.fechaVencimiento ?? null,
       });
 
       return await withDbRetry(() => this.materialRepository.save(material));
@@ -467,6 +469,14 @@ export class InventarioService {
         material.idProveedor = proveedor.id;
         material.proveedor = proveedor;
       }
+    }
+
+    if (dto.precioUnitario !== undefined) {
+      material.precioUnitario = dto.precioUnitario ?? null;
+    }
+
+    if (dto.fechaVencimiento !== undefined) {
+      material.fechaVencimiento = dto.fechaVencimiento ?? null;
     }
 
     // Regla de negocio: stockActual se preserva intacto
