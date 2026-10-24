@@ -18,14 +18,18 @@ import { CreateSolicitudArregloPagoDto } from './dto/create-solicitud-arreglo-pa
 import { CreateSolicitudCambioTitularDto } from './dto/create-solicitud-cambio-titular.dto';
 import { CreateSolicitudDisponibilidadServiciosDto } from './dto/create-solicitud-disponibilidad-servicios.dto';
 import { CreateSolicitudInfraestructuraLinderosDto } from './dto/create-solicitud-infraestructura-linderos.dto';
+import { CreateSolicitudConstanciaServicioDto } from './dto/create-solicitud-constancia-servicio.dto';
+import { MotivoConstanciaServicio } from '../../common/enums/motivo-constancia-servicio.enum';
 import { DocumentoSolicitud } from './entities/documento-solicitud.entity';
 import { SolicitudAfiliacion } from './entities/solicitud-afiliacion.entity';
 import { SolicitudArregloPago } from './entities/solicitud-arreglo-pago.entity';
 import { SolicitudCambioTitular } from './entities/solicitud-cambio-titular.entity';
 import { SolicitudDisponibilidadServicios } from './entities/solicitud-disponibilidad-servicios.entity';
 import { SolicitudInfraestructuraLinderos } from './entities/solicitud-infraestructura-linderos.entity';
+import { SolicitudConstanciaServicio } from './entities/solicitud-constancia-servicio.entity';
 import { SolicitudServicio } from './entities/solicitud-servicio.entity';
 import { Solicitud } from './entities/solicitud.entity';
+import { TipoSolicitud } from './entities/tipo-solicitud.entity';
 import { SolicitudNoEncontradaException } from './errors/solicitud.errors';
 import { SolicitudesService } from './solicitudes.service';
 import { TiposSolicitudService } from './tipos-solicitud.service';
@@ -1182,6 +1186,192 @@ describe('SolicitudesService', () => {
       );
     });
     /* eslint-enable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/require-await */
+  });
+
+  describe('crearSolicitudConstanciaServicio y validarConstanciaServicio', () => {
+    const dtoConstanciaBase: CreateSolicitudConstanciaServicioDto = {
+      tipoServicio: 'Domiciliar',
+      nis: 'NIS-45892',
+      propietarioInmueble: 'María Elena Rodríguez Vargas',
+      nombreSolicitante: 'Carlos Alberto Mora Jiménez',
+      identificacionSolicitante: '1-1234-0567',
+      correoElectronico: 'carlos.mora@ejemplo.com',
+      telefono: '8888-1234',
+      folioReal: '123456-000',
+      planoCatastrado: 'SJ-1234567-2020',
+      planoAgrimensura: 'AG-998877-2019',
+      naturalezaInmueble: NaturalezaInmuebleCambioTitular.INSCRITO,
+      calidadTitular: CalidadTitularCambioTitular.PROPIETARIO,
+      provincia: 'San José',
+      canton: 'Pérez Zeledón',
+      distrito: 'San Isidro de El General',
+      direccionExacta: '100 m norte de la iglesia',
+      motivo: MotivoConstanciaServicio.BONO_VIVIENDA,
+      tramitePorRealizar: 'Solicitud bono BANHVI',
+      medioNotificacionPrincipal: MedioNotificacionCambioTitular.CORREO,
+      medioNotificacionSecundario: MedioNotificacionCambioTitular.TELEFONO,
+      firma: 'data:image/png;base64,sample',
+    };
+
+    it('1. Valida y acepta motivos oficiales estándar', () => {
+      expect(() =>
+        service.validarConstanciaServicio(dtoConstanciaBase),
+      ).not.toThrow();
+
+      const conBanco = {
+        ...dtoConstanciaBase,
+        motivo: MotivoConstanciaServicio.TRAMITE_BANCARIO,
+      };
+      expect(() =>
+        service.validarConstanciaServicio(conBanco),
+      ).not.toThrow();
+    });
+
+    it('2. Exige descripción en otroMotivo cuando se utiliza la opción Otro', () => {
+      const conOtroSinDetalle = {
+        ...dtoConstanciaBase,
+        motivo: MotivoConstanciaServicio.OTRO,
+        otroMotivo: undefined,
+      };
+      expect(() =>
+        service.validarConstanciaServicio(conOtroSinDetalle),
+      ).toThrow(BadRequestException);
+      expect(() =>
+        service.validarConstanciaServicio(conOtroSinDetalle),
+      ).toThrow(
+        'Debe especificar el motivo en otroMotivo cuando selecciona la opción "Otro".',
+      );
+
+      const conOtroEspacios = {
+        ...dtoConstanciaBase,
+        motivo: MotivoConstanciaServicio.OTRO,
+        otroMotivo: '   ',
+      };
+      expect(() =>
+        service.validarConstanciaServicio(conOtroEspacios),
+      ).toThrow(BadRequestException);
+    });
+
+    it('3. Acepta motivo Otro cuando se proporciona otroMotivo válido', () => {
+      const conOtroValido = {
+        ...dtoConstanciaBase,
+        motivo: MotivoConstanciaServicio.OTRO,
+        otroMotivo: 'Trámite especial ante el IMAS',
+      };
+      expect(() =>
+        service.validarConstanciaServicio(conOtroValido),
+      ).not.toThrow();
+    });
+
+    it('4. Rechaza motivo no permitido o inexistente', () => {
+      const conMotivoInvalido = {
+        ...dtoConstanciaBase,
+        motivo: 'Motivo No Catalogado' as MotivoConstanciaServicio,
+      };
+      expect(() =>
+        service.validarConstanciaServicio(conMotivoInvalido),
+      ).toThrow(BadRequestException);
+      expect(() =>
+        service.validarConstanciaServicio(conMotivoInvalido),
+      ).toThrow(/no es válido/);
+    });
+
+    it('5. Rechaza medios de notificación principal y secundario idénticos', () => {
+      const conMediosIdenticos = {
+        ...dtoConstanciaBase,
+        medioNotificacionPrincipal: MedioNotificacionCambioTitular.CORREO,
+        medioNotificacionSecundario: MedioNotificacionCambioTitular.CORREO,
+      };
+      expect(() =>
+        service.validarConstanciaServicio(conMediosIdenticos),
+      ).toThrow(BadRequestException);
+      expect(() =>
+        service.validarConstanciaServicio(conMediosIdenticos),
+      ).toThrow(/no puede ser idéntico al principal/);
+    });
+
+    it('6. Registra solicitud y detalle de constancia correctamente en transacción', async () => {
+      const tipoConstancia: TipoSolicitud = {
+        id: 6,
+        nombre: 'Constancia de Servicio Existente',
+        slug: TipoSolicitudSlug.SERVICIO_EXISTENTE,
+        descripcion: 'Formulario oficial de constancia de servicio',
+        activo: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      findBySlugTipo.mockResolvedValue(tipoConstancia);
+
+      const mockSolicitudCreada = {
+        id: 601,
+        tipoSolicitudId: 6,
+        codigoSeguimiento: 'SOL-2026-SERV01',
+        estado: EstadoSolicitud.PENDIENTE,
+        fechaIngreso: new Date(),
+      };
+      createSolicitud.mockReturnValue(mockSolicitudCreada);
+      saveSolicitud.mockResolvedValue(mockSolicitudCreada);
+
+      const mockDetalleCreado = {
+        id: 701,
+        solicitudId: 601,
+        ...dtoConstanciaBase,
+      };
+
+      const createDetalleConstancia = jest
+        .fn()
+        .mockReturnValue(mockDetalleCreado);
+      const saveDetalleConstancia = jest
+        .fn()
+        .mockResolvedValue(mockDetalleCreado);
+
+      transactionMock.mockImplementation(async (callback) => {
+        const managerMock = {
+          getRepository: (entity: unknown) => {
+            if (entity === Solicitud) {
+              return {
+                create: createSolicitud,
+                save: saveSolicitud,
+              };
+            }
+            if (entity === SolicitudConstanciaServicio) {
+              return {
+                create: createDetalleConstancia,
+                save: saveDetalleConstancia,
+              };
+            }
+            if (entity === DocumentoSolicitud) {
+              return {
+                save: saveDocumento,
+              };
+            }
+            return {};
+          },
+        };
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+        return await callback(managerMock);
+      });
+
+      const resultado =
+        await service.crearSolicitudConstanciaServicio(dtoConstanciaBase);
+
+      expect(resultado).toBeDefined();
+      expect(createSolicitud).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tipoSolicitudId: 6,
+          estado: EstadoSolicitud.PENDIENTE,
+        }),
+      );
+      expect(createDetalleConstancia).toHaveBeenCalledWith(
+        expect.objectContaining({
+          solicitudId: 601,
+          tipoServicio: 'Domiciliar',
+          nis: 'NIS-45892',
+          motivo: MotivoConstanciaServicio.BONO_VIVIENDA,
+        }),
+      );
+      expect(resultado.detalleConstanciaServicio).toEqual(mockDetalleCreado);
+    });
   });
 
   describe('actualizarEstado', () => {

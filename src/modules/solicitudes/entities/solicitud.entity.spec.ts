@@ -8,6 +8,7 @@ import { SolicitudArregloPago } from './solicitud-arreglo-pago.entity';
 import { SolicitudCambioTitular } from './solicitud-cambio-titular.entity';
 import { SolicitudDisponibilidadServicios } from './solicitud-disponibilidad-servicios.entity';
 import { SolicitudInfraestructuraLinderos } from './solicitud-infraestructura-linderos.entity';
+import { SolicitudConstanciaServicio } from './solicitud-constancia-servicio.entity';
 import { Solicitud } from './solicitud.entity';
 import { TipoSolicitud } from './tipo-solicitud.entity';
 
@@ -127,13 +128,16 @@ describe('Solicitud Entity (Encabezado central)', () => {
     solicitud5.detalleDisponibilidadServicios = detalleDisponibilidad;
 
     const solicitud6 = new Solicitud();
-    solicitud6.detalleServicioExistente = { numeroNIS: '987654' };
+    const detalleConstancia = new SolicitudConstanciaServicio();
+    detalleConstancia.nis = '987654';
+    solicitud6.detalleConstanciaServicio = detalleConstancia;
 
     expect(solicitud1.detalleArregloPago).toBeDefined();
     expect(solicitud2.detalleCambioTitular).toBeDefined();
     expect(solicitud3.detalleInfraestructuraLinderos).toBeDefined();
     expect(solicitud4.detalleAfiliacion).toBeDefined();
     expect(solicitud5.detalleDisponibilidadServicios).toBeDefined();
+    expect(solicitud6.detalleConstanciaServicio).toBeDefined();
     expect(solicitud6.detalleServicioExistente).toBeDefined();
   });
 
