@@ -8,8 +8,8 @@ const nodeRequire = createRequire(__filename);
 
 const mssqlPool = {
   max: 10,
-  min: 0,
-  idleTimeoutMillis: 30_000,
+  min: 2,
+  idleTimeoutMillis: 60_000,
   acquireTimeoutMillis: 30_000,
 };
 
