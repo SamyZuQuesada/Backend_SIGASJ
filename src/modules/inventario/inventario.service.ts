@@ -137,24 +137,18 @@ export class InventarioService {
     private readonly movimientoRepository: Repository<MovimientoInventario>,
     @InjectRepository(DocumentoMovimientoInventario)
     private readonly documentoMovimientoRepository: Repository<DocumentoMovimientoInventario>,
-    @Optional()
     @InjectRepository(SolicitudMaterial)
-    private readonly solicitudMaterialRepository?: Repository<SolicitudMaterial>,
-    @Optional()
+    private readonly solicitudMaterialRepository: Repository<SolicitudMaterial>,
     @InjectRepository(DetalleSolicitudMaterial)
-    private readonly detalleSolicitudRepository?: Repository<DetalleSolicitudMaterial>,
-    @Optional()
+    private readonly detalleSolicitudRepository: Repository<DetalleSolicitudMaterial>,
     @InjectRepository(Averia)
-    private readonly averiaRepository?: Repository<Averia>,
-    @Optional()
+    private readonly averiaRepository: Repository<Averia>,
     @InjectRepository(AlertaReposicion)
-    private readonly alertaReposicionRepository?: Repository<AlertaReposicion>,
-    @Optional()
+    private readonly alertaReposicionRepository: Repository<AlertaReposicion>,
     @InjectRepository(ReposicionMaterial)
-    private readonly reposicionMaterialRepository?: Repository<ReposicionMaterial>,
-    @Optional()
+    private readonly reposicionMaterialRepository: Repository<ReposicionMaterial>,
     @InjectRepository(DetalleReposicionMaterial)
-    private readonly detalleReposicionRepository?: Repository<DetalleReposicionMaterial>,
+    private readonly detalleReposicionRepository: Repository<DetalleReposicionMaterial>,
     @Optional()
     private readonly notificacionesService?: NotificacionesAveriasService,
   ) {}
@@ -248,6 +242,8 @@ export class InventarioService {
         categoria,
         idProveedor: proveedor.id,
         proveedor,
+        precioUnitario: dto.precioUnitario ?? null,
+        fechaVencimiento: dto.fechaVencimiento ?? null,
       });
 
       return await withDbRetry(() => this.materialRepository.save(material));
@@ -473,6 +469,14 @@ export class InventarioService {
         material.idProveedor = proveedor.id;
         material.proveedor = proveedor;
       }
+    }
+
+    if (dto.precioUnitario !== undefined) {
+      material.precioUnitario = dto.precioUnitario ?? null;
+    }
+
+    if (dto.fechaVencimiento !== undefined) {
+      material.fechaVencimiento = dto.fechaVencimiento ?? null;
     }
 
     // Regla de negocio: stockActual se preserva intacto
@@ -1085,11 +1089,6 @@ export class InventarioService {
 
             material.stockActual = stockActual;
             await materialRepo.save(material);
-            if (typeof materialRepo.update === 'function') {
-              await materialRepo.update(material.id, {
-                stockActual,
-              });
-            }
 
             const materialPersistido = await materialRepo.findOne({
               where: { id: material.id },
@@ -1107,6 +1106,7 @@ export class InventarioService {
               idMaterial: material.id,
               idUsuario,
               idProveedor: proveedor ? proveedor.id : idProveedor || null,
+              precioUnitario: dto.precioUnitario ?? null,
             });
 
             const movimientoGuardado = await movimientoRepo.save(movimiento);
@@ -1279,11 +1279,6 @@ export class InventarioService {
 
             material.stockActual = stockActual;
             await materialRepo.save(material);
-            if (typeof materialRepo.update === 'function') {
-              await materialRepo.update(material.id, {
-                stockActual,
-              });
-            }
 
             // Reconsultar directamente desde la base de datos dentro de la transacción para devolver el stock realmente persistido
             const materialPersistido = await materialRepo.findOne({
@@ -1306,6 +1301,16 @@ export class InventarioService {
             });
 
             const movimientoGuardado = await movimientoRepo.save(movimiento);
+
+            if (movimientoGuardado.idSolicitud) {
+              try {
+                await manager.query(
+                  `UPDATE SolicitudMaterial SET estado = 'DESPACHADA' WHERE idSolicitud = ${movimientoGuardado.idSolicitud} AND estado = 'APROBADA'`,
+                );
+              } catch {
+                // Si la tabla no existe o el campo no aplica, no bloquear la salida
+              }
+            }
 
             if (movimientoGuardado.idAveria) {
               await registrarEventoHistorialEnManager(manager, {
@@ -2501,27 +2506,9 @@ export class InventarioService {
 
     try {
       return await withDbRetry(async () => {
-        const materialesQb = this.crearQueryMaterialesReporte(query);
-        const totalMateriales = await materialesQb.getCount();
-
-        const materialesActivos = await this.crearQueryMaterialesReporte(query)
-          .andWhere('material.activo = :activo', { activo: true })
-          .getCount();
-
-        const materialesStockBajo = await this.crearQueryMaterialesReporte(
-          query,
-        )
-          .andWhere('material.stockActual <= material.stockMinimo')
-          .getCount();
-
-        const entradasRegistradas = await this.contarMovimientosReporte(
-          query,
-          TipoMovimientoInventario.ENTRADA,
-        );
-        const salidasRegistradas = await this.contarMovimientosReporte(
-          query,
-          TipoMovimientoInventario.SALIDA,
-        );
+        const hoy = new Date();
+        const fechaLimite90 = new Date();
+        fechaLimite90.setDate(fechaLimite90.getDate() + 90);
 
         const porCategoriaQb = this.materialRepository
           .createQueryBuilder('material')
@@ -2546,26 +2533,73 @@ export class InventarioService {
           });
         }
 
-        const porCategoriaRows = await porCategoriaQb
-          .groupBy('categoria.id')
-          .addGroupBy('categoria.nombre')
-          .orderBy('categoria.nombre', 'ASC')
-          .getRawMany<{
-            idCategoria: number | string | null;
-            categoriaNombre: string | null;
-            totalMateriales: string;
-            materialesStockBajo: string;
-          }>();
+        const [
+          totalMateriales,
+          materialesActivos,
+          materialesStockBajo,
+          entradasRegistradas,
+          salidasRegistradas,
+          valorResult,
+          materialesPorVencer,
+          proximosVencer,
+          porCategoriaRows,
+          materiales,
+          movimientos,
+        ] = await Promise.all([
+          this.crearQueryMaterialesReporte(query).getCount(),
+          this.crearQueryMaterialesReporte(query)
+            .andWhere('material.activo = :activo', { activo: true })
+            .getCount(),
+          this.crearQueryMaterialesReporte(query)
+            .andWhere('material.stockActual <= material.stockMinimo')
+            .getCount(),
+          this.contarMovimientosReporte(query, TipoMovimientoInventario.ENTRADA),
+          this.contarMovimientosReporte(query, TipoMovimientoInventario.SALIDA),
+          this.crearQueryMaterialesReporte(query)
+            .select(
+              'SUM(material.stockActual * material.precioUnitario)',
+              'valor',
+            )
+            .andWhere('material.precioUnitario IS NOT NULL')
+            .getRawOne<{ valor: string | null }>(),
+          this.crearQueryMaterialesReporte(query)
+            .andWhere('material.fechaVencimiento IS NOT NULL')
+            .andWhere('material.fechaVencimiento >= :hoy', { hoy })
+            .andWhere('material.fechaVencimiento <= :fechaLimite90', {
+              fechaLimite90,
+            })
+            .getCount(),
+          this.crearQueryMaterialesReporte(query)
+            .andWhere('material.fechaVencimiento IS NOT NULL')
+            .andWhere('material.fechaVencimiento >= :hoy2', { hoy2: hoy })
+            .andWhere('material.fechaVencimiento <= :fechaLimite902', {
+              fechaLimite902: fechaLimite90,
+            })
+            .orderBy('material.fechaVencimiento', 'ASC')
+            .take(10)
+            .getMany(),
+          porCategoriaQb
+            .groupBy('categoria.id')
+            .addGroupBy('categoria.nombre')
+            .orderBy('categoria.nombre', 'ASC')
+            .getRawMany<{
+              idCategoria: number | string | null;
+              categoriaNombre: string | null;
+              totalMateriales: string;
+              materialesStockBajo: string;
+            }>(),
+          this.crearQueryMaterialesReporte(query)
+            .leftJoinAndSelect('material.categoria', 'categoria')
+            .orderBy('material.nombre', 'ASC')
+            .take(100)
+            .getMany(),
+          this.crearQueryMovimientosReporte(query, true)
+            .take(100)
+            .getMany(),
+        ]);
 
-        const materiales = await this.crearQueryMaterialesReporte(query)
-          .leftJoinAndSelect('material.categoria', 'categoria')
-          .orderBy('material.nombre', 'ASC')
-          .take(100)
-          .getMany();
-
-        const movimientos = await this.crearQueryMovimientosReporte(query, true)
-          .take(100)
-          .getMany();
+        const valorTotalInventario =
+          valorResult?.valor != null ? Number(valorResult.valor) : null;
 
         return {
           indicadores: {
@@ -2574,6 +2608,8 @@ export class InventarioService {
             materialesStockBajo,
             entradasRegistradas,
             salidasRegistradas,
+            valorTotalInventario,
+            materialesPorVencer,
           },
           porCategoria: porCategoriaRows.map((row) => ({
             idCategoria:
@@ -2601,6 +2637,13 @@ export class InventarioService {
           movimientos: movimientos.map((movimiento) =>
             this.mapMovimientoInventarioAdmin(movimiento),
           ),
+          proximosVencer: proximosVencer.map((m) => ({
+            id: m.id,
+            nombre: m.nombre,
+            fechaVencimiento: m.fechaVencimiento,
+            stockActual: m.stockActual,
+            unidadMedida: m.unidadMedida,
+          })),
         };
       });
     } catch (error) {
@@ -3347,9 +3390,7 @@ export class InventarioService {
     id: number,
     user: AuthenticatedUser,
   ): Promise<Record<string, unknown>> {
-    const solicitudRepo =
-      this.solicitudMaterialRepository ??
-      this.materialRepository.manager.getRepository(SolicitudMaterial);
+    const solicitudRepo = this.solicitudMaterialRepository;
 
     return withDbRetry(async () => {
       const solicitud = await solicitudRepo.findOne({
@@ -3385,9 +3426,7 @@ export class InventarioService {
     user: AuthenticatedUser,
     motivoRechazo?: string,
   ): Promise<Record<string, unknown>> {
-    const solicitudRepo =
-      this.solicitudMaterialRepository ??
-      this.materialRepository.manager.getRepository(SolicitudMaterial);
+    const solicitudRepo = this.solicitudMaterialRepository;
 
     return withDbRetry(async () => {
       const solicitud = await solicitudRepo.findOne({
@@ -3412,6 +3451,50 @@ export class InventarioService {
         EstadoSolicitudMaterial.RECHAZADA,
         motivoRechazo,
       );
+    });
+  }
+
+  /**
+   * Cancela una solicitud PENDIENTE por parte del fontanero que la registró.
+   * Solo el propietario puede cancelarla y únicamente si aún no fue revisada.
+   */
+  async cancelarSolicitudMaterialFontanero(
+    id: number,
+    user: AuthenticatedUser,
+  ): Promise<Record<string, unknown>> {
+    const idFontanero = Number(user.userId);
+    const solicitudRepo = this.solicitudMaterialRepository;
+
+    return withDbRetry(async () => {
+      const solicitud = await solicitudRepo.findOne({ where: { id } });
+
+      if (!solicitud) {
+        throw new NotFoundException(
+          `Solicitud de material con ID ${id} no encontrada`,
+        );
+      }
+
+      if (Number(solicitud.idFontanero) !== idFontanero) {
+        throw new ForbiddenException(
+          'No tiene permiso para cancelar esta solicitud de materiales',
+        );
+      }
+
+      if (solicitud.estado !== EstadoSolicitudMaterial.PENDIENTE) {
+        throw new BadRequestException(
+          `Solo se puede cancelar una solicitud en estado PENDIENTE. Estado actual: ${solicitud.estado}`,
+        );
+      }
+
+      solicitud.estado = EstadoSolicitudMaterial.CANCELADA;
+      await solicitudRepo.save(solicitud);
+
+      return {
+        id: solicitud.id,
+        codigo: solicitud.codigo ?? null,
+        estado: solicitud.estado,
+        mensaje: 'La solicitud fue cancelada correctamente.',
+      };
     });
   }
 

@@ -1,9 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, type TransformFnParams } from 'class-transformer';
 import {
+  IsDate,
   IsInt,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
+  IsPositive,
   IsString,
   MaxLength,
   Min,
@@ -112,10 +115,10 @@ export class CreateMaterialDto {
   @Min(0, { message: 'El stock mínimo no puede ser negativo' })
   stockMinimo?: number;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 1,
     description:
-      'Identificador de la categoría para clasificar el material en bodega (obligatorio; también se acepta el alias categoriaId)',
+      'Identificador de la categoría (obligatorio junto con idProveedor; también se acepta el alias categoriaId). Al menos uno de idCategoria o categoriaId debe enviarse con valor mayor a cero.',
   })
   @Transform((params: TransformFnParams) => {
     const raw = rawValue(params);
@@ -160,10 +163,10 @@ export class CreateMaterialDto {
   })
   categoriaId?: number;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 1,
     description:
-      'Identificador del proveedor asociado al material (obligatorio; también se acepta el alias proveedorId)',
+      'Identificador del proveedor asociado al material (obligatorio junto con idCategoria; también se acepta el alias proveedorId). Al menos uno de idProveedor o proveedorId debe enviarse con valor mayor a cero.',
   })
   @Transform((params: TransformFnParams) => {
     const raw = rawValue(params);
@@ -207,4 +210,34 @@ export class CreateMaterialDto {
     message: 'El identificador de proveedor debe ser mayor a cero',
   })
   proveedorId?: number;
+
+  @ApiPropertyOptional({
+    example: 1250.5,
+    description: 'Precio unitario de referencia del material (opcional)',
+  })
+  @Transform(({ value, obj, key }: TransformFnParams) => {
+    const raw = obj && typeof obj === 'object' && key in obj ? (obj as Record<string, unknown>)[key] : value;
+    if (raw === undefined || raw === null || raw === '') return undefined;
+    const n = Number(raw);
+    return isNaN(n) ? raw : n;
+  })
+  @IsOptional()
+  @IsNumber({}, { message: 'El precio unitario debe ser un número' })
+  @IsPositive({ message: 'El precio unitario debe ser mayor a cero' })
+  precioUnitario?: number | null;
+
+  @ApiPropertyOptional({
+    example: '2027-12-31',
+    description: 'Fecha de vencimiento del material (aplica a insumos químicos y similares)',
+  })
+  @Transform(({ value, obj, key }: TransformFnParams) => {
+    const raw = obj && typeof obj === 'object' && key in obj ? (obj as Record<string, unknown>)[key] : value;
+    if (raw === undefined || raw === null || raw === '') return undefined;
+    if (raw instanceof Date) return raw;
+    const d = new Date(raw as string);
+    return isNaN(d.getTime()) ? raw : d;
+  })
+  @IsOptional()
+  @IsDate({ message: 'La fecha de vencimiento debe ser una fecha válida' })
+  fechaVencimiento?: Date | null;
 }

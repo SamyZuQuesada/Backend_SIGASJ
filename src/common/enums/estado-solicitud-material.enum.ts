@@ -18,6 +18,16 @@ export enum EstadoSolicitudMaterial {
    * (p. ej. falta de justificación, stock no disponible, avería no confirmada).
    */
   RECHAZADA = 'RECHAZADA',
+
+  /**
+   * Estado cuando el propio fontanero anula su solicitud antes de que sea revisada.
+   */
+  CANCELADA = 'CANCELADA',
+
+  /**
+   * Estado tras confirmar que los materiales fueron entregados físicamente al fontanero.
+   */
+  DESPACHADA = 'DESPACHADA',
 }
 
 export const ESTADO_SOLICITUD_MATERIAL_LABELS: Record<
@@ -27,6 +37,8 @@ export const ESTADO_SOLICITUD_MATERIAL_LABELS: Record<
   [EstadoSolicitudMaterial.PENDIENTE]: 'Pendiente',
   [EstadoSolicitudMaterial.APROBADA]: 'Aprobada',
   [EstadoSolicitudMaterial.RECHAZADA]: 'Rechazada',
+  [EstadoSolicitudMaterial.CANCELADA]: 'Cancelada',
+  [EstadoSolicitudMaterial.DESPACHADA]: 'Despachada',
 };
 
 export function isEstadoSolicitudMaterialValido(estado: string): boolean {

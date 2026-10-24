@@ -4,7 +4,9 @@ import {
   IsDate,
   IsInt,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
+  IsPositive,
   IsString,
   MaxLength,
   Min,
@@ -130,4 +132,19 @@ export class RegistrarEntradaDto {
   @IsOptional()
   @IsDate({ message: 'La fecha de movimiento debe ser una fecha válida' })
   fechaMovimiento?: Date;
+
+  @ApiPropertyOptional({
+    example: 1250.5,
+    description: 'Precio unitario pagado en esta entrada (opcional, para trazabilidad de costos)',
+  })
+  @Transform((params: TransformFnParams) => {
+    const raw = rawValue(params);
+    if (raw === undefined || raw === null || raw === '') return undefined;
+    const n = Number(raw);
+    return isNaN(n) ? raw : n;
+  })
+  @IsOptional()
+  @IsNumber({}, { message: 'El precio unitario debe ser un número' })
+  @IsPositive({ message: 'El precio unitario debe ser mayor a cero' })
+  precioUnitario?: number | null;
 }

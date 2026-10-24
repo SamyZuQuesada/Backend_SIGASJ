@@ -4,6 +4,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   OneToMany,
@@ -65,6 +66,7 @@ export class Material {
   /**
    * Indica si el material se encuentra activo para su uso y despacho operativo.
    */
+  @Index()
   @Column({ default: true })
   activo: boolean;
 
@@ -74,6 +76,13 @@ export class Material {
   @UpdateDateColumn()
   updatedAt: Date;
 
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  precioUnitario?: number | null;
+
+  @Column({ type: 'datetime2', nullable: true })
+  fechaVencimiento?: Date | null;
+
+  @Index()
   @Column({ type: 'int', nullable: true })
   idCategoria?: number | null;
 
@@ -84,6 +93,7 @@ export class Material {
   @JoinColumn({ name: 'idCategoria' })
   categoria?: CategoriaMaterial | null;
 
+  @Index()
   @Column({ type: 'int', nullable: true })
   idProveedor?: number | null;
 

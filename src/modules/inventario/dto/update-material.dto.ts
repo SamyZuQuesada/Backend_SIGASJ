@@ -2,9 +2,12 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, type TransformFnParams } from 'class-transformer';
 import {
   IsBoolean,
+  IsDate,
   IsInt,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
+  IsPositive,
   IsString,
   MaxLength,
   Min,
@@ -225,4 +228,35 @@ export class UpdateMaterialDto {
     message: 'El identificador de proveedor debe ser mayor a cero',
   })
   proveedorId?: number | null;
+
+  @ApiPropertyOptional({
+    example: 1250.5,
+    description: 'Precio unitario de referencia del material (opcional)',
+  })
+  @Transform((params: TransformFnParams) => {
+    const raw = rawValue(params);
+    if (raw === undefined || raw === null || raw === '') return undefined;
+    const n = Number(raw);
+    return isNaN(n) ? raw : n;
+  })
+  @IsOptional()
+  @ValidateIf((_, val) => val !== null)
+  @IsNumber({}, { message: 'El precio unitario debe ser un número' })
+  @IsPositive({ message: 'El precio unitario debe ser mayor a cero' })
+  precioUnitario?: number | null;
+
+  @ApiPropertyOptional({
+    example: '2027-12-31',
+    description: 'Fecha de vencimiento del material (aplica a insumos químicos y similares)',
+  })
+  @Transform((params: TransformFnParams) => {
+    const raw = rawValue(params);
+    if (raw === undefined || raw === null || raw === '') return undefined;
+    if (raw instanceof Date) return raw;
+    const d = new Date(raw as string);
+    return isNaN(d.getTime()) ? raw : d;
+  })
+  @IsOptional()
+  @IsDate({ message: 'La fecha de vencimiento debe ser una fecha válida' })
+  fechaVencimiento?: Date | null;
 }

@@ -33,13 +33,21 @@ import { SolicitudMaterial } from './entities/solicitud-material.entity';
 import { InventarioService } from './inventario.service';
 
 /**
- * Controlador para la gestión de solicitudes de materiales por parte de los Fontaneros.
+ * Controlador para la gestión de solicitudes de materiales.
  *
- * Rutas expuestas:
- * - POST /api/v1/fontanero/solicitudes-materiales
- * - GET  /api/v1/fontanero/solicitudes-materiales
- * - GET  /api/v1/fontanero/solicitudes-materiales/:id
- * (con sus respectivos alias bajo /inventario/ para interoperabilidad)
+ * Rutas Fontanero:
+ * - POST  /api/v1/fontanero/solicitudes-materiales
+ * - GET   /api/v1/fontanero/solicitudes-materiales
+ * - GET   /api/v1/fontanero/solicitudes-materiales/:id
+ * - PATCH /api/v1/fontanero/solicitudes-materiales/:id/cancelar
+ *
+ * Rutas Administradora:
+ * - GET   /api/v1/admin/solicitudes-materiales
+ * - GET   /api/v1/admin/solicitudes-materiales/:id
+ * - PATCH /api/v1/admin/solicitudes-materiales/:id/aprobar
+ * - PATCH /api/v1/admin/solicitudes-materiales/:id/rechazar
+ *
+ * (Alias disponibles bajo /inventario/ para interoperabilidad)
  */
 @ApiTags('Solicitudes de Materiales')
 @ApiBearerAuth()
@@ -165,6 +173,29 @@ export class SolicitudesMaterialesController {
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<any> {
     return this.inventarioService.obtenerSolicitudMaterialFontanero(id, user);
+  }
+
+  @Patch([
+    'fontanero/solicitudes-materiales/:id/cancelar',
+    'inventario/solicitudes-materiales/:id/cancelar',
+  ])
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.FONTANERO)
+  @ApiOperation({
+    summary: 'Cancelar una solicitud de materiales (Fontanero)',
+    description:
+      'Permite al fontanero anular su propia solicitud siempre que aún esté en estado PENDIENTE. No modifica existencias.',
+  })
+  @ApiParam({ name: 'id', description: 'ID de la solicitud', type: Number })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Solicitud cancelada' })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'La solicitud no está en estado PENDIENTE' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'La solicitud pertenece a otro fontanero' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Solicitud no encontrada' })
+  cancelarSolicitud(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<any> {
+    return this.inventarioService.cancelarSolicitudMaterialFontanero(id, user);
   }
 
   @Get([
