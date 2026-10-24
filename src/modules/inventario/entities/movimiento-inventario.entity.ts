@@ -159,6 +159,12 @@ export class MovimientoInventario {
   documentos?: DocumentoMovimientoInventario[];
 
   /**
+   * Precio unitario al momento del movimiento (aplica principalmente en ENTRADAS por compra).
+   */
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  precioUnitario?: number | null;
+
+  /**
    * Fecha y hora exacta de registro cronológico del movimiento en la base de datos.
    */
   @CreateDateColumn()

@@ -74,6 +74,12 @@ export class Material {
   @UpdateDateColumn()
   updatedAt: Date;
 
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  precioUnitario?: number | null;
+
+  @Column({ type: 'datetime2', nullable: true })
+  fechaVencimiento?: Date | null;
+
   @Column({ type: 'int', nullable: true })
   idCategoria?: number | null;
 

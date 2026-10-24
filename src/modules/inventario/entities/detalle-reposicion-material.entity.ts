@@ -53,6 +53,9 @@ export class DetalleReposicionMaterial {
   @Column({ type: 'int' })
   cantidad: number;
 
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  precioUnitario?: number | null;
+
   @Column({ type: 'varchar', length: 255, nullable: true })
   observacion: string | null;
 
