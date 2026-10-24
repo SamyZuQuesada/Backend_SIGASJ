@@ -5,30 +5,43 @@ export const TIPOS_ACTIVIDAD_FONTANERO_INICIALES = [
     codigo: TipoActividadFontaneroCodigo.CONTROL_FUGAS,
     nombre: 'Control de Fugas',
     orden: 1,
+    activo: true,
   },
   {
     codigo: TipoActividadFontaneroCodigo.TOMA_PRESION,
     nombre: 'Toma de presión',
     orden: 2,
+    activo: true,
   },
   {
     codigo: TipoActividadFontaneroCodigo.VISITA_CAMPO,
     nombre: 'Visita de Campo',
     orden: 3,
+    activo: true,
   },
   {
     codigo: TipoActividadFontaneroCodigo.CONTROL_CLOROS,
     nombre: 'Control de Cloros',
     orden: 4,
+    activo: true,
   },
   {
     codigo: TipoActividadFontaneroCodigo.CONTROL_OPERATIVO,
     nombre: 'Control Operativo',
     orden: 5,
+    activo: true,
   },
   {
     codigo: TipoActividadFontaneroCodigo.INCAPACIDAD_VACACIONES,
     nombre: 'Incapacidad o vacaciones',
     orden: 6,
+    activo: false,
   },
 ] as const;
+
+export const TIPOS_ACTIVIDAD_FONTANERO_REGISTRO =
+  TIPOS_ACTIVIDAD_FONTANERO_INICIALES.filter((tipo) => tipo.activo);
+
+export const esTipoActividadOfrecidoEnRegistro = (
+  codigo: TipoActividadFontaneroCodigo,
+): boolean => codigo !== TipoActividadFontaneroCodigo.INCAPACIDAD_VACACIONES;

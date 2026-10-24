@@ -182,15 +182,30 @@ export class ActividadesFontaneroController {
   @Patch('fontanero/actividades/:id/corregir')
   @HttpCode(HttpStatus.OK)
   @Roles(Role.FONTANERO)
+  @UseInterceptors(
+    FilesInterceptor('documentos', MAX_ACTIVIDAD_DOCUMENT_FILES, {
+      limits: {
+        fileSize: MAX_ACTIVIDAD_DOCUMENT_BYTES,
+        files: MAX_ACTIVIDAD_DOCUMENT_FILES,
+      },
+    }),
+  )
+  @ApiConsumes('application/json', 'multipart/form-data')
   @ApiOperation({
     summary: 'Corregir y reenviar una actividad propia (Fontanero)',
   })
   corregirPropia(
     @Param('id', ActividadIdPipe) id: number,
     @Body() dto: CorregirActividadDto,
+    @UploadedFiles() files: UploadedImageFile[] | undefined,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.actividadesFontaneroService.corregirPropia(id, dto, user);
+    return this.actividadesFontaneroService.corregirPropia(
+      id,
+      dto,
+      user,
+      files,
+    );
   }
 
   // ── Administradora ───────────────────────────────────────────────────────
