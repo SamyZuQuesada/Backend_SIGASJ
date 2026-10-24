@@ -2506,61 +2506,9 @@ export class InventarioService {
 
     try {
       return await withDbRetry(async () => {
-        const materialesQb = this.crearQueryMaterialesReporte(query);
-        const totalMateriales = await materialesQb.getCount();
-
-        const materialesActivos = await this.crearQueryMaterialesReporte(query)
-          .andWhere('material.activo = :activo', { activo: true })
-          .getCount();
-
-        const materialesStockBajo = await this.crearQueryMaterialesReporte(
-          query,
-        )
-          .andWhere('material.stockActual <= material.stockMinimo')
-          .getCount();
-
-        const entradasRegistradas = await this.contarMovimientosReporte(
-          query,
-          TipoMovimientoInventario.ENTRADA,
-        );
-        const salidasRegistradas = await this.contarMovimientosReporte(
-          query,
-          TipoMovimientoInventario.SALIDA,
-        );
-
-        const valorResult = await this.crearQueryMaterialesReporte(query)
-          .select(
-            'SUM(material.stockActual * material.precioUnitario)',
-            'valor',
-          )
-          .andWhere('material.precioUnitario IS NOT NULL')
-          .getRawOne<{ valor: string | null }>();
-        const valorTotalInventario =
-          valorResult?.valor != null ? Number(valorResult.valor) : null;
-
         const hoy = new Date();
         const fechaLimite90 = new Date();
         fechaLimite90.setDate(fechaLimite90.getDate() + 90);
-
-        const materialesPorVencer = await this.crearQueryMaterialesReporte(
-          query,
-        )
-          .andWhere('material.fechaVencimiento IS NOT NULL')
-          .andWhere('material.fechaVencimiento >= :hoy', { hoy })
-          .andWhere('material.fechaVencimiento <= :fechaLimite90', {
-            fechaLimite90,
-          })
-          .getCount();
-
-        const proximosVencer = await this.crearQueryMaterialesReporte(query)
-          .andWhere('material.fechaVencimiento IS NOT NULL')
-          .andWhere('material.fechaVencimiento >= :hoy2', { hoy2: hoy })
-          .andWhere('material.fechaVencimiento <= :fechaLimite902', {
-            fechaLimite902: fechaLimite90,
-          })
-          .orderBy('material.fechaVencimiento', 'ASC')
-          .take(10)
-          .getMany();
 
         const porCategoriaQb = this.materialRepository
           .createQueryBuilder('material')
@@ -2585,26 +2533,73 @@ export class InventarioService {
           });
         }
 
-        const porCategoriaRows = await porCategoriaQb
-          .groupBy('categoria.id')
-          .addGroupBy('categoria.nombre')
-          .orderBy('categoria.nombre', 'ASC')
-          .getRawMany<{
-            idCategoria: number | string | null;
-            categoriaNombre: string | null;
-            totalMateriales: string;
-            materialesStockBajo: string;
-          }>();
+        const [
+          totalMateriales,
+          materialesActivos,
+          materialesStockBajo,
+          entradasRegistradas,
+          salidasRegistradas,
+          valorResult,
+          materialesPorVencer,
+          proximosVencer,
+          porCategoriaRows,
+          materiales,
+          movimientos,
+        ] = await Promise.all([
+          this.crearQueryMaterialesReporte(query).getCount(),
+          this.crearQueryMaterialesReporte(query)
+            .andWhere('material.activo = :activo', { activo: true })
+            .getCount(),
+          this.crearQueryMaterialesReporte(query)
+            .andWhere('material.stockActual <= material.stockMinimo')
+            .getCount(),
+          this.contarMovimientosReporte(query, TipoMovimientoInventario.ENTRADA),
+          this.contarMovimientosReporte(query, TipoMovimientoInventario.SALIDA),
+          this.crearQueryMaterialesReporte(query)
+            .select(
+              'SUM(material.stockActual * material.precioUnitario)',
+              'valor',
+            )
+            .andWhere('material.precioUnitario IS NOT NULL')
+            .getRawOne<{ valor: string | null }>(),
+          this.crearQueryMaterialesReporte(query)
+            .andWhere('material.fechaVencimiento IS NOT NULL')
+            .andWhere('material.fechaVencimiento >= :hoy', { hoy })
+            .andWhere('material.fechaVencimiento <= :fechaLimite90', {
+              fechaLimite90,
+            })
+            .getCount(),
+          this.crearQueryMaterialesReporte(query)
+            .andWhere('material.fechaVencimiento IS NOT NULL')
+            .andWhere('material.fechaVencimiento >= :hoy2', { hoy2: hoy })
+            .andWhere('material.fechaVencimiento <= :fechaLimite902', {
+              fechaLimite902: fechaLimite90,
+            })
+            .orderBy('material.fechaVencimiento', 'ASC')
+            .take(10)
+            .getMany(),
+          porCategoriaQb
+            .groupBy('categoria.id')
+            .addGroupBy('categoria.nombre')
+            .orderBy('categoria.nombre', 'ASC')
+            .getRawMany<{
+              idCategoria: number | string | null;
+              categoriaNombre: string | null;
+              totalMateriales: string;
+              materialesStockBajo: string;
+            }>(),
+          this.crearQueryMaterialesReporte(query)
+            .leftJoinAndSelect('material.categoria', 'categoria')
+            .orderBy('material.nombre', 'ASC')
+            .take(100)
+            .getMany(),
+          this.crearQueryMovimientosReporte(query, true)
+            .take(100)
+            .getMany(),
+        ]);
 
-        const materiales = await this.crearQueryMaterialesReporte(query)
-          .leftJoinAndSelect('material.categoria', 'categoria')
-          .orderBy('material.nombre', 'ASC')
-          .take(100)
-          .getMany();
-
-        const movimientos = await this.crearQueryMovimientosReporte(query, true)
-          .take(100)
-          .getMany();
+        const valorTotalInventario =
+          valorResult?.valor != null ? Number(valorResult.valor) : null;
 
         return {
           indicadores: {
