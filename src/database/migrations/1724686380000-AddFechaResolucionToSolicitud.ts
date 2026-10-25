@@ -1,9 +1,9 @@
 import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
 
-export class AddFechaResolucionToSolicitud1724686360000
+export class AddFechaResolucionToSolicitud1724686380000
   implements MigrationInterface
 {
-  name = 'AddFechaResolucionToSolicitud1724686360000';
+  name = 'AddFechaResolucionToSolicitud1724686380000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     const table = await queryRunner.getTable('Solicitud');
