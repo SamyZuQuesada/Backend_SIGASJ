@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, type TransformFnParams } from 'class-transformer';
 import {
+  IsBoolean,
   IsDate,
   IsInt,
   IsNotEmpty,
@@ -240,4 +241,20 @@ export class CreateMaterialDto {
   @IsOptional()
   @IsDate({ message: 'La fecha de vencimiento debe ser una fecha válida' })
   fechaVencimiento?: Date | null;
+
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Indica si este material requiere fecha de vencimiento (p. ej. insumos químicos)',
+  })
+  @Transform(({ value, obj, key }: TransformFnParams) => {
+    const raw = obj && typeof obj === 'object' && key in obj ? (obj as Record<string, unknown>)[key] : value;
+    if (raw === undefined || raw === null) return undefined;
+    if (typeof raw === 'boolean') return raw;
+    if (raw === 'true' || raw === '1' || raw === 1) return true;
+    if (raw === 'false' || raw === '0' || raw === 0) return false;
+    return raw;
+  })
+  @IsOptional()
+  @IsBoolean({ message: 'requiereFechaVencimiento debe ser un booleano' })
+  requiereFechaVencimiento?: boolean;
 }

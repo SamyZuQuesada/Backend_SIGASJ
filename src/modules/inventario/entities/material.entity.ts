@@ -82,6 +82,10 @@ export class Material {
   @Column({ type: 'datetime2', nullable: true })
   fechaVencimiento?: Date | null;
 
+  /** Indica que este material requiere fecha de vencimiento (p. ej. insumos químicos). */
+  @Column({ default: false })
+  requiereFechaVencimiento: boolean;
+
   @Index()
   @Column({ type: 'int', nullable: true })
   idCategoria?: number | null;

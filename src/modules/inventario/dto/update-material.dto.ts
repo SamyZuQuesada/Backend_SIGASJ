@@ -259,4 +259,20 @@ export class UpdateMaterialDto {
   @IsOptional()
   @IsDate({ message: 'La fecha de vencimiento debe ser una fecha válida' })
   fechaVencimiento?: Date | null;
+
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Indica si este material requiere fecha de vencimiento (p. ej. insumos químicos)',
+  })
+  @Transform((params: TransformFnParams) => {
+    const raw = rawValue(params);
+    if (raw === undefined || raw === null) return undefined;
+    if (typeof raw === 'boolean') return raw;
+    if (raw === 'true' || raw === '1' || raw === 1) return true;
+    if (raw === 'false' || raw === '0' || raw === 0) return false;
+    return raw;
+  })
+  @IsOptional()
+  @IsBoolean({ message: 'requiereFechaVencimiento debe ser un booleano' })
+  requiereFechaVencimiento?: boolean;
 }
