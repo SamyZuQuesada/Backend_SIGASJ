@@ -34,6 +34,14 @@ export class CategoriaMaterial {
   @Column({ default: true })
   activo: boolean;
 
+  /**
+   * Si true, los materiales de esta categoría pueden (y deben poder)
+   * registrar fecha de vencimiento (químicos, cloro, etc.).
+   * Tubería PVC, válvulas, herramientas: false.
+   */
+  @Column({ default: false })
+  requiereFechaVencimiento: boolean;
+
   @CreateDateColumn()
   createdAt: Date;
 

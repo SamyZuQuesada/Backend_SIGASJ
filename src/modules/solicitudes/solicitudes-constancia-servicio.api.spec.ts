@@ -172,7 +172,9 @@ describe('API POST /solicitudes/servicio-existente (Constancia de Servicio Exist
     const errors = Array.isArray(body.message) ? body.message : [body.message];
     expect(
       errors.some((m) =>
-        m?.includes('Debe especificar el motivo cuando selecciona la opción Otro'),
+        m?.includes(
+          'Debe especificar el motivo cuando selecciona la opción Otro',
+        ),
       ),
     ).toBe(true);
     expect(mockCrear).not.toHaveBeenCalled();
@@ -194,7 +196,9 @@ describe('API POST /solicitudes/servicio-existente (Constancia de Servicio Exist
     const errors = Array.isArray(body.message) ? body.message : [body.message];
     expect(
       errors.some((m) =>
-        m?.includes('Debe especificar el motivo cuando selecciona la opción Otro'),
+        m?.includes(
+          'Debe especificar el motivo cuando selecciona la opción Otro',
+        ),
       ),
     ).toBe(true);
     expect(mockCrear).not.toHaveBeenCalled();
@@ -264,7 +268,9 @@ describe('API POST /solicitudes/servicio-existente (Constancia de Servicio Exist
       ),
     ).toBe(true);
     expect(
-      errors.some((m) => m?.includes('El nombre del solicitante es obligatorio')),
+      errors.some((m) =>
+        m?.includes('El nombre del solicitante es obligatorio'),
+      ),
     ).toBe(true);
     expect(
       errors.some((m) =>
@@ -278,14 +284,16 @@ describe('API POST /solicitudes/servicio-existente (Constancia de Servicio Exist
       true,
     );
     expect(
-      errors.some((m) => m?.includes('La naturaleza del inmueble es obligatoria')),
+      errors.some((m) =>
+        m?.includes('La naturaleza del inmueble es obligatoria'),
+      ),
     ).toBe(true);
     expect(
       errors.some((m) => m?.includes('La calidad del titular es obligatoria')),
     ).toBe(true);
-    expect(
-      errors.some((m) => m?.includes('La provincia es obligatoria')),
-    ).toBe(true);
+    expect(errors.some((m) => m?.includes('La provincia es obligatoria'))).toBe(
+      true,
+    );
     expect(errors.some((m) => m?.includes('El cantón es obligatorio'))).toBe(
       true,
     );
@@ -320,7 +328,9 @@ describe('API POST /solicitudes/servicio-existente (Constancia de Servicio Exist
     const body = response.body as ValidationBody;
     const errors = Array.isArray(body.message) ? body.message : [body.message];
     expect(
-      errors.some((m) => m?.includes('should not exist') || m?.includes('estado')),
+      errors.some(
+        (m) => m?.includes('should not exist') || m?.includes('estado'),
+      ),
     ).toBe(true);
   });
 });

@@ -1,7 +1,32 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EstadoSolicitudAusencia } from '../../../common/enums/estado-solicitud-ausencia.enum';
 import { TipoSolicitudAusencia } from '../../../common/enums/tipo-solicitud-ausencia.enum';
+import {
+  resumenDiasVacaciones,
+  type ResumenDiasVacaciones,
+} from '../dias-periodo-ausencia';
+import { DocumentoSolicitudAusencia } from '../entities/documento-solicitud-ausencia.entity';
 import { SolicitudAusencia } from '../entities/solicitud-ausencia.entity';
+
+export class DocumentoAusenciaFontaneroResponse {
+  @ApiProperty()
+  id: number;
+
+  @ApiProperty()
+  nombreOriginal: string;
+
+  @ApiProperty()
+  tipoArchivo: string;
+
+  @ApiProperty()
+  rutaReferenciaArchivo: string;
+
+  @ApiProperty()
+  tamanio: number;
+
+  @ApiProperty()
+  fechaCarga: Date;
+}
 
 /**
  * Vista Fontanero de SolicitudAusencia.
@@ -47,12 +72,33 @@ export class SolicitudAusenciaFontaneroResponse {
   })
   reviewedAt: Date | null;
 
+  @ApiProperty({ type: [DocumentoAusenciaFontaneroResponse] })
+  documentos: DocumentoAusenciaFontaneroResponse[];
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description:
+      'Solo vacaciones: días calendario, feriados CR en el periodo y días netos a descontar',
+  })
+  resumenVacaciones: ResumenDiasVacaciones | null;
+
   @ApiProperty()
   createdAt: Date;
 
   @ApiProperty()
   updatedAt: Date;
 }
+
+const toDocumento = (
+  documento: DocumentoSolicitudAusencia,
+): DocumentoAusenciaFontaneroResponse => ({
+  id: documento.id,
+  nombreOriginal: documento.nombreOriginal,
+  tipoArchivo: documento.tipoArchivo,
+  rutaReferenciaArchivo: documento.rutaReferenciaArchivo,
+  tamanio: documento.tamanio,
+  fechaCarga: documento.fechaCarga,
+});
 
 export const toSolicitudAusenciaFontaneroResponse = (
   solicitud: SolicitudAusencia,
@@ -67,6 +113,11 @@ export const toSolicitudAusenciaFontaneroResponse = (
   estado: solicitud.estado,
   motivoRechazo: solicitud.motivoRechazo,
   reviewedAt: solicitud.reviewedAt,
+  documentos: (solicitud.documentos ?? []).map(toDocumento),
+  resumenVacaciones:
+    solicitud.tipo === TipoSolicitudAusencia.VACACIONES
+      ? resumenDiasVacaciones(solicitud.fechaInicio, solicitud.fechaFin)
+      : null,
   createdAt: solicitud.createdAt,
   updatedAt: solicitud.updatedAt,
 });

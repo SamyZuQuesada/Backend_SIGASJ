@@ -247,7 +247,8 @@ export class UpdateMaterialDto {
 
   @ApiPropertyOptional({
     example: '2027-12-31',
-    description: 'Fecha de vencimiento del material (aplica a insumos químicos y similares)',
+    description:
+      'Fecha de vencimiento del material (aplica a insumos químicos y similares)',
   })
   @Transform((params: TransformFnParams) => {
     const raw = rawValue(params);

@@ -135,7 +135,8 @@ export class RegistrarEntradaDto {
 
   @ApiPropertyOptional({
     example: 1250.5,
-    description: 'Precio unitario pagado en esta entrada (opcional, para trazabilidad de costos)',
+    description:
+      'Precio unitario pagado en esta entrada (opcional, para trazabilidad de costos)',
   })
   @Transform((params: TransformFnParams) => {
     const raw = rawValue(params);

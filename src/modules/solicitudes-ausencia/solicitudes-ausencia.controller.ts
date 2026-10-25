@@ -9,6 +9,7 @@ import {
   Patch,
   Post,
   Query,
+  StreamableFile,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -17,6 +18,7 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { createReadStream } from 'fs';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/enums/role.enum';
@@ -77,6 +79,25 @@ export class SolicitudesAusenciaController {
   @ApiResponse({ status: 404, description: 'No existe' })
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.solicitudesService.findOneDetalle(id);
+  }
+
+  @Get(':id/documentos/:filename')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMINISTRADORA)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Descargar o ver evidencia de una solicitud' })
+  async descargarDocumento(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('filename') filename: string,
+  ): Promise<StreamableFile> {
+    const { absolutePath, mimeType, documento } =
+      await this.solicitudesService.obtenerArchivoDocumento(id, filename, {
+        rolAdministradora: true,
+      });
+    return new StreamableFile(createReadStream(absolutePath), {
+      type: mimeType,
+      disposition: `inline; filename="${encodeURIComponent(documento.nombreOriginal)}"`,
+    });
   }
 
   @Patch(':id/aprobar')

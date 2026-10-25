@@ -416,6 +416,79 @@ export function deleteActividadDocument(
   if (existsSync(filePath)) unlinkSync(filePath);
 }
 
+/**
+ * Evidencia de SolicitudAusencia. PDF/JPG/PNG, máx. 10 MB.
+ * Carpeta: uploads/solicitudes-ausencia/<id>/
+ */
+export function saveAusenciaDocument(
+  solicitudId: number,
+  file: ActividadDocumentFile,
+): { rutaReferenciaArchivo: string; filename: string } {
+  validateActividadDocument(file);
+  const extension = ACTIVIDAD_DOCUMENT_MIME_TYPES[file.mimetype];
+
+  const folder = join(UPLOAD_ROOT, 'solicitudes-ausencia', String(solicitudId));
+  mkdirSync(folder, { recursive: true });
+
+  const filename = `${Date.now()}-${randomUUID()}${extension}`;
+  writeFileSync(join(folder, filename), file.buffer);
+
+  const rutaReferenciaArchivo = `/api/v1/fontanero/solicitudes-ausencia/${solicitudId}/documentos/${filename}`;
+  return { rutaReferenciaArchivo, filename };
+}
+
+export function deleteAusenciaDocument(
+  solicitudId: number,
+  rutaReferenciaArchivo: string,
+): void {
+  const prefix = `/api/v1/fontanero/solicitudes-ausencia/${solicitudId}/documentos/`;
+  if (!rutaReferenciaArchivo.startsWith(prefix)) return;
+
+  const filename = rutaReferenciaArchivo.substring(prefix.length);
+  const safeName = basename(filename);
+  if (!safeName || safeName !== filename || safeName.includes('..')) return;
+
+  const filePath = join(
+    UPLOAD_ROOT,
+    'solicitudes-ausencia',
+    String(solicitudId),
+    safeName,
+  );
+  if (existsSync(filePath)) unlinkSync(filePath);
+}
+
+export function getAusenciaDocumentFilePath(
+  solicitudId: number,
+  filename: string,
+): { absolutePath: string; mimeType: string } {
+  const safeName = basename(filename);
+  if (!safeName || safeName !== filename || safeName.includes('..')) {
+    throw new BadRequestException('Nombre de archivo inválido.');
+  }
+
+  const absolutePath = join(
+    UPLOAD_ROOT,
+    'solicitudes-ausencia',
+    String(solicitudId),
+    safeName,
+  );
+  if (!existsSync(absolutePath)) {
+    throw new NotFoundException('Archivo de evidencia no encontrado.');
+  }
+
+  const ext = extname(safeName).toLowerCase();
+  const mimeType =
+    ext === '.pdf'
+      ? 'application/pdf'
+      : ext === '.png'
+        ? 'image/png'
+        : ext === '.jpg' || ext === '.jpeg'
+          ? 'image/jpeg'
+          : 'application/octet-stream';
+
+  return { absolutePath, mimeType };
+}
+
 export type MovimientoDocumentFile = {
   originalname: string;
   mimetype: string;
