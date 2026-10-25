@@ -17,6 +17,7 @@ import {
   MOVIMIENTOS_VACACIONES_PAGE_DEFAULT,
   QueryMovimientosVacacionesDto,
 } from './dto/query-movimientos-vacaciones.dto';
+import { ColaboradoresService } from './colaboradores.service';
 import { Colaborador } from './entities/colaborador.entity';
 import { MovimientoVacaciones } from './entities/movimiento-vacaciones.entity';
 import { compararFechasIso, esFechaCalendario } from './fecha-permiso';
@@ -64,6 +65,7 @@ export class VacacionesService {
     private readonly movimientoRepository: Repository<MovimientoVacaciones>,
     @InjectRepository(Colaborador)
     private readonly colaboradorRepository: Repository<Colaborador>,
+    private readonly colaboradoresService: ColaboradoresService,
   ) {}
 
   /**
@@ -278,9 +280,8 @@ export class VacacionesService {
   async obtenerBalancePorUsuarioId(
     usuarioId: number,
   ): Promise<BalanceVacaciones> {
-    const colaborador = await this.colaboradorRepository.findOne({
-      where: { usuarioId, activo: true },
-    });
+    const colaborador =
+      await this.colaboradoresService.resolverActivoPorUsuarioId(usuarioId);
     if (!colaborador) {
       throw new ForbiddenException(
         'No hay un colaborador activo vinculado a su cuenta',

@@ -15,6 +15,7 @@ import {
   construirHtmlAprobacionAusencia,
   construirTextoAprobacionAusencia,
 } from './correo-aprobacion-ausencia.template';
+import { parseCorreosAviso } from './correos-aviso.util';
 import { SolicitudAusencia } from './entities/solicitud-ausencia.entity';
 
 /**
@@ -43,10 +44,12 @@ export class NotificacionSolicitudAusenciaService {
         where: { id: solicitud.colaboradorId },
       }));
 
-    const destino =
-      solicitud.correoNotificacion?.trim().toLowerCase() ||
-      colaborador?.correoElectronico?.trim().toLowerCase() ||
-      '';
+    const destinos = parseCorreosAviso(
+      solicitud.correoNotificacion?.trim() ||
+        colaborador?.correoElectronico?.trim() ||
+        '',
+    );
+    const destino = destinos.join(', ');
 
     if (!destino) {
       this.logger.warn(

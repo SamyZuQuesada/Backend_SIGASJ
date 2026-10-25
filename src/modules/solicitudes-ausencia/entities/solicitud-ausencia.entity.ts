@@ -72,17 +72,25 @@ export class SolicitudAusencia {
   motivo: string | null;
 
   /**
-   * Correo indicado por el Fontanero al solicitar.
-   * Se usa para notificar la aprobación (no sustituye la identidad JWT).
+   * Correo(s) indicado(s) por el Fontanero al solicitar.
+   * Lista separada por coma; se usa para notificar la aprobación.
    */
-  @ApiPropertyOptional({ nullable: true, example: 'fontanero@asadasanjuan.cr' })
-  @Column({ type: 'varchar', length: 255, nullable: true })
+  @ApiPropertyOptional({
+    nullable: true,
+    example: 'fontanero@asadasanjuan.cr, jefe@asadasanjuan.cr',
+  })
+  @Column({ type: 'varchar', length: 500, nullable: true })
   correoNotificacion: string | null;
 
   /** Observaciones administrativas (vacías mientras PENDIENTE). */
   @ApiPropertyOptional({ nullable: true })
   @Column({ type: 'varchar', length: 500, nullable: true })
   observaciones: string | null;
+
+  /** Adjuntos del permiso (JSON). Vacaciones no usa este campo. */
+  @ApiPropertyOptional({ nullable: true })
+  @Column({ type: 'text', nullable: true })
+  adjuntosJson: string | null;
 
   @ApiProperty({ enum: EstadoSolicitudAusencia })
   @Column({

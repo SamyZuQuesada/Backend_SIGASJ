@@ -1,21 +1,20 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, type TransformFnParams } from 'class-transformer';
 import {
-  IsEmail,
+  Allow,
   IsEnum,
   IsNotEmpty,
-  IsOptional,
   IsString,
   Matches,
   MaxLength,
+  ValidateIf,
 } from 'class-validator';
 import { TipoSolicitudAusencia } from '../../../common/enums/tipo-solicitud-ausencia.enum';
+import { MAX_CORREOS_AVISO_LENGTH, normalizarCorreosAviso } from '../correos-aviso.util';
+import { IsListaCorreosAviso } from '../is-lista-correos-aviso.validator';
 
 const trimString = ({ value }: TransformFnParams): unknown =>
   typeof value === 'string' ? value.trim() : value;
-
-const trimLower = ({ value }: TransformFnParams): unknown =>
-  typeof value === 'string' ? value.trim().toLowerCase() : value;
 
 const trimUpper = ({ value }: TransformFnParams): unknown =>
   typeof value === 'string' ? value.trim().toUpperCase() : value;
@@ -53,13 +52,18 @@ export class CrearSolicitudAusenciaFontaneroDto {
   fechaFin!: string;
 
   @ApiProperty({
-    example: 'fontanero@asadasanjuan.cr',
-    description: 'Correo donde se avisará si la solicitud es aprobada',
+    example: 'fontanero@asadasanjuan.cr, jefe@asadasanjuan.cr',
+    description:
+      'Uno o más correos (coma, punto y coma o espacio) donde se avisará si la solicitud es aprobada',
   })
-  @Transform(trimLower)
+  @Transform(({ value }: TransformFnParams): unknown =>
+    typeof value === 'string' ? normalizarCorreosAviso(value) : value,
+  )
   @IsNotEmpty({ message: 'Indique el correo donde desea recibir el aviso' })
-  @IsEmail({}, { message: 'El correo electrónico no es válido' })
-  @MaxLength(255, { message: 'El correo no puede superar 255 caracteres' })
+  @IsListaCorreosAviso()
+  @MaxLength(MAX_CORREOS_AVISO_LENGTH, {
+    message: 'Los correos de aviso no pueden superar 500 caracteres',
+  })
   correo!: string;
 
   @ApiPropertyOptional({
@@ -68,8 +72,15 @@ export class CrearSolicitudAusenciaFontaneroDto {
     example: 'Cita médica',
   })
   @Transform(trimOptional)
-  @IsOptional()
+  @ValidateIf(
+    (dto: CrearSolicitudAusenciaFontaneroDto) =>
+      dto.tipo === TipoSolicitudAusencia.PERMISO,
+  )
+  @IsNotEmpty({ message: 'Indique el motivo del permiso' })
   @IsString()
   @MaxLength(500)
   motivo?: string | null;
+
+  @Allow()
+  documentos?: unknown;
 }

@@ -7,15 +7,21 @@ import {
   Param,
   ParseIntPipe,
   Post,
+  UploadedFiles,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
+  ApiConsumes,
   ApiOperation,
   ApiParam,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { MAX_ACTIVIDAD_DOCUMENT_BYTES, MAX_ACTIVIDAD_DOCUMENT_FILES } from '../../common/media/public-media';
+import type { AdjuntoSolicitudAusencia } from './adjuntos-ausencia';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/enums/role.enum';
@@ -68,11 +74,21 @@ export class FontaneroSolicitudesAusenciaController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @UseInterceptors(
+    FilesInterceptor('documentos', MAX_ACTIVIDAD_DOCUMENT_FILES, {
+      limits: {
+        fileSize: MAX_ACTIVIDAD_DOCUMENT_BYTES,
+        files: MAX_ACTIVIDAD_DOCUMENT_FILES,
+      },
+    }),
+  )
+  @ApiConsumes('multipart/form-data', 'application/json')
   @ApiOperation({
     summary: 'Crear solicitud de ausencia (formulario Fontanero)',
     description:
       'Identidad solo por JWT → Colaborador. Estado inicial PENDIENTE. ' +
-      'No crea PermisoColaborador ni MovimientoVacaciones.',
+      'No crea PermisoColaborador ni MovimientoVacaciones. ' +
+      'Los archivos (PDF/JPG/PNG) solo aplican a permiso.',
   })
   @ApiResponse({
     status: HttpStatus.CREATED,
@@ -90,10 +106,15 @@ export class FontaneroSolicitudesAusenciaController {
   })
   crearPropia(
     @Body() dto: CrearSolicitudAusenciaFontaneroDto,
+    @UploadedFiles() archivos: AdjuntoSolicitudAusencia[] | undefined,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<SolicitudAusenciaFontaneroResponse> {
     const usuarioId = user.idUsuario ?? Number(user.userId);
-    return this.solicitudesService.crearSolicitudPropia(usuarioId, dto);
+    return this.solicitudesService.crearSolicitudPropia(
+      usuarioId,
+      dto,
+      archivos ?? [],
+    );
   }
 
   @Get(':id')

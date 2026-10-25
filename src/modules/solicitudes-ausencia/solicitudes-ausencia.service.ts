@@ -15,6 +15,7 @@ import { TipoMovimientoVacaciones } from '../../common/enums/tipo-movimiento-vac
 import { TipoRegistroGeneradoAusencia } from '../../common/enums/tipo-registro-generado-ausencia.enum';
 import { TipoSolicitudAusencia } from '../../common/enums/tipo-solicitud-ausencia.enum';
 import { NotificacionesAveriasService } from '../notificaciones/notificaciones-averias.service';
+import { ColaboradoresService } from '../recursos-humanos/colaboradores.service';
 import { Colaborador } from '../recursos-humanos/entities/colaborador.entity';
 import {
   compararFechasIso,
@@ -25,7 +26,14 @@ import {
   BalanceVacaciones,
   VacacionesService,
 } from '../recursos-humanos/vacaciones.service';
-import { diasInclusiveEntreFechas } from './dias-periodo-ausencia';
+import {
+  diasAusenciaSinFeriados,
+  esFeriadoCostaRica,
+} from './feriados-costa-rica';
+import {
+  persistirAdjuntosSolicitudAusencia,
+  type AdjuntoSolicitudAusencia,
+} from './adjuntos-ausencia';
 import { CrearSolicitudAusenciaFontaneroDto } from './dto/crear-solicitud-ausencia-fontanero.dto';
 import { RechazarSolicitudAusenciaDto } from './dto/rechazar-solicitud-ausencia.dto';
 import {
@@ -61,6 +69,7 @@ export class SolicitudesAusenciaService {
     private readonly solicitudRepository: Repository<SolicitudAusencia>,
     @InjectRepository(Colaborador)
     private readonly colaboradorRepository: Repository<Colaborador>,
+    private readonly colaboradoresService: ColaboradoresService,
     private readonly permisosService: PermisosColaboradorService,
     private readonly vacacionesService: VacacionesService,
     private readonly notificacionSolicitudAusencia: NotificacionSolicitudAusenciaService,
@@ -75,20 +84,14 @@ export class SolicitudesAusenciaService {
   async obtenerColaboradorDelUsuarioAutenticado(
     usuarioId: number,
   ): Promise<Colaborador> {
-    if (!Number.isInteger(usuarioId) || usuarioId <= 0) {
-      throw new ForbiddenException(
-        'No hay un colaborador activo vinculado a su cuenta',
-      );
+    const colaborador =
+      await this.colaboradoresService.resolverActivoPorUsuarioId(usuarioId);
+    if (colaborador) {
+      return colaborador;
     }
-    const colaborador = await this.colaboradorRepository.findOne({
-      where: { usuarioId, activo: true },
-    });
-    if (!colaborador) {
-      throw new ForbiddenException(
-        'No hay un colaborador activo vinculado a su cuenta',
-      );
-    }
-    return colaborador;
+    throw new ForbiddenException(
+      'No hay un colaborador activo vinculado a su cuenta',
+    );
   }
 
   /**
@@ -139,9 +142,19 @@ export class SolicitudesAusenciaService {
   async crearSolicitudPropia(
     usuarioId: number,
     dto: CrearSolicitudAusenciaFontaneroDto,
+    archivos: AdjuntoSolicitudAusencia[] = [],
   ): Promise<SolicitudAusenciaFontaneroResponse> {
     const colaborador =
       await this.obtenerColaboradorDelUsuarioAutenticado(usuarioId);
+
+    if (dto.tipo === TipoSolicitudAusencia.PERMISO && !dto.motivo?.trim()) {
+      throw new BadRequestException('Indique el motivo del permiso');
+    }
+    if (dto.tipo === TipoSolicitudAusencia.VACACIONES && archivos.length > 0) {
+      throw new BadRequestException(
+        'La solicitud de vacaciones no admite archivos adjuntos',
+      );
+    }
 
     const { solicitud, creada } =
       await this.solicitudRepository.manager.transaction(async (manager) =>
@@ -150,12 +163,24 @@ export class SolicitudesAusenciaService {
           tipo: dto.tipo,
           fechaInicio: dto.fechaInicio,
           fechaFin: dto.fechaFin,
-          motivo: dto.motivo?.trim() || null,
+          motivo:
+            dto.tipo === TipoSolicitudAusencia.VACACIONES
+              ? null
+              : dto.motivo?.trim() || null,
           correoNotificacion: dto.correo.trim().toLowerCase(),
           jotformSubmissionId: `sigasj-${randomUUID()}`,
           manager,
         }),
       );
+
+    if (creada && archivos.length > 0) {
+      const adjuntos = persistirAdjuntosSolicitudAusencia(
+        solicitud.id,
+        archivos,
+      );
+      solicitud.adjuntosJson = JSON.stringify(adjuntos);
+      await this.solicitudRepository.save(solicitud);
+    }
 
     if (creada) {
       await this.avisarAdministradorasSolicitudPendiente(
@@ -394,7 +419,7 @@ export class SolicitudesAusenciaService {
             registroGeneradoTipo: TipoRegistroGeneradoAusencia.PERMISO,
           });
         } else if (solicitud.tipo === TipoSolicitudAusencia.VACACIONES) {
-          const cantidadDias = diasInclusiveEntreFechas(
+          const cantidadDias = diasAusenciaSinFeriados(
             solicitud.fechaInicio,
             solicitud.fechaFin,
           );
@@ -511,6 +536,21 @@ export class SolicitudesAusenciaService {
     if (compararFechasIso(fechaInicio, fechaFin) > 0) {
       throw new BadRequestException(
         'fechaFin no puede ser anterior a fechaInicio',
+      );
+    }
+    if (esFeriadoCostaRica(fechaInicio)) {
+      throw new BadRequestException(
+        'La fecha de inicio no puede ser un feriado',
+      );
+    }
+    if (esFeriadoCostaRica(fechaFin)) {
+      throw new BadRequestException(
+        'La fecha de fin no puede ser un feriado',
+      );
+    }
+    if (diasAusenciaSinFeriados(fechaInicio, fechaFin) < 1) {
+      throw new BadRequestException(
+        'El periodo no incluye días hábiles: solo hay feriados en ese rango',
       );
     }
   }

@@ -927,6 +927,45 @@ describe('SolicitudesAusencia (épica 6.5)', () => {
       ).toBe(false);
     });
 
+    it('POST acepta varios correos de aviso', async () => {
+      const { token } = await crearFontaneroVinculado();
+
+      const res = await request(app.getHttpServer())
+        .post(FONTANERO)
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          tipo: 'PERMISO',
+          fechaInicio: '2026-11-10',
+          fechaFin: '2026-11-11',
+          correo: 'aviso@asadasanjuan.cr, jefe@asadasanjuan.cr',
+          motivo: 'Cita médica',
+        })
+        .expect(201);
+
+      const body = res.body as FontaneroSolicitudBody;
+      expect(body.correoNotificacion).toBe(
+        'aviso@asadasanjuan.cr, jefe@asadasanjuan.cr',
+      );
+    });
+
+    it('POST con un correo inválido en la lista: 400', async () => {
+      const { token } = await crearFontaneroVinculado();
+
+      await request(app.getHttpServer())
+        .post(FONTANERO)
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          tipo: 'PERMISO',
+          fechaInicio: '2026-11-10',
+          fechaFin: '2026-11-11',
+          correo: 'aviso@asadasanjuan.cr, no-es-correo',
+          motivo: 'Cita médica',
+        })
+        .expect(400);
+
+      expect(await solicitudRepo.count()).toBe(0);
+    });
+
     it('POST sin correo: 400', async () => {
       const { token } = await crearFontaneroVinculado();
 

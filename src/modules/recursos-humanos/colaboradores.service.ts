@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, Not, Repository, WhereExpressionBuilder } from 'typeorm';
+import { Brackets, IsNull, Not, Repository, WhereExpressionBuilder } from 'typeorm';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import {
   CreateColaboradorDto,
@@ -36,6 +36,11 @@ const patronLike = (valor: string): string => `%${escaparLike(valor)}%`;
 
 const sinGuiones = (valor: string): string => valor.replace(/[-\s]/g, '');
 
+const esEntornoDePruebaOProduccion = (): boolean => {
+  const env = (process.env.NODE_ENV ?? 'development').toLowerCase();
+  return env === 'test' || env === 'production';
+};
+
 const esViolacionUnicidad = (error: unknown): boolean => {
   const e = error as { number?: number; code?: string; message?: string };
   return (
@@ -60,6 +65,64 @@ export class ColaboradoresService {
     @InjectRepository(Puesto)
     private readonly puestoRepository: Repository<Puesto>,
   ) {}
+
+  /**
+   * Resuelve el colaborador activo de una cuenta. En desarrollo, si el
+   * Fontanero aún no tiene ficha de RRHH, la vincula o la crea.
+   */
+  async resolverActivoPorUsuarioId(
+    usuarioId: number,
+  ): Promise<Colaborador | null> {
+    const id = Number(usuarioId);
+    if (!Number.isInteger(id) || id <= 0) {
+      return null;
+    }
+
+    const porUsuario = await this.colaboradorRepository.findOne({
+      where: { usuarioId: id, activo: true },
+    });
+    if (porUsuario) {
+      return porUsuario;
+    }
+
+    const usuario = await this.usuarioRepository.findOne({
+      where: { idUsuario: id, activo: true },
+    });
+    const correo = usuario?.correo?.trim().toLowerCase() ?? '';
+    if (correo) {
+      const porCorreo = await this.colaboradorRepository.findOne({
+        where: { correoElectronico: correo, activo: true },
+      });
+      if (porCorreo && !porCorreo.usuarioId) {
+        porCorreo.usuarioId = id;
+        return this.colaboradorRepository.save(porCorreo);
+      }
+      if (porCorreo?.usuarioId === id) {
+        return porCorreo;
+      }
+    }
+
+    if (!usuario || esEntornoDePruebaOProduccion()) {
+      return null;
+    }
+
+    const sinCuenta = await this.colaboradorRepository.find({
+      where: { usuarioId: IsNull(), activo: true },
+    });
+    const fontanerosSueltos = sinCuenta.filter((item) =>
+      /fontanero/i.test(`${item.cargo} ${item.nombre}`),
+    );
+    if (fontanerosSueltos.length === 1) {
+      const unico = fontanerosSueltos[0];
+      unico.usuarioId = id;
+      this.logger.log(
+        `Colaborador ${unico.id} vinculado a usuario ${id} (${correo})`,
+      );
+      return this.colaboradorRepository.save(unico);
+    }
+
+    return this.crearColaboradorFontaneroDesarrollo(usuario);
+  }
 
   async create(dto: CreateColaboradorDto): Promise<Colaborador> {
     const cedula = normalizarCedula(dto.cedula);
@@ -248,6 +311,57 @@ export class ColaboradoresService {
       );
     }
     return this.findOne(id);
+  }
+
+  private async crearColaboradorFontaneroDesarrollo(
+    usuario: Usuario,
+  ): Promise<Colaborador> {
+    let puesto = await this.puestoRepository.findOne({
+      where: { nombre: 'Fontanero' },
+    });
+    if (!puesto) {
+      puesto = await this.puestoRepository.save(
+        this.puestoRepository.create({
+          nombre: 'Fontanero',
+          activo: true,
+          critico: true,
+        }),
+      );
+    }
+
+    const partes = usuario.nombre.trim().split(/\s+/).filter(Boolean);
+    const nombre = partes[0] || 'Fontanero';
+    const apellidos = partes.slice(1).join(' ') || 'ASADA San Juan';
+    const cedula = await this.cedulaDisponibleParaUsuario(usuario.idUsuario);
+
+    const colaborador = this.colaboradorRepository.create({
+      nombre,
+      apellidos,
+      cedula,
+      correoElectronico: usuario.correo.trim().toLowerCase(),
+      puestoId: puesto.id,
+      cargo: puesto.nombre,
+      activo: true,
+      usuarioId: usuario.idUsuario,
+    });
+    const guardado = await this.colaboradorRepository.save(colaborador);
+    this.logger.log(
+      `Colaborador de desarrollo creado: id=${guardado.id} usuarioId=${usuario.idUsuario}`,
+    );
+    return guardado;
+  }
+
+  private async cedulaDisponibleParaUsuario(usuarioId: number): Promise<string> {
+    for (let intento = 0; intento < 20; intento += 1) {
+      const sucursal = String(1000 + usuarioId + intento).padStart(4, '0').slice(-4);
+      const secuencia = String(usuarioId).padStart(4, '0').slice(-4);
+      const cedula = `9-${sucursal}-${secuencia}`;
+      const existe = await this.colaboradorRepository.exists({ where: { cedula } });
+      if (!existe) {
+        return cedula;
+      }
+    }
+    return `9-${String(Date.now()).slice(-8, -4)}-${String(Date.now()).slice(-4)}`;
   }
 
   private async obtenerPorId(id: number): Promise<Colaborador> {
