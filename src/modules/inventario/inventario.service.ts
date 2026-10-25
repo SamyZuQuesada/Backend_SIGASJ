@@ -244,6 +244,7 @@ export class InventarioService {
         proveedor,
         precioUnitario: dto.precioUnitario ?? null,
         fechaVencimiento: dto.fechaVencimiento ?? null,
+        requiereFechaVencimiento: dto.requiereFechaVencimiento ?? false,
       });
 
       return await withDbRetry(() => this.materialRepository.save(material));
@@ -477,6 +478,10 @@ export class InventarioService {
 
     if (dto.fechaVencimiento !== undefined) {
       material.fechaVencimiento = dto.fechaVencimiento ?? null;
+    }
+
+    if (dto.requiereFechaVencimiento !== undefined) {
+      material.requiereFechaVencimiento = dto.requiereFechaVencimiento;
     }
 
     // Regla de negocio: stockActual se preserva intacto
@@ -1255,10 +1260,10 @@ export class InventarioService {
               if (typeof manager.query === 'function') {
                 try {
                   const solicitudes: Array<{
-                    idSolicitud: number;
+                    id: number;
                     estado?: string | null;
                   }> = await manager.query(
-                    `SELECT idSolicitud, estado FROM SolicitudServicio WHERE idSolicitud = ${solicitudIdNum}`,
+                    `SELECT id, estado FROM SolicitudMaterial WHERE id = ${solicitudIdNum}`,
                   );
                   if (Array.isArray(solicitudes)) {
                     if (solicitudes.length === 0) {
@@ -1305,7 +1310,7 @@ export class InventarioService {
             if (movimientoGuardado.idSolicitud) {
               try {
                 await manager.query(
-                  `UPDATE SolicitudMaterial SET estado = 'DESPACHADA' WHERE idSolicitud = ${movimientoGuardado.idSolicitud} AND estado = 'APROBADA'`,
+                  `UPDATE SolicitudMaterial SET estado = 'DESPACHADA' WHERE id = ${movimientoGuardado.idSolicitud} AND estado = 'APROBADA'`,
                 );
               } catch {
                 // Si la tabla no existe o el campo no aplica, no bloquear la salida
@@ -2563,6 +2568,7 @@ export class InventarioService {
             .andWhere('material.precioUnitario IS NOT NULL')
             .getRawOne<{ valor: string | null }>(),
           this.crearQueryMaterialesReporte(query)
+            .andWhere('material.requiereFechaVencimiento = :reqVenc', { reqVenc: true })
             .andWhere('material.fechaVencimiento IS NOT NULL')
             .andWhere('material.fechaVencimiento >= :hoy', { hoy })
             .andWhere('material.fechaVencimiento <= :fechaLimite90', {
@@ -2570,6 +2576,7 @@ export class InventarioService {
             })
             .getCount(),
           this.crearQueryMaterialesReporte(query)
+            .andWhere('material.requiereFechaVencimiento = :reqVenc2', { reqVenc2: true })
             .andWhere('material.fechaVencimiento IS NOT NULL')
             .andWhere('material.fechaVencimiento >= :hoy2', { hoy2: hoy })
             .andWhere('material.fechaVencimiento <= :fechaLimite902', {
