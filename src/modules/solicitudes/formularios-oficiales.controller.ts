@@ -116,6 +116,22 @@ export class FormulariosOficialesController {
    * DESCARGA PÚBLICA (Cards de Solicitudes Digitales):
    * ========================================================================= */
 
+  @Get('formularios-oficiales')
+  @ApiOperation({
+    summary:
+      'Listar los 6 trámites oficiales con su formulario PDF disponible (Público)',
+    description:
+      'Devuelve el catálogo público de los 6 trámites oficiales con su estado y enlace directo de descarga para las Cards del portal.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Catálogo de formularios oficiales descargables',
+    type: [FormularioOficialItemDto],
+  })
+  listarFormulariosPublicos(): Promise<FormularioOficialItemDto[]> {
+    return this.formulariosService.listarFormulariosOficialesAdmin();
+  }
+
   @Get(':slug/formulario-oficial')
   @ApiOperation({
     summary: 'Descargar el PDF oficial correspondiente a un trámite (Público)',

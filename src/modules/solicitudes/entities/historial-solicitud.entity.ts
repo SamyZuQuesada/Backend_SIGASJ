@@ -67,12 +67,13 @@ export class HistorialSolicitud {
   @Column({ type: 'varchar', length: 50, nullable: true })
   tipoEvento?: string | null;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 'Solicitud registrada en el sistema',
     description: 'Descripción detallada o motivo del evento en el historial',
+    nullable: true,
   })
   @Column({ type: 'varchar', length: 500, nullable: true })
-  descripcion: string;
+  descripcion?: string | null;
 
   @ApiPropertyOptional({
     example: 'Su solicitud está en revisión.',
@@ -91,7 +92,7 @@ export class HistorialSolicitud {
   notaInterna?: string | null;
 
   get comentario(): string | undefined {
-    return this.descripcion;
+    return this.descripcion ?? undefined;
   }
 
   set comentario(value: string | undefined) {

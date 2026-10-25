@@ -197,7 +197,6 @@ describe('SolicitudesService', () => {
     ]);
     createQueryBuilderGetOne = jest.fn().mockResolvedValue(null);
     findBySlugTipo = jest.fn().mockResolvedValue(mockSolicitud.tipoSolicitud);
-    findHistorial = jest.fn().mockResolvedValue([]);
     saveHistorial = jest
       .fn()
       .mockImplementation((hist: unknown) => Promise.resolve({ id: 1, ...(hist as object) }));
@@ -409,13 +408,7 @@ describe('SolicitudesService', () => {
       expect(serialized).not.toMatch(/"id"\s*:/);
       expect(findHistorial).toHaveBeenCalledWith({
         where: { solicitudId: 1 },
-        order: { fecha: 'ASC', id: 'ASC' },
-        select: {
-          fecha: true,
-          estadoAnterior: true,
-          estadoNuevo: true,
-          observacionPublica: true,
-        },
+        order: { fechaHora: 'ASC', id: 'ASC' },
       });
     });
 
@@ -1835,7 +1828,7 @@ describe('SolicitudesService', () => {
       expect(findHistorial).toHaveBeenCalledWith({
         where: { solicitudId: 1 },
         relations: { usuario: { rol: true } },
-        order: { fecha: 'ASC', id: 'ASC' },
+        order: { fechaHora: 'ASC', id: 'ASC' },
       });
     });
 

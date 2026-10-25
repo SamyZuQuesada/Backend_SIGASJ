@@ -101,6 +101,15 @@ export class Solicitud {
   fechaIngreso: Date;
 
   @ApiPropertyOptional({
+    example: '2026-10-25T14:30:00.000Z',
+    description:
+      'Fecha y hora en que se resolvió la solicitud (APROBADA, RECHAZADA, FINALIZADA, CANCELADA)',
+    nullable: true,
+  })
+  @Column({ type: 'datetime2', nullable: true })
+  fechaResolucion?: Date | null;
+
+  @ApiPropertyOptional({
     description:
       'Fecha de baja lógica. Evita la eliminación física de solicitudes procesadas para resguardo histórico y de auditoría.',
     nullable: true,
