@@ -1,19 +1,21 @@
 import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
 
 /**
- * Marca los materiales que deben llevar fecha de vencimiento.
- * Idempotente: si la columna ya existe (por un intento anterior) no vuelve a crearla.
- * En SQL Server conserva el default con nombre fijo; en el resto usa el tipo boolean.
+ * Agrega Material.requiereFechaVencimiento.
+ * Va en 631 porque main ya usa 620, 621, 622 y 623 para otras migraciones,
+ * y 630 desactiva tipos de actividad. precioUnitario y fechaVencimiento
+ * los cubre la 620 de main (AddPrecioUnitarioAndFechaVencimientoToInventario).
  */
-export class AddRequiereFechaVencimientoToMaterial1724686200000
+export class AddRequiereFechaVencimientoToMaterial1724686310000
   implements MigrationInterface
 {
-  name = 'AddRequiereFechaVencimientoToMaterial1724686200000';
+  name = 'AddRequiereFechaVencimientoToMaterial1724686310000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    if (
-      await queryRunner.hasColumn('Material', 'requiereFechaVencimiento')
-    ) {
+    if (!(await queryRunner.hasTable('Material'))) {
+      return;
+    }
+    if (await queryRunner.hasColumn('Material', 'requiereFechaVencimiento')) {
       return;
     }
 
@@ -36,9 +38,10 @@ export class AddRequiereFechaVencimientoToMaterial1724686200000
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    if (
-      !(await queryRunner.hasColumn('Material', 'requiereFechaVencimiento'))
-    ) {
+    if (!(await queryRunner.hasTable('Material'))) {
+      return;
+    }
+    if (!(await queryRunner.hasColumn('Material', 'requiereFechaVencimiento'))) {
       return;
     }
 
