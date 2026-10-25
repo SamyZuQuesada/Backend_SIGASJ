@@ -188,9 +188,18 @@ export class SolicitudesMaterialesController {
   })
   @ApiParam({ name: 'id', description: 'ID de la solicitud', type: Number })
   @ApiResponse({ status: HttpStatus.OK, description: 'Solicitud cancelada' })
-  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'La solicitud no está en estado PENDIENTE' })
-  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'La solicitud pertenece a otro fontanero' })
-  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Solicitud no encontrada' })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'La solicitud no está en estado PENDIENTE',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'La solicitud pertenece a otro fontanero',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Solicitud no encontrada',
+  })
   cancelarSolicitud(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: AuthenticatedUser,

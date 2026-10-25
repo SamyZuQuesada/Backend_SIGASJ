@@ -162,8 +162,7 @@ export class SolicitudConstanciaServicio {
 
   @ApiProperty({
     example: 'Inscrito',
-    description:
-      'Naturaleza del inmueble (e.g. Inscrito | Sin inscribir)',
+    description: 'Naturaleza del inmueble (e.g. Inscrito | Sin inscribir)',
     maxLength: 80,
   })
   @Column({ type: 'varchar', length: 80 })
@@ -234,7 +233,8 @@ export class SolicitudConstanciaServicio {
   otroMotivo?: string | null;
 
   @ApiPropertyOptional({
-    example: 'Solicitud de bono de vivienda familiar en entidad autorizada BANHVI',
+    example:
+      'Solicitud de bono de vivienda familiar en entidad autorizada BANHVI',
     description: 'Descripción o especificación del trámite por realizar',
     maxLength: 255,
     nullable: true,

@@ -23,7 +23,8 @@ describe('Entidad SolicitudConstanciaServicio', () => {
     detalle.provincia = 'San José';
     detalle.canton = 'Pérez Zeledón';
     detalle.distrito = 'San Isidro de El General';
-    detalle.direccionExacta = '100 m norte de la iglesia, casa blanca esquinera';
+    detalle.direccionExacta =
+      '100 m norte de la iglesia, casa blanca esquinera';
     detalle.motivo = MotivoConstanciaServicio.BONO_VIVIENDA;
     detalle.otroMotivo = null;
     detalle.tramitePorRealizar = 'Solicitud de bono de vivienda BANHVI';

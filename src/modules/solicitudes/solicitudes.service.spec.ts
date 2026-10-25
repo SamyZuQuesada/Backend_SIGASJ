@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { EstadoSolicitud } from '../../common/enums/estado-solicitud.enum';
+import { Role } from '../../common/enums/role.enum';
 import { PlazoArregloPago } from '../../common/enums/plazo-arreglo-pago.enum';
 import { SolicitudEstado } from '../../common/enums/solicitud-estado.enum';
 import { TipoDocumentoSolicitud } from '../../common/enums/tipo-documento-solicitud.enum';
@@ -20,6 +21,7 @@ import { CreateSolicitudDisponibilidadServiciosDto } from './dto/create-solicitu
 import { CreateSolicitudInfraestructuraLinderosDto } from './dto/create-solicitud-infraestructura-linderos.dto';
 import { CreateSolicitudConstanciaServicioDto } from './dto/create-solicitud-constancia-servicio.dto';
 import { MotivoConstanciaServicio } from '../../common/enums/motivo-constancia-servicio.enum';
+import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { DocumentoSolicitud } from './entities/documento-solicitud.entity';
 import { HistorialSolicitud } from './entities/historial-solicitud.entity';
 import { SolicitudAfiliacion } from './entities/solicitud-afiliacion.entity';
@@ -31,7 +33,11 @@ import { SolicitudConstanciaServicio } from './entities/solicitud-constancia-ser
 import { SolicitudServicio } from './entities/solicitud-servicio.entity';
 import { Solicitud } from './entities/solicitud.entity';
 import { TipoSolicitud } from './entities/tipo-solicitud.entity';
-import { SolicitudNoEncontradaException } from './errors/solicitud.errors';
+import {
+  MENSAJE_SEGUIMIENTO_NO_ENCONTRADO,
+  SolicitudNoEncontradaException,
+  SolicitudSeguimientoNoEncontradaException,
+} from './errors/solicitud.errors';
 import { SolicitudesService } from './solicitudes.service';
 import { TiposSolicitudService } from './tipos-solicitud.service';
 
@@ -84,6 +90,7 @@ describe('SolicitudesService', () => {
   let findHistorial: jest.Mock;
   let saveHistorial: jest.Mock;
   let createHistorial: jest.Mock;
+  let createQueryBuilderGetOne: jest.Mock;
 
   const docsInfraReunion = [
     {
@@ -136,7 +143,6 @@ describe('SolicitudesService', () => {
     createdAt: new Date('2026-10-20T10:00:00Z'),
     updatedAt: new Date('2026-10-20T10:00:00Z'),
     documentos: [],
-    historial: [{ id: 1, evento: 'REGISTRADA' }],
     establecerValoresPorDefecto: jest.fn(),
   } as unknown as Solicitud;
 
@@ -177,6 +183,19 @@ describe('SolicitudesService', () => {
       .fn()
       .mockImplementation((doc: unknown) => Promise.resolve(doc));
     createDocumento = jest.fn().mockImplementation((doc: unknown) => doc);
+    findHistorial = jest.fn().mockResolvedValue([
+      {
+        id: 1,
+        solicitudId: 1,
+        estadoAnterior: null,
+        estadoNuevo: EstadoSolicitud.PENDIENTE,
+        observacionPublica: null,
+        notaInterna: null,
+        idUsuario: null,
+        fecha: new Date('2026-10-20T10:00:00Z'),
+      },
+    ]);
+    createQueryBuilderGetOne = jest.fn().mockResolvedValue(null);
     findBySlugTipo = jest.fn().mockResolvedValue(mockSolicitud.tipoSolicitud);
     findHistorial = jest.fn().mockResolvedValue([]);
     saveHistorial = jest
@@ -186,6 +205,16 @@ describe('SolicitudesService', () => {
       .fn()
       .mockImplementation((hist: unknown) => ({ id: 1, ...(hist as object) }));
     transactionMock = jest.fn();
+
+    const qbChain = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      leftJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      setParameter: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      getOne: createQueryBuilderGetOne,
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -203,11 +232,7 @@ describe('SolicitudesService', () => {
             findAndCount: findAndCountSolicitud,
             save: saveSolicitud,
             create: createSolicitud,
-            createQueryBuilder: jest.fn().mockReturnValue({
-              where: jest.fn().mockReturnThis(),
-              orderBy: jest.fn().mockReturnThis(),
-              getOne: jest.fn().mockResolvedValue(null),
-            }),
+            createQueryBuilder: jest.fn().mockReturnValue(qbChain),
             manager: {
               transaction: transactionMock,
             },
@@ -300,6 +325,115 @@ describe('SolicitudesService', () => {
       await expect(
         service.findByCodigoSeguimiento('CODIGO-INEXISTENTE'),
       ).rejects.toThrow(SolicitudNoEncontradaException);
+    });
+  });
+
+  describe('consultarSeguimientoPublico', () => {
+    const dtoOk = {
+      codigo: 'SOL-2026-00001',
+      identificacion: '1-1234-0567',
+    };
+
+    it('código inexistente → error genérico (sin revelar existencia)', async () => {
+      createQueryBuilderGetOne.mockResolvedValue(null);
+
+      await expect(service.consultarSeguimientoPublico(dtoOk)).rejects.toThrow(
+        SolicitudSeguimientoNoEncontradaException,
+      );
+      await expect(service.consultarSeguimientoPublico(dtoOk)).rejects.toThrow(
+        MENSAJE_SEGUIMIENTO_NO_ENCONTRADO,
+      );
+    });
+
+    it('código existente + identificación incorrecta → mismo error genérico', async () => {
+      createQueryBuilderGetOne.mockResolvedValue(null);
+
+      try {
+        await service.consultarSeguimientoPublico({
+          codigo: 'SOL-2026-00001',
+          identificacion: '9-9999-9999',
+        });
+        fail('debió fallar');
+      } catch (error) {
+        expect(error).toBeInstanceOf(SolicitudSeguimientoNoEncontradaException);
+        expect((error as Error).message).toBe(
+          MENSAJE_SEGUIMIENTO_NO_ENCONTRADO,
+        );
+      }
+    });
+
+    it('combinación correcta → DTO público sin notaInterna/usuario/documentos/id', async () => {
+      createQueryBuilderGetOne.mockResolvedValue(mockSolicitud);
+      findHistorial.mockResolvedValue([
+        {
+          fecha: new Date('2026-10-19T10:00:00Z'),
+          estadoAnterior: null,
+          estadoNuevo: EstadoSolicitud.PENDIENTE,
+          observacionPublica: null,
+          notaInterna: null,
+          idUsuario: null,
+        },
+        {
+          fecha: new Date('2026-10-21T12:00:00Z'),
+          estadoAnterior: EstadoSolicitud.PENDIENTE,
+          estadoNuevo: EstadoSolicitud.EN_REVISION,
+          observacionPublica: 'Su solicitud está en revisión.',
+          notaInterna: 'Dato interno confidencial',
+          idUsuario: 7,
+          usuario: { idUsuario: 7, nombre: 'María Admin', email: 'a@b.cr' },
+        },
+      ]);
+
+      const result = await service.consultarSeguimientoPublico(dtoOk);
+      const serialized = JSON.stringify(result);
+
+      expect(result.codigoSeguimiento).toBe('SOL-2026-00001');
+      expect(result.estado).toBe(EstadoSolicitud.PENDIENTE);
+      expect(result.fechaIngreso).toEqual(mockSolicitud.fechaIngreso);
+      expect(result.tipoSolicitud).toEqual({
+        nombre: 'Solicitud de Arreglo de Pago Domiciliar',
+        slug: TipoSolicitudSlug.ARREGLO_PAGO,
+      });
+      expect(result.historial).toHaveLength(2);
+      expect(result.historial[0].estadoAnterior).toBeNull();
+      expect(result.historial[1].observacionPublica).toBe(
+        'Su solicitud está en revisión.',
+      );
+
+      expect(serialized).not.toContain('Dato interno confidencial');
+      expect(serialized).not.toContain('notaInterna');
+      expect(serialized).not.toContain('idUsuario');
+      expect(serialized).not.toContain('María Admin');
+      expect(serialized).not.toContain('a@b.cr');
+      expect(serialized).not.toContain('1-1234-0567');
+      expect(serialized).not.toMatch(/"id"\s*:/);
+      expect(findHistorial).toHaveBeenCalledWith({
+        where: { solicitudId: 1 },
+        order: { fecha: 'ASC', id: 'ASC' },
+        select: {
+          fecha: true,
+          estadoAnterior: true,
+          estadoNuevo: true,
+          observacionPublica: true,
+        },
+      });
+    });
+
+    it('error de query → respuesta genérica (no filtra detalle interno)', async () => {
+      createQueryBuilderGetOne.mockRejectedValue(new Error('SQL explosion'));
+
+      await expect(service.consultarSeguimientoPublico(dtoOk)).rejects.toThrow(
+        SolicitudSeguimientoNoEncontradaException,
+      );
+    });
+
+    it('sin historial → estado actual y historial vacío', async () => {
+      createQueryBuilderGetOne.mockResolvedValue(mockSolicitud);
+      findHistorial.mockResolvedValue([]);
+
+      const result = await service.consultarSeguimientoPublico(dtoOk);
+      expect(result.estado).toBe(EstadoSolicitud.PENDIENTE);
+      expect(result.historial).toEqual([]);
     });
   });
 
@@ -1253,9 +1387,7 @@ describe('SolicitudesService', () => {
         ...dtoConstanciaBase,
         motivo: MotivoConstanciaServicio.TRAMITE_BANCARIO,
       };
-      expect(() =>
-        service.validarConstanciaServicio(conBanco),
-      ).not.toThrow();
+      expect(() => service.validarConstanciaServicio(conBanco)).not.toThrow();
     });
 
     it('2. Exige descripción en otroMotivo cuando se utiliza la opción Otro', () => {
@@ -1278,9 +1410,9 @@ describe('SolicitudesService', () => {
         motivo: MotivoConstanciaServicio.OTRO,
         otroMotivo: '   ',
       };
-      expect(() =>
-        service.validarConstanciaServicio(conOtroEspacios),
-      ).toThrow(BadRequestException);
+      expect(() => service.validarConstanciaServicio(conOtroEspacios)).toThrow(
+        BadRequestException,
+      );
     });
 
     it('3. Acepta motivo Otro cuando se proporciona otroMotivo válido', () => {
@@ -1406,17 +1538,282 @@ describe('SolicitudesService', () => {
   });
 
   describe('actualizarEstado', () => {
-    it('debe actualizar el estado de la solicitud', async () => {
-      findOneSolicitud.mockResolvedValue({ ...mockSolicitud });
-      saveSolicitud.mockImplementation((s) => Promise.resolve(s));
+    const adminUser: AuthenticatedUser = {
+      userId: '7',
+      idUsuario: 7,
+      email: 'admin@asada.cr',
+      role: Role.ADMINISTRADORA,
+      name: 'Admin',
+    };
 
-      const actualizada = await service.actualizarEstado(
+    type HistorialCreatePayload = {
+      solicitudId: number;
+      estadoAnterior: EstadoSolicitud | null;
+      estadoNuevo: EstadoSolicitud;
+      observacionPublica: string | null;
+      notaInterna: string | null;
+      idUsuario: number;
+    };
+
+    type TxManager = {
+      getRepository: (entity: unknown) => unknown;
+    };
+
+    const setupCambioEstadoTx = (opts?: {
+      solicitud?: typeof mockSolicitud | null;
+      affected?: number;
+      historialFail?: boolean;
+    }) => {
+      const solicitudValor =
+        opts?.solicitud !== undefined ? opts.solicitud : { ...mockSolicitud };
+      const findOneTx = jest.fn().mockResolvedValue(solicitudValor);
+      const executeClaim = jest
+        .fn()
+        .mockResolvedValue({ affected: opts?.affected ?? 1 });
+      const createHistorial = jest.fn((data: HistorialCreatePayload) => data);
+      const saveHistorial = jest.fn((data: HistorialCreatePayload) => {
+        if (opts?.historialFail) {
+          return Promise.reject(new Error('fallo historial'));
+        }
+        return Promise.resolve({
+          ...data,
+          id: 41,
+          fecha: new Date('2026-10-24T18:00:00Z'),
+        });
+      });
+
+      transactionMock.mockImplementation((work: (m: TxManager) => unknown) => {
+        const manager: TxManager = {
+          getRepository: (entity: unknown) => {
+            if (entity === Solicitud) {
+              return {
+                findOne: findOneTx,
+                createQueryBuilder: () => ({
+                  update: () => ({
+                    set: () => ({
+                      where: () => ({
+                        andWhere: () => ({
+                          execute: executeClaim,
+                        }),
+                      }),
+                    }),
+                  }),
+                }),
+              };
+            }
+            if (entity === HistorialSolicitud) {
+              return {
+                create: createHistorial,
+                save: saveHistorial,
+              };
+            }
+            throw new Error('Repo inesperado');
+          },
+        };
+        return work(manager);
+      });
+
+      return { findOneTx, executeClaim, createHistorial, saveHistorial };
+    };
+
+    it('cambia estado, crea historial y usa usuario del JWT', async () => {
+      const { createHistorial, executeClaim } = setupCambioEstadoTx();
+
+      const result = await service.actualizarEstado(
         1,
-        EstadoSolicitud.APROBADA,
+        {
+          estadoNuevo: EstadoSolicitud.EN_REVISION,
+          observacionPublica: 'Mensaje público',
+          notaInterna: 'Nota interna',
+        },
+        adminUser,
       );
 
-      expect(actualizada.estado).toBe(EstadoSolicitud.APROBADA);
-      expect(saveSolicitud).toHaveBeenCalled();
+      expect(executeClaim).toHaveBeenCalled();
+      expect(createHistorial).toHaveBeenCalledWith(
+        expect.objectContaining({
+          solicitudId: 1,
+          estadoAnterior: EstadoSolicitud.PENDIENTE,
+          estadoNuevo: EstadoSolicitud.EN_REVISION,
+          observacionPublica: 'Mensaje público',
+          notaInterna: 'Nota interna',
+          idUsuario: 7,
+        }),
+      );
+      expect(result.estadoAnterior).toBe(EstadoSolicitud.PENDIENTE);
+      expect(result.estadoNuevo).toBe(EstadoSolicitud.EN_REVISION);
+      expect(result.idUsuario).toBe(7);
+      expect(result.historialId).toBe(41);
+    });
+
+    it('mantiene observacionPublica y notaInterna independientes', async () => {
+      setupCambioEstadoTx();
+
+      const result = await service.actualizarEstado(
+        1,
+        {
+          estadoNuevo: EstadoSolicitud.RECHAZADA,
+          observacionPublica: 'A',
+          notaInterna: 'B',
+        },
+        adminUser,
+      );
+
+      expect(result.observacionPublica).toBe('A');
+      expect(result.notaInterna).toBe('B');
+    });
+
+    it('ignora idUsuario del cliente: siempre usa JWT', async () => {
+      const { createHistorial } = setupCambioEstadoTx();
+
+      await service.actualizarEstado(
+        1,
+        { estadoNuevo: EstadoSolicitud.APROBADA },
+        adminUser,
+      );
+
+      const payload = createHistorial.mock.calls[0]?.[0] as
+        HistorialCreatePayload | undefined;
+      expect(payload?.idUsuario).toBe(7);
+    });
+
+    it('rechaza mismo estado sin crear historial', async () => {
+      const { saveHistorial, executeClaim } = setupCambioEstadoTx({
+        solicitud: {
+          ...mockSolicitud,
+          estado: EstadoSolicitud.APROBADA,
+        },
+      });
+
+      await expect(
+        service.actualizarEstado(
+          1,
+          { estadoNuevo: EstadoSolicitud.APROBADA },
+          adminUser,
+        ),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(executeClaim).not.toHaveBeenCalled();
+      expect(saveHistorial).not.toHaveBeenCalled();
+    });
+
+    it('404 si la solicitud no existe', async () => {
+      const { saveHistorial } = setupCambioEstadoTx({ solicitud: null });
+
+      await expect(
+        service.actualizarEstado(
+          999,
+          { estadoNuevo: EstadoSolicitud.EN_REVISION },
+          adminUser,
+        ),
+      ).rejects.toThrow(SolicitudNoEncontradaException);
+
+      expect(saveHistorial).not.toHaveBeenCalled();
+    });
+
+    it('rollback: si falla historial, la transacción propaga el error', async () => {
+      setupCambioEstadoTx({ historialFail: true });
+
+      await expect(
+        service.actualizarEstado(
+          1,
+          { estadoNuevo: EstadoSolicitud.FINALIZADA },
+          adminUser,
+        ),
+      ).rejects.toThrow('fallo historial');
+    });
+
+    it('409 si el claim concurrente no afecta filas', async () => {
+      setupCambioEstadoTx({ affected: 0 });
+
+      await expect(
+        service.actualizarEstado(
+          1,
+          { estadoNuevo: EstadoSolicitud.CANCELADA },
+          adminUser,
+        ),
+      ).rejects.toThrow(/concurrente/);
+    });
+
+    it('secuencia A→B→C deja historial coherente en llamadas sucesivas', async () => {
+      const estados = [
+        EstadoSolicitud.PENDIENTE,
+        EstadoSolicitud.EN_REVISION,
+        EstadoSolicitud.APROBADA,
+      ];
+      let idx = 0;
+      const historiales: Array<{
+        estadoAnterior: EstadoSolicitud | null;
+        estadoNuevo: EstadoSolicitud;
+      }> = [];
+
+      transactionMock.mockImplementation((work: (m: TxManager) => unknown) => {
+        const estadoActual = estados[idx];
+        const manager: TxManager = {
+          getRepository: (entity: unknown) => {
+            if (entity === Solicitud) {
+              return {
+                findOne: jest.fn().mockResolvedValue({
+                  ...mockSolicitud,
+                  estado: estadoActual,
+                }),
+                createQueryBuilder: () => ({
+                  update: () => ({
+                    set: () => ({
+                      where: () => ({
+                        andWhere: () => ({
+                          execute: jest.fn().mockResolvedValue({ affected: 1 }),
+                        }),
+                      }),
+                    }),
+                  }),
+                }),
+              };
+            }
+            if (entity === HistorialSolicitud) {
+              return {
+                create: (data: HistorialCreatePayload) => data,
+                save: (data: HistorialCreatePayload) => {
+                  historiales.push({
+                    estadoAnterior: data.estadoAnterior,
+                    estadoNuevo: data.estadoNuevo,
+                  });
+                  idx += 1;
+                  return Promise.resolve({
+                    ...data,
+                    id: historiales.length,
+                    fecha: new Date(),
+                  });
+                },
+              };
+            }
+            throw new Error('Repo inesperado');
+          },
+        };
+        return work(manager);
+      });
+
+      await service.actualizarEstado(
+        1,
+        { estadoNuevo: EstadoSolicitud.EN_REVISION },
+        adminUser,
+      );
+      await service.actualizarEstado(
+        1,
+        { estadoNuevo: EstadoSolicitud.APROBADA },
+        { ...adminUser, idUsuario: 9, userId: '9' },
+      );
+
+      expect(historiales).toEqual([
+        {
+          estadoAnterior: EstadoSolicitud.PENDIENTE,
+          estadoNuevo: EstadoSolicitud.EN_REVISION,
+        },
+        {
+          estadoAnterior: EstadoSolicitud.EN_REVISION,
+          estadoNuevo: EstadoSolicitud.APROBADA,
+        },
+      ]);
     });
   });
 
@@ -1432,7 +1829,48 @@ describe('SolicitudesService', () => {
 
       expect(docs).toHaveLength(1);
       expect(hist).toHaveLength(1);
+      expect(hist[0].estadoNuevo).toBe(EstadoSolicitud.PENDIENTE);
+      expect(hist[0].usuario).toBeNull();
       expect(findDocumentos).toHaveBeenCalled();
+      expect(findHistorial).toHaveBeenCalledWith({
+        where: { solicitudId: 1 },
+        relations: { usuario: { rol: true } },
+        order: { fecha: 'ASC', id: 'ASC' },
+      });
+    });
+
+    it('mapea usuario responsable sin datos sensibles', async () => {
+      findOneSolicitud.mockResolvedValue(mockSolicitud);
+      findHistorial.mockResolvedValueOnce([
+        {
+          id: 2,
+          solicitudId: 1,
+          estadoAnterior: EstadoSolicitud.PENDIENTE,
+          estadoNuevo: EstadoSolicitud.EN_REVISION,
+          observacionPublica: 'Pública',
+          notaInterna: 'Interna',
+          idUsuario: 7,
+          fecha: new Date('2026-10-21T10:00:00Z'),
+          usuario: {
+            idUsuario: 7,
+            nombre: 'María Rodríguez',
+            correo: 'secreto@example.com',
+            password: 'hash',
+            rol: { nombre: 'ADMINISTRADORA' },
+          },
+        },
+      ]);
+
+      const hist = await service.findHistorialBySolicitudId(1);
+
+      expect(hist[0].usuario).toEqual({
+        idUsuario: 7,
+        nombre: 'María Rodríguez',
+        rol: 'ADMINISTRADORA',
+      });
+      expect(hist[0]).not.toHaveProperty('correo');
+      expect(JSON.stringify(hist[0])).not.toContain('secreto@');
+      expect(JSON.stringify(hist[0])).not.toContain('hash');
     });
   });
 

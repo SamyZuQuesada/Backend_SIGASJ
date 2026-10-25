@@ -57,6 +57,16 @@ describe('SolicitudesController', () => {
               mensaje: null,
             }),
             findByCodigoSeguimiento: jest.fn().mockResolvedValue(mockSolicitud),
+            consultarSeguimientoPublico: jest.fn().mockResolvedValue({
+              codigoSeguimiento: 'SOL-2026-00001',
+              estado: EstadoSolicitud.PENDIENTE,
+              fechaIngreso: mockSolicitud.fechaIngreso,
+              tipoSolicitud: {
+                nombre: mockSolicitud.tipoSolicitud.nombre,
+                slug: mockSolicitud.tipoSolicitud.slug,
+              },
+              historial: [],
+            }),
             findById: jest.fn().mockResolvedValue(mockSolicitud),
             findAll: jest.fn().mockResolvedValue({
               solicitudes: [mockSolicitud],
@@ -92,6 +102,17 @@ describe('SolicitudesController', () => {
               ubicacion: '/uploads/solicitudes/pendientes/123-cedula.pdf',
               tokenReclamo: 'tok123',
               fechaCarga: new Date(),
+            }),
+            actualizarEstado: jest.fn().mockResolvedValue({
+              solicitudId: 1,
+              codigoSeguimiento: 'SOL-2026-00001',
+              estadoAnterior: EstadoSolicitud.PENDIENTE,
+              estadoNuevo: EstadoSolicitud.EN_REVISION,
+              observacionPublica: null,
+              notaInterna: null,
+              idUsuario: 7,
+              fecha: new Date(),
+              historialId: 41,
             }),
           },
         },
@@ -263,12 +284,24 @@ describe('SolicitudesController', () => {
     expect(res2).toEqual(mockSolicitud);
   });
 
-  it('findByCodigoSeguimiento debe consultar la solicitud por código público', async () => {
-    const result = await controller.findByCodigoSeguimiento('SOL-2026-00001');
-    expect(jest.mocked(service.findByCodigoSeguimiento)).toHaveBeenCalledWith(
-      'SOL-2026-00001',
+  it('GET seguimiento por código solo ya no expone datos', () => {
+    expect(() => controller.findByCodigoSeguimiento('SOL-2026-00001')).toThrow(
+      /No fue posible localizar una solicitud/,
     );
-    expect(result).toEqual(mockSolicitud);
+    expect(jest.mocked(service.findByCodigoSeguimiento)).not.toHaveBeenCalled();
+  });
+
+  it('POST seguimiento delega en consultarSeguimientoPublico', async () => {
+    const dto = {
+      codigo: 'SOL-2026-00001',
+      identificacion: '1-1234-0567',
+    };
+    const result = await controller.consultarSeguimientoPublico(dto);
+    expect(
+      jest.mocked(service.consultarSeguimientoPublico),
+    ).toHaveBeenCalledWith(dto);
+    expect(result.codigoSeguimiento).toBe('SOL-2026-00001');
+    expect(result).not.toHaveProperty('notaInterna');
   });
 
   it('findById debe consultar la solicitud por ID', async () => {
@@ -308,5 +341,30 @@ describe('SolicitudesController', () => {
         controller.subirDocumento(undefined, 'identificacion'),
       ).toThrow('Debe adjuntar un archivo.');
     });
+  });
+
+  it('cambiarEstado debe delegar en actualizarEstado con usuario JWT', async () => {
+    const user = {
+      userId: '7',
+      idUsuario: 7,
+      email: 'admin@asada.cr',
+      role: 'ADMINISTRADORA',
+      name: 'Admin',
+    };
+    const dto = {
+      estadoNuevo: EstadoSolicitud.EN_REVISION,
+      observacionPublica: 'Público',
+      notaInterna: 'Interno',
+    };
+
+    const result = await controller.cambiarEstado(1, dto, user as never);
+
+    expect(jest.mocked(service.actualizarEstado)).toHaveBeenCalledWith(
+      1,
+      dto,
+      user,
+    );
+    expect(result.estadoNuevo).toBe(EstadoSolicitud.EN_REVISION);
+    expect(result.idUsuario).toBe(7);
   });
 });

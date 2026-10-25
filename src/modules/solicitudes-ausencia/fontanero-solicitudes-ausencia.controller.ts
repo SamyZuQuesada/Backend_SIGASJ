@@ -7,11 +7,13 @@ import {
   Param,
   ParseIntPipe,
   Post,
+  StreamableFile,
+  UploadedFile,
   UploadedFiles,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { FilesInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
   ApiConsumes,
@@ -20,14 +22,19 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { MAX_ACTIVIDAD_DOCUMENT_BYTES, MAX_ACTIVIDAD_DOCUMENT_FILES } from '../../common/media/public-media';
-import type { AdjuntoSolicitudAusencia } from './adjuntos-ausencia';
+import { createReadStream } from 'fs';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/enums/role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
+import {
+  MAX_ACTIVIDAD_DOCUMENT_BYTES,
+  MAX_ACTIVIDAD_DOCUMENT_FILES,
+  type UploadedImageFile,
+} from '../../common/media/public-media';
+import type { AdjuntoSolicitudAusencia } from './adjuntos-ausencia';
 import { CrearSolicitudAusenciaFontaneroDto } from './dto/crear-solicitud-ausencia-fontanero.dto';
 import { SolicitudAusenciaFontaneroResponse } from './dto/solicitud-ausencia-fontanero.response';
 import { SolicitudesAusenciaService } from './solicitudes-ausencia.service';
@@ -115,6 +122,51 @@ export class FontaneroSolicitudesAusenciaController {
       dto,
       archivos ?? [],
     );
+  }
+
+  @Post(':id/documentos')
+  @HttpCode(HttpStatus.CREATED)
+  @UseInterceptors(
+    FileInterceptor('archivo', {
+      limits: { fileSize: MAX_ACTIVIDAD_DOCUMENT_BYTES, files: 1 },
+    }),
+  )
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Adjuntar evidencia a una solicitud propia pendiente',
+    description: 'PDF, JPG o PNG. Máximo 10 MB.',
+  })
+  @ApiParam({ name: 'id', description: 'ID de la solicitud', type: Number })
+  adjuntarDocumento(
+    @Param('id', ParseIntPipe) id: number,
+    @UploadedFile() file: UploadedImageFile | undefined,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const usuarioId = user.idUsuario ?? Number(user.userId);
+    return this.solicitudesService.adjuntarDocumentoPropio(usuarioId, id, file);
+  }
+
+  @Get(':id/documentos/:filename')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Descargar o ver evidencia de una solicitud propia',
+  })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiParam({ name: 'filename', type: String })
+  async descargarDocumento(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('filename') filename: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<StreamableFile> {
+    const usuarioId = user.idUsuario ?? Number(user.userId);
+    const { absolutePath, mimeType, documento } =
+      await this.solicitudesService.obtenerArchivoDocumento(id, filename, {
+        usuarioId,
+      });
+    return new StreamableFile(createReadStream(absolutePath), {
+      type: mimeType,
+      disposition: `inline; filename="${encodeURIComponent(documento.nombreOriginal)}"`,
+    });
   }
 
   @Get(':id')

@@ -18,6 +18,7 @@ describe('CategoriaMaterial Entity (Inventario ASADA)', () => {
       categoria.descripcion =
         'Tuberías de PVC, polietileno y mangueras para conducción';
       categoria.activo = true;
+      categoria.requiereFechaVencimiento = false;
       categoria.createdAt = fechaCreacion;
       categoria.updatedAt = fechaActualizacion;
 
@@ -27,6 +28,7 @@ describe('CategoriaMaterial Entity (Inventario ASADA)', () => {
         'Tuberías de PVC, polietileno y mangueras para conducción',
       );
       expect(categoria.activo).toBe(true);
+      expect(categoria.requiereFechaVencimiento).toBe(false);
       expect(categoria.createdAt).toEqual(fechaCreacion);
       expect(categoria.updatedAt).toEqual(fechaActualizacion);
     });

@@ -79,7 +79,8 @@ export class CreateSolicitudConstanciaServicioDto {
     message: 'El nombre del propietario del inmueble es obligatorio',
   })
   @IsString({
-    message: 'El nombre del propietario del inmueble debe ser una cadena de texto',
+    message:
+      'El nombre del propietario del inmueble debe ser una cadena de texto',
   })
   @MaxLength(150, {
     message: 'El nombre del propietario no puede exceder 150 caracteres',
@@ -123,10 +124,7 @@ export class CreateSolicitudConstanciaServicioDto {
   })
   @Transform(trimString)
   @IsNotEmpty({ message: 'El correo electrónico es obligatorio' })
-  @IsEmail(
-    {},
-    { message: 'El correo electrónico no tiene un formato válido' },
-  )
+  @IsEmail({}, { message: 'El correo electrónico no tiene un formato válido' })
   @MaxLength(150, {
     message: 'El correo electrónico no puede exceder 150 caracteres',
   })
@@ -197,7 +195,8 @@ export class CreateSolicitudConstanciaServicioDto {
   @ApiProperty({
     example: CalidadTitularCambioTitular.PROPIETARIO,
     enum: CalidadTitularCambioTitular,
-    description: 'Calidad del titular (Propietario | Poseedor | Representante legal)',
+    description:
+      'Calidad del titular (Propietario | Poseedor | Representante legal)',
   })
   @Transform(trimString)
   @IsNotEmpty({ message: 'La calidad del titular es obligatoria' })

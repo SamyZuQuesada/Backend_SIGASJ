@@ -167,7 +167,9 @@ describe('Validación física de tabla SolicitudConstanciaServicio en SQL Server
       indices.find((idx) => idx.INDEX_NAME.includes('_nis')),
     ).toBeDefined();
     expect(
-      indices.find((idx) => idx.INDEX_NAME.includes('_identificacionSolicitante')),
+      indices.find((idx) =>
+        idx.INDEX_NAME.includes('_identificacionSolicitante'),
+      ),
     ).toBeDefined();
     expect(
       indices.find((idx) => idx.INDEX_NAME.includes('_motivo')),

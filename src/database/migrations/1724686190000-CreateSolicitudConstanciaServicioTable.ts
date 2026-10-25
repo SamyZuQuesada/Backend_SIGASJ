@@ -225,10 +225,7 @@ export class CreateSolicitudConstanciaServicioTable1724686190000 implements Migr
         (f) => f.name === 'FK_SolicitudConstanciaServicio_Solicitud',
       );
       if (fk) {
-        await queryRunner.dropForeignKey(
-          'SolicitudConstanciaServicio',
-          fk,
-        );
+        await queryRunner.dropForeignKey('SolicitudConstanciaServicio', fk);
       }
       await queryRunner.dropTable('SolicitudConstanciaServicio', true);
     }

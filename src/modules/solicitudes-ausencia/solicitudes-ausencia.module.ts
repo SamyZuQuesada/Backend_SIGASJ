@@ -5,6 +5,7 @@ import { RecursosHumanosModule } from '../recursos-humanos/recursos-humanos.modu
 import { Colaborador } from '../recursos-humanos/entities/colaborador.entity';
 import { CorrelacionSolicitudAusenciaService } from './correlacion-solicitud-ausencia.service';
 import { CorrelacionSolicitudAusencia } from './entities/correlacion-solicitud-ausencia.entity';
+import { DocumentoSolicitudAusencia } from './entities/documento-solicitud-ausencia.entity';
 import { SolicitudAusencia } from './entities/solicitud-ausencia.entity';
 import { JotformWebhookController } from './jotform-webhook.controller';
 import { JotformWebhookService } from './jotform-webhook.service';
@@ -17,6 +18,7 @@ import { SolicitudesAusenciaService } from './solicitudes-ausencia.service';
   imports: [
     TypeOrmModule.forFeature([
       SolicitudAusencia,
+      DocumentoSolicitudAusencia,
       CorrelacionSolicitudAusencia,
       Colaborador,
     ]),

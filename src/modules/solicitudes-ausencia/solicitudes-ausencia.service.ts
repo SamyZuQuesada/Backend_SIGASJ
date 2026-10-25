@@ -27,13 +27,25 @@ import {
   VacacionesService,
 } from '../recursos-humanos/vacaciones.service';
 import {
-  diasAusenciaSinFeriados,
-  esFeriadoCostaRica,
-} from './feriados-costa-rica';
+  deleteAusenciaDocument,
+  getAusenciaDocumentFilePath,
+  saveAusenciaDocument,
+  type ActividadDocumentFile,
+  validateActividadDocument,
+} from '../../common/media/public-media';
 import {
   persistirAdjuntosSolicitudAusencia,
   type AdjuntoSolicitudAusencia,
 } from './adjuntos-ausencia';
+import {
+  diasVacacionesNetos,
+  resumenDiasVacaciones,
+  type ResumenDiasVacaciones,
+} from './dias-periodo-ausencia';
+import {
+  diasAusenciaSinFeriados,
+  esFeriadoCostaRica,
+} from './feriados-costa-rica';
 import { CrearSolicitudAusenciaFontaneroDto } from './dto/crear-solicitud-ausencia-fontanero.dto';
 import { RechazarSolicitudAusenciaDto } from './dto/rechazar-solicitud-ausencia.dto';
 import {
@@ -45,6 +57,7 @@ import {
   SolicitudAusenciaFontaneroResponse,
   toSolicitudAusenciaFontaneroResponse,
 } from './dto/solicitud-ausencia-fontanero.response';
+import { DocumentoSolicitudAusencia } from './entities/documento-solicitud-ausencia.entity';
 import { SolicitudAusencia } from './entities/solicitud-ausencia.entity';
 import { NotificacionSolicitudAusenciaService } from './notificacion-solicitud-ausencia.service';
 
@@ -58,6 +71,17 @@ export type SolicitudesAusenciaListado = {
 
 export type SolicitudAusenciaDetalle = SolicitudAusencia & {
   saldoVacaciones: BalanceVacaciones | null;
+  resumenVacaciones: ResumenDiasVacaciones | null;
+};
+
+export type DocumentoAusenciaResponse = {
+  id: number;
+  solicitudId: number;
+  nombreOriginal: string;
+  tipoArchivo: string;
+  rutaReferenciaArchivo: string;
+  tamanio: number;
+  fechaCarga: Date;
 };
 
 @Injectable()
@@ -67,6 +91,8 @@ export class SolicitudesAusenciaService {
   constructor(
     @InjectRepository(SolicitudAusencia)
     private readonly solicitudRepository: Repository<SolicitudAusencia>,
+    @InjectRepository(DocumentoSolicitudAusencia)
+    private readonly documentoRepository: Repository<DocumentoSolicitudAusencia>,
     @InjectRepository(Colaborador)
     private readonly colaboradorRepository: Repository<Colaborador>,
     private readonly colaboradoresService: ColaboradoresService,
@@ -107,6 +133,7 @@ export class SolicitudesAusenciaService {
 
     const solicitudes = await this.solicitudRepository.find({
       where: { colaboradorId: colaborador.id },
+      relations: { documentos: true },
       order: { createdAt: 'DESC', id: 'DESC' },
     });
 
@@ -126,6 +153,7 @@ export class SolicitudesAusenciaService {
 
     const solicitud = await this.solicitudRepository.findOne({
       where: { id: solicitudId, colaboradorId: colaborador.id },
+      relations: { documentos: true },
     });
     if (!solicitud) {
       throw new NotFoundException(
@@ -133,6 +161,103 @@ export class SolicitudesAusenciaService {
       );
     }
     return toSolicitudAusenciaFontaneroResponse(solicitud);
+  }
+
+  /**
+   * Adjunta evidencia (PDF/JPG/PNG) a una solicitud propia PENDIENTE.
+   */
+  async adjuntarDocumentoPropio(
+    usuarioId: number,
+    solicitudId: number,
+    file: ActividadDocumentFile | undefined,
+  ): Promise<DocumentoAusenciaResponse> {
+    validateActividadDocument(file);
+    const colaborador =
+      await this.obtenerColaboradorDelUsuarioAutenticado(usuarioId);
+
+    const solicitud = await this.solicitudRepository.findOne({
+      where: { id: solicitudId, colaboradorId: colaborador.id },
+    });
+    if (!solicitud) {
+      throw new NotFoundException(
+        `No existe la solicitud de ausencia ${solicitudId}`,
+      );
+    }
+    if (solicitud.estado !== EstadoSolicitudAusencia.PENDIENTE) {
+      throw new ConflictException(
+        'Solo se puede adjuntar evidencia a solicitudes pendientes',
+      );
+    }
+
+    const { rutaReferenciaArchivo } = saveAusenciaDocument(solicitudId, file);
+    const documento = this.documentoRepository.create({
+      solicitudId,
+      nombreOriginal: file.originalname,
+      tipoArchivo: file.mimetype,
+      rutaReferenciaArchivo,
+      tamanio: file.size,
+    });
+
+    let saved: DocumentoSolicitudAusencia;
+    try {
+      saved = await this.documentoRepository.save(documento);
+    } catch (error) {
+      try {
+        deleteAusenciaDocument(solicitudId, rutaReferenciaArchivo);
+      } catch {
+        // Se conserva el error original de persistencia.
+      }
+      throw error;
+    }
+
+    return {
+      id: saved.id,
+      solicitudId,
+      nombreOriginal: saved.nombreOriginal,
+      tipoArchivo: saved.tipoArchivo,
+      rutaReferenciaArchivo: saved.rutaReferenciaArchivo,
+      tamanio: saved.tamanio,
+      fechaCarga: saved.fechaCarga,
+    };
+  }
+
+  async obtenerArchivoDocumento(
+    solicitudId: number,
+    filename: string,
+    opts?: { usuarioId?: number; rolAdministradora?: boolean },
+  ): Promise<{
+    absolutePath: string;
+    mimeType: string;
+    documento: DocumentoSolicitudAusencia;
+  }> {
+    const docs = await this.documentoRepository.find({
+      where: { solicitudId },
+      relations: { solicitud: true },
+    });
+    const match =
+      docs.find((d) => d.rutaReferenciaArchivo.endsWith(`/${filename}`)) ??
+      null;
+    if (!match) {
+      throw new NotFoundException('Documento de evidencia no encontrado');
+    }
+
+    if (!opts?.rolAdministradora) {
+      if (!opts?.usuarioId) {
+        throw new ForbiddenException('No autorizado');
+      }
+      const colaborador = await this.obtenerColaboradorDelUsuarioAutenticado(
+        opts.usuarioId,
+      );
+      if (match.solicitud.colaboradorId !== colaborador.id) {
+        throw new NotFoundException('Documento de evidencia no encontrado');
+      }
+    }
+
+    const { absolutePath, mimeType } = getAusenciaDocumentFilePath(
+      solicitudId,
+      filename,
+    );
+    return { absolutePath, mimeType, documento: match };
   }
 
   /**
@@ -324,7 +449,12 @@ export class SolicitudesAusenciaService {
   async findOneDetalle(id: number): Promise<SolicitudAusenciaDetalle> {
     const solicitud = await this.findOne(id);
     let saldoVacaciones: BalanceVacaciones | null = null;
+    let resumenVacaciones: ResumenDiasVacaciones | null = null;
     if (solicitud.tipo === TipoSolicitudAusencia.VACACIONES) {
+      resumenVacaciones = resumenDiasVacaciones(
+        solicitud.fechaInicio,
+        solicitud.fechaFin,
+      );
       try {
         saldoVacaciones = await this.vacacionesService.obtenerBalance(
           solicitud.colaboradorId,
@@ -333,13 +463,13 @@ export class SolicitudesAusenciaService {
         saldoVacaciones = null;
       }
     }
-    return Object.assign(solicitud, { saldoVacaciones });
+    return Object.assign(solicitud, { saldoVacaciones, resumenVacaciones });
   }
 
   async findOne(id: number): Promise<SolicitudAusencia> {
     const solicitud = await this.solicitudRepository.findOne({
       where: { id },
-      relations: { colaborador: true },
+      relations: { colaborador: true, documentos: true },
     });
     if (!solicitud) {
       throw new NotFoundException(`No existe la solicitud de ausencia ${id}`);
@@ -419,13 +549,13 @@ export class SolicitudesAusenciaService {
             registroGeneradoTipo: TipoRegistroGeneradoAusencia.PERMISO,
           });
         } else if (solicitud.tipo === TipoSolicitudAusencia.VACACIONES) {
-          const cantidadDias = diasAusenciaSinFeriados(
+          const cantidadDias = diasVacacionesNetos(
             solicitud.fechaInicio,
             solicitud.fechaFin,
           );
           if (cantidadDias < 1) {
             throw new BadRequestException(
-              'El periodo de vacaciones no produce días válidos',
+              'El periodo de vacaciones no produce días válidos tras descontar feriados',
             );
           }
           // Saldo se revalida en VacacionesService al momento de aprobar.

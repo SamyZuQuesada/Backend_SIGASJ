@@ -27,6 +27,7 @@ async function bootstrap() {
     'proyectos',
     'transparencia',
     'formularios-oficiales',
+    'formularios-descargables',
   ].forEach((sub) => {
     const subDir = join(uploadDir, sub);
     if (!existsSync(subDir)) {

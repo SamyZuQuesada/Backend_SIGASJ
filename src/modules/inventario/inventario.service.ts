@@ -20,6 +20,7 @@ import {
 } from '../../common/enums/estado-reposicion-material.transitions';
 import { OrigenReposicionMaterial } from '../../common/enums/origen-reposicion-material.enum';
 import { EstadoSolicitudMaterial } from '../../common/enums/estado-solicitud-material.enum';
+import { validarFechaVencimientoMaterial } from './validar-vencimiento-material';
 import { Role } from '../../common/enums/role.enum';
 import { TipoMovimientoInventario } from '../../common/enums/tipo-movimiento-inventario.enum';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
@@ -243,7 +244,14 @@ export class InventarioService {
         idProveedor: proveedor.id,
         proveedor,
         precioUnitario: dto.precioUnitario ?? null,
-        fechaVencimiento: dto.fechaVencimiento ?? null,
+        requiereFechaVencimiento:
+          dto.requiereFechaVencimiento ?? categoria.requiereFechaVencimiento,
+        fechaVencimiento: validarFechaVencimientoMaterial(
+          dto.requiereFechaVencimiento ?? categoria.requiereFechaVencimiento,
+          categoria.requiereFechaVencimiento
+            ? (dto.fechaVencimiento ?? null)
+            : null,
+        ),
       });
 
       return await withDbRetry(() => this.materialRepository.save(material));
@@ -475,9 +483,30 @@ export class InventarioService {
       material.precioUnitario = dto.precioUnitario ?? null;
     }
 
-    if (dto.fechaVencimiento !== undefined) {
+    // Resuelve categoría efectiva para aplicar regla de vencimiento.
+    let categoriaEfectiva = material.categoria ?? null;
+    if (!categoriaEfectiva && material.idCategoria) {
+      categoriaEfectiva = await withDbRetry(() =>
+        this.categoriaRepository.findOne({
+          where: { id: material.idCategoria! },
+        }),
+      );
+    }
+
+    if (categoriaEfectiva && !categoriaEfectiva.requiereFechaVencimiento) {
+      material.fechaVencimiento = null;
+    } else if (dto.fechaVencimiento !== undefined) {
       material.fechaVencimiento = dto.fechaVencimiento ?? null;
     }
+
+    if (dto.requiereFechaVencimiento !== undefined) {
+      material.requiereFechaVencimiento = dto.requiereFechaVencimiento;
+    }
+
+    material.fechaVencimiento = validarFechaVencimientoMaterial(
+      material.requiereFechaVencimiento ?? false,
+      material.fechaVencimiento ?? null,
+    );
 
     // Regla de negocio: stockActual se preserva intacto
     try {
@@ -550,6 +579,7 @@ export class InventarioService {
         nombre: nombreNormalizado,
         descripcion: dto.descripcion ?? null,
         activo: true,
+        requiereFechaVencimiento: dto.requiereFechaVencimiento === true,
       });
 
       return await withDbRetry(() => this.categoriaRepository.save(categoria));
@@ -679,8 +709,33 @@ export class InventarioService {
       categoria.descripcion = dto.descripcion?.trim() || null;
     }
 
+    const desactivoVencimiento =
+      dto.requiereFechaVencimiento === false &&
+      categoria.requiereFechaVencimiento === true;
+
+    if (dto.requiereFechaVencimiento !== undefined) {
+      categoria.requiereFechaVencimiento = dto.requiereFechaVencimiento;
+    }
+
     try {
-      return await withDbRetry(() => this.categoriaRepository.save(categoria));
+      const guardada = await withDbRetry(() =>
+        this.categoriaRepository.save(categoria),
+      );
+
+      // Si la categoría deja de requerir vencimiento, limpia fechas en materiales.
+      if (desactivoVencimiento) {
+        await withDbRetry(() =>
+          this.materialRepository
+            .createQueryBuilder()
+            .update()
+            .set({ fechaVencimiento: null })
+            .where('idCategoria = :id', { id })
+            .andWhere('fechaVencimiento IS NOT NULL')
+            .execute(),
+        );
+      }
+
+      return guardada;
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -1255,10 +1310,10 @@ export class InventarioService {
               if (typeof manager.query === 'function') {
                 try {
                   const solicitudes: Array<{
-                    idSolicitud: number;
+                    id: number;
                     estado?: string | null;
                   }> = await manager.query(
-                    `SELECT idSolicitud, estado FROM SolicitudServicio WHERE idSolicitud = ${solicitudIdNum}`,
+                    `SELECT id, estado FROM SolicitudMaterial WHERE id = ${solicitudIdNum}`,
                   );
                   if (Array.isArray(solicitudes)) {
                     if (solicitudes.length === 0) {
@@ -1305,7 +1360,7 @@ export class InventarioService {
             if (movimientoGuardado.idSolicitud) {
               try {
                 await manager.query(
-                  `UPDATE SolicitudMaterial SET estado = 'DESPACHADA' WHERE idSolicitud = ${movimientoGuardado.idSolicitud} AND estado = 'APROBADA'`,
+                  `UPDATE SolicitudMaterial SET estado = 'DESPACHADA' WHERE id = ${movimientoGuardado.idSolicitud} AND estado = 'APROBADA'`,
                 );
               } catch {
                 // Si la tabla no existe o el campo no aplica, no bloquear la salida
@@ -2553,7 +2608,10 @@ export class InventarioService {
           this.crearQueryMaterialesReporte(query)
             .andWhere('material.stockActual <= material.stockMinimo')
             .getCount(),
-          this.contarMovimientosReporte(query, TipoMovimientoInventario.ENTRADA),
+          this.contarMovimientosReporte(
+            query,
+            TipoMovimientoInventario.ENTRADA,
+          ),
           this.contarMovimientosReporte(query, TipoMovimientoInventario.SALIDA),
           this.crearQueryMaterialesReporte(query)
             .select(
@@ -2563,6 +2621,7 @@ export class InventarioService {
             .andWhere('material.precioUnitario IS NOT NULL')
             .getRawOne<{ valor: string | null }>(),
           this.crearQueryMaterialesReporte(query)
+            .andWhere('material.requiereFechaVencimiento = :reqVenc', { reqVenc: true })
             .andWhere('material.fechaVencimiento IS NOT NULL')
             .andWhere('material.fechaVencimiento >= :hoy', { hoy })
             .andWhere('material.fechaVencimiento <= :fechaLimite90', {
@@ -2570,6 +2629,7 @@ export class InventarioService {
             })
             .getCount(),
           this.crearQueryMaterialesReporte(query)
+            .andWhere('material.requiereFechaVencimiento = :reqVenc2', { reqVenc2: true })
             .andWhere('material.fechaVencimiento IS NOT NULL')
             .andWhere('material.fechaVencimiento >= :hoy2', { hoy2: hoy })
             .andWhere('material.fechaVencimiento <= :fechaLimite902', {
@@ -2593,9 +2653,7 @@ export class InventarioService {
             .orderBy('material.nombre', 'ASC')
             .take(100)
             .getMany(),
-          this.crearQueryMovimientosReporte(query, true)
-            .take(100)
-            .getMany(),
+          this.crearQueryMovimientosReporte(query, true).take(100).getMany(),
         ]);
 
         const valorTotalInventario =
