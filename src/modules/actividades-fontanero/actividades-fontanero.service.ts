@@ -206,6 +206,17 @@ export class ActividadesFontaneroService {
     for (const file of files) validateActividadDocument(file);
     const idUsuario = this.parseOptionalUsuarioId(user.userId);
 
+    const esBorrador = this.isBorradorFlag(dto.esBorrador);
+    if (esBorrador) {
+      delete datosEspecificos.fechaFin;
+      delete datosEspecificos.horaFin;
+    }
+    if (!esBorrador && (!dto.fechaFin?.trim() || !dto.horaFin?.trim())) {
+      throw new BadRequestException(
+        'La fecha y hora de finalización son obligatorias para registrar la actividad',
+      );
+    }
+
     const actividad = this.actividadRepository.create({
       titulo: dto.titulo,
       descripcion: dto.descripcion ?? null,
@@ -216,8 +227,10 @@ export class ActividadesFontaneroService {
       fechaActividad: dto.fechaActividad,
       tipoActividad,
       fontanero: idUsuario ? { idUsuario } : null,
-      estado: EstadoActividadFontanero.REPORTADA,
-      estadoRevision: 'PENDIENTE',
+      estado: esBorrador
+        ? EstadoActividadFontanero.BORRADOR
+        : EstadoActividadFontanero.REPORTADA,
+      estadoRevision: esBorrador ? 'BORRADOR' : 'PENDIENTE',
       fechaRevision: null,
       fontaneroId: user.userId,
       observacionCorreccion: null,
@@ -338,6 +351,154 @@ export class ActividadesFontaneroService {
       data: data.map((item) => this.toFontaneroResponse(item)),
       total,
     };
+  }
+
+  async actualizarBorrador(
+    id: number,
+    dto: CreateActividadDto,
+    user: AuthenticatedUser,
+    files: ActividadDocumentFile[] = [],
+  ): Promise<ActividadFontaneroResponse> {
+    const actividad = await this.requireOwnedActividad(id, user.userId);
+    if (actividad.estado !== EstadoActividadFontanero.BORRADOR) {
+      throw new ForbiddenException(ACTIVIDADES_MSG.forbidden);
+    }
+
+    const tipoActividad =
+      actividad.tipoActividad ??
+      (await this.requireTipoActividadActivo(dto.tipoActividadId));
+    const horarioPrevio = this.horarioDesdeDatos(actividad.datosEspecificos);
+    dto.fechaActividad = actividad.fechaActividad ?? dto.fechaActividad;
+    dto.horaInicio = horarioPrevio.horaInicio ?? dto.horaInicio;
+
+    const extraidos = this.extractDatosEspecificos(dto);
+    if (this.isBorradorFlag(dto.esBorrador)) {
+      delete extraidos.fechaFin;
+      delete extraidos.horaFin;
+    }
+    const datosEspecificos = {
+      ...(this.datosSinHorario(actividad.datosEspecificos) ?? {}),
+      ...extraidos,
+    };
+    const erroresEspecificos = validarDatosEspecificosActividad({
+      codigo: tipoActividad.codigo,
+      datos: datosEspecificos,
+    });
+    if (erroresEspecificos.length > 0) {
+      throw new BadRequestException(erroresEspecificos);
+    }
+    for (const file of files) validateActividadDocument(file);
+
+    actividad.titulo = dto.titulo;
+    actividad.descripcion = dto.descripcion ?? null;
+    actividad.ubicacion = dto.ubicacion ?? null;
+    actividad.observaciones = dto.observaciones ?? null;
+    actividad.datosEspecificos =
+      Object.keys(datosEspecificos).length > 0 ? datosEspecificos : null;
+
+    await this.actividadRepository.save(actividad);
+
+    const eliminarIds = new Set(dto.documentosEliminarIds ?? []);
+    const aEliminar = (actividad.documentos ?? []).filter((documento) =>
+      eliminarIds.has(documento.id),
+    );
+    for (const previo of aEliminar) {
+      await this.documentoRepository.remove(previo);
+      try {
+        deleteActividadDocument(id, previo.rutaReferenciaArchivo);
+      } catch {
+        /* best-effort */
+      }
+    }
+
+    for (const file of files) {
+      const { rutaReferenciaArchivo } = saveActividadDocument(id, file);
+      const document = this.documentoRepository.create({
+        nombreOriginal: file.originalname,
+        tipoArchivo: file.mimetype,
+        rutaReferenciaArchivo,
+        tamanio: file.size,
+        actividad,
+      });
+      await this.documentoRepository.save(document);
+    }
+
+    return this.toFontaneroResponse(await this.requireActividad(id));
+  }
+
+  async entregarBorrador(
+    id: number,
+    dto: CreateActividadDto,
+    user: AuthenticatedUser,
+    files: ActividadDocumentFile[] = [],
+  ): Promise<ActividadFontaneroResponse> {
+    const actividad = await this.requireOwnedActividad(id, user.userId);
+    if (actividad.estado !== EstadoActividadFontanero.BORRADOR) {
+      throw new ForbiddenException(ACTIVIDADES_MSG.forbidden);
+    }
+    if (!dto.fechaFin?.trim() || !dto.horaFin?.trim()) {
+      throw new BadRequestException(
+        'La fecha y hora de finalización son obligatorias para registrar la actividad',
+      );
+    }
+
+    await this.actualizarBorrador(id, { ...dto, esBorrador: true }, user, files);
+
+    const actualizada = await this.requireOwnedActividad(id, user.userId);
+    const tipoActividad = actualizada.tipoActividad;
+    if (!tipoActividad?.codigo) {
+      throw new BadRequestException(
+        'El tipo de actividad asociado al borrador no está disponible',
+      );
+    }
+    const datosEspecificos = this.extractDatosEspecificos({
+      ...dto,
+      fechaActividad: actualizada.fechaActividad ?? dto.fechaActividad,
+      horaInicio:
+        this.horarioDesdeDatos(actualizada.datosEspecificos).horaInicio ??
+        dto.horaInicio,
+      esBorrador: false,
+    });
+    const erroresEspecificos = validarDatosEspecificosActividad({
+      codigo: tipoActividad.codigo,
+      datos: datosEspecificos,
+    });
+    if (erroresEspecificos.length > 0) {
+      throw new BadRequestException(erroresEspecificos);
+    }
+
+    actualizada.datosEspecificos = datosEspecificos;
+    actualizada.estado = EstadoActividadFontanero.REPORTADA;
+    actualizada.estadoRevision = 'PENDIENTE';
+    await this.actividadRepository.save(actualizada);
+
+    return this.toFontaneroResponse(await this.requireActividad(id));
+  }
+
+  async eliminarBorrador(
+    id: number,
+    user: AuthenticatedUser,
+  ): Promise<{ deleted: true }> {
+    const actividad = await this.requireOwnedActividad(id, user.userId);
+    if (actividad.estado !== EstadoActividadFontanero.BORRADOR) {
+      throw new ForbiddenException(ACTIVIDADES_MSG.forbidden);
+    }
+
+    const documentos = await this.documentoRepository.find({
+      where: { actividad: { id } },
+    });
+    for (const documento of documentos) {
+      try {
+        deleteActividadDocument(id, documento.rutaReferenciaArchivo);
+      } catch {
+        /* best-effort */
+      }
+    }
+    if (documentos.length > 0) {
+      await this.documentoRepository.remove(documentos);
+    }
+    await this.actividadRepository.remove(actividad);
+    return { deleted: true };
   }
 
   async correccionesPendientes(
@@ -534,7 +695,9 @@ export class ActividadesFontaneroService {
         .leftJoinAndSelect('actividad.tipoActividad', 'tipo')
         .leftJoinAndSelect('actividad.fontanero', 'fontanero');
 
-      if (query.estado) {
+      this.excludeBorradores(qb);
+
+      if (query.estado && query.estado !== EstadoActividadFontanero.BORRADOR) {
         qb.andWhere('actividad.estado = :estado', { estado: query.estado });
       }
 
@@ -583,10 +746,14 @@ export class ActividadesFontaneroService {
 
   async historialAdmin(): Promise<ListadoActividadesAdminResponse> {
     return withDbRetry(async () => {
-      const data = await this.actividadRepository.find({
-        relations: { tipoActividad: true },
-        order: { updatedAt: 'DESC' },
-      });
+      const data = await this.actividadRepository
+        .createQueryBuilder('actividad')
+        .leftJoinAndSelect('actividad.tipoActividad', 'tipo')
+        .where('actividad.estado <> :borrador', {
+          borrador: EstadoActividadFontanero.BORRADOR,
+        })
+        .orderBy('actividad.updatedAt', 'DESC')
+        .getMany();
 
       const mapped = data.map((item) => this.toAdminResponse(item));
       return {
@@ -621,6 +788,7 @@ export class ActividadesFontaneroService {
 
     return withDbRetry(async () => {
       const qb = this.actividadRepository.createQueryBuilder('actividad');
+      this.excludeBorradores(qb);
       this.applyFechaActividadFilters(qb, query);
       return this.buildResumenActividades(qb);
     });
@@ -752,10 +920,23 @@ export class ActividadesFontaneroService {
     }
   }
 
+  private excludeBorradores(
+    qb: SelectQueryBuilder<ActividadFontanero>,
+  ): void {
+    qb.andWhere('actividad.estado <> :borrador', {
+      borrador: EstadoActividadFontanero.BORRADOR,
+    });
+  }
+
+  private isBorradorFlag(value: unknown): boolean {
+    return value === true || value === 'true' || value === '1';
+  }
+
   private applyReportFilters(
     qb: SelectQueryBuilder<ActividadFontanero>,
     filters: QueryReporteActividadesDto,
   ): void {
+    this.excludeBorradores(qb);
     this.applyFechaActividadFilters(qb, filters);
     if (filters.fontaneroId) {
       qb.andWhere('actividad.fontaneroId = :fontaneroId', {
@@ -830,7 +1011,10 @@ export class ActividadesFontaneroService {
           fontanero: true,
         },
       });
-      if (!actividad) {
+      if (
+        !actividad ||
+        actividad.estado === EstadoActividadFontanero.BORRADOR
+      ) {
         throw new NotFoundException(ACTIVIDADES_MSG.actividadNotFound);
       }
       return this.toAdminResponse(actividad);

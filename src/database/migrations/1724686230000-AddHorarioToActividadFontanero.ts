@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
 
-export class AddHorarioToActividadFontanero1724686200000 implements MigrationInterface {
-  name = 'AddHorarioToActividadFontanero1724686200000';
+export class AddHorarioToActividadFontanero1724686230000 implements MigrationInterface {
+  name = 'AddHorarioToActividadFontanero1724686230000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     const table = await queryRunner.getTable('ActividadFontanero');

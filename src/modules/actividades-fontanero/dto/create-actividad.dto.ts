@@ -1,7 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, type TransformFnParams } from 'class-transformer';
 import {
+  Allow,
   IsArray,
+  IsBoolean,
   IsDateString,
   IsInt,
   IsNotEmpty,
@@ -13,6 +15,7 @@ import {
   MaxLength,
   Min,
   Validate,
+  ValidateIf,
   ValidatorConstraint,
   type ValidationArguments,
   type ValidatorConstraintInterface,
@@ -58,6 +61,25 @@ const trimString = (params: TransformFnParams): unknown => {
   return typeof raw === 'string' ? raw.trim() : raw;
 };
 
+const toFechaCalendario = (params: TransformFnParams): unknown => {
+  const raw = rawValue(params);
+  if (raw instanceof Date && !Number.isNaN(raw.getTime())) {
+    const year = raw.getUTCFullYear();
+    const month = String(raw.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(raw.getUTCDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+  if (typeof raw !== 'string') {
+    return raw;
+  }
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  const iso = /^(\d{4}-\d{2}-\d{2})/.exec(trimmed);
+  return iso ? iso[1] : trimmed;
+};
+
 const normalizeHora = (params: TransformFnParams): unknown => {
   const raw = trimString(params);
   if (typeof raw !== 'string') {
@@ -98,14 +120,37 @@ const toInt = (params: TransformFnParams): unknown => {
   return raw;
 };
 
+const toBooleanFlag = (params: TransformFnParams): unknown => {
+  const raw = params.value ?? rawValue(params);
+  if (raw === true || raw === 'true' || raw === '1') return true;
+  if (raw === false || raw === 'false' || raw === '0' || raw === '' || raw == null) {
+    return false;
+  }
+  return raw;
+};
+
+const esBorradorDto = (dto: CreateActividadDto) => Boolean(dto.esBorrador);
+
 const toOptionalNumber = (params: TransformFnParams): unknown => {
-  const raw = rawValue(params);
+  const raw = params.value ?? rawValue(params);
   if (raw === undefined || raw === null || raw === '') return undefined;
   if (typeof raw === 'number') return raw;
   if (typeof raw === 'string' && raw.trim() !== '' && Number.isFinite(Number(raw))) {
     return Number(raw);
   }
   return raw;
+};
+
+const toIdArray = (params: TransformFnParams): unknown => {
+  const raw = params.value ?? rawValue(params);
+  if (raw === undefined || raw === null || raw === '') {
+    return undefined;
+  }
+  const values = Array.isArray(raw) ? raw : String(raw).split(',');
+  const ids = values
+    .map((value) => Number.parseInt(String(value).trim(), 10))
+    .filter((value) => Number.isInteger(value) && value > 0);
+  return ids.length > 0 ? ids : undefined;
 };
 
 export class CreateActividadDto {
@@ -122,7 +167,7 @@ export class CreateActividadDto {
     example: '2026-09-07',
     description: 'Fecha en que se realizó la actividad (YYYY-MM-DD)',
   })
-  @Transform(trimString)
+  @Transform(toFechaCalendario)
   @IsDateString(
     {},
     { message: 'La fecha de la actividad debe tener formato YYYY-MM-DD' },
@@ -141,28 +186,42 @@ export class CreateActividadDto {
   })
   horaInicio: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: '2026-09-08',
-    description: 'Fecha en que finaliza la actividad (YYYY-MM-DD)',
+    description: 'Fecha en que finaliza la actividad (YYYY-MM-DD). Opcional en borrador.',
   })
-  @Transform(trimString)
+  @Transform(toFechaCalendario)
+  @ValidateIf((dto: CreateActividadDto) => !esBorradorDto(dto))
+  @IsNotEmpty({ message: 'La fecha de finalización es obligatoria' })
   @IsDateString(
     {},
     { message: 'La fecha de finalización debe tener formato YYYY-MM-DD' },
   )
-  fechaFin: string;
+  @IsFechaActividadValida({
+    message: 'La fecha de finalización no puede ser futura',
+  })
+  fechaFin?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: '16:00',
-    description: 'Hora de finalización de la actividad (HH:mm)',
+    description: 'Hora de finalización de la actividad (HH:mm). Opcional en borrador.',
   })
   @Transform(normalizeHora)
+  @ValidateIf((dto: CreateActividadDto) => !esBorradorDto(dto))
   @IsNotEmpty({ message: 'La hora de finalización es obligatoria' })
   @Matches(HORA_PATTERN, {
     message: 'La hora de finalización debe tener formato HH:mm',
   })
   @Validate(PeriodoActividadValidoConstraint)
-  horaFin: string;
+  horaFin?: string;
+
+  @ApiPropertyOptional({
+    description: 'Si es verdadero, se guarda como borrador y no llega a administradora',
+  })
+  @Transform(toBooleanFlag)
+  @IsOptional()
+  @IsBoolean()
+  esBorrador?: boolean;
 
   @ApiProperty({ example: 'Reparación de tubería', maxLength: 200 })
   @Transform(trimString)
@@ -244,7 +303,17 @@ export class CreateActividadDto {
     description: 'Documentos adjuntos para incapacidades o vacaciones',
     type: [String],
   })
+  @Allow()
   @IsOptional()
-  @IsArray({ message: 'Los documentos deben ser una lista' })
-  documentos?: string[];
+  documentos?: unknown;
+
+  @ApiPropertyOptional({
+    description: 'Identificadores de evidencias a eliminar al guardar el borrador',
+    type: [Number],
+  })
+  @Transform(toIdArray)
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  documentosEliminarIds?: number[];
 }

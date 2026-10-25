@@ -1,10 +1,15 @@
 import {
   Body,
+  CallHandler,
   Controller,
+  ExecutionContext,
   Get,
   HttpCode,
   HttpStatus,
+  Injectable,
+  NestInterceptor,
   Param,
+  Delete,
   Patch,
   Post,
   Query,
@@ -13,6 +18,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import type { Observable } from 'rxjs';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
@@ -42,6 +48,19 @@ import {
   MAX_ACTIVIDAD_DOCUMENT_FILES,
   type UploadedImageFile,
 } from '../../common/media/public-media';
+
+@Injectable()
+class MarcarEsBorradorInterceptor implements NestInterceptor {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
+    const request = context.switchToHttp().getRequest<{
+      body?: Record<string, unknown>;
+    }>();
+    if (request.body && typeof request.body === 'object') {
+      request.body.esBorrador = true;
+    }
+    return next.handle();
+  }
+}
 
 @ApiTags('Actividades Fontanero')
 @ApiBearerAuth()
@@ -177,6 +196,74 @@ export class ActividadesFontaneroController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.actividadesFontaneroService.adjuntarDocumento(id, file, user);
+  }
+
+  @Post('fontanero/actividades/:id/borrador')
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.FONTANERO)
+  @UseInterceptors(
+    FilesInterceptor('documentos', MAX_ACTIVIDAD_DOCUMENT_FILES, {
+      limits: {
+        fileSize: MAX_ACTIVIDAD_DOCUMENT_BYTES,
+        files: MAX_ACTIVIDAD_DOCUMENT_FILES,
+      },
+    }),
+    MarcarEsBorradorInterceptor,
+  )
+  @ApiConsumes('application/json', 'multipart/form-data')
+  @ApiOperation({ summary: 'Actualizar un borrador propio (Fontanero)' })
+  actualizarBorrador(
+    @Param('id', ActividadIdPipe) id: number,
+    @Body() dto: CreateActividadDto,
+    @UploadedFiles() files: UploadedImageFile[] | undefined,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.actividadesFontaneroService.actualizarBorrador(
+      id,
+      { ...dto, esBorrador: true },
+      user,
+      files ?? [],
+    );
+  }
+
+  @Post('fontanero/actividades/:id/registrar')
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.FONTANERO)
+  @UseInterceptors(
+    FilesInterceptor('documentos', MAX_ACTIVIDAD_DOCUMENT_FILES, {
+      limits: {
+        fileSize: MAX_ACTIVIDAD_DOCUMENT_BYTES,
+        files: MAX_ACTIVIDAD_DOCUMENT_FILES,
+      },
+    }),
+  )
+  @ApiConsumes('application/json', 'multipart/form-data')
+  @ApiOperation({
+    summary: 'Registrar un borrador propio como actividad (Fontanero)',
+  })
+  entregarBorrador(
+    @Param('id', ActividadIdPipe) id: number,
+    @Body() dto: CreateActividadDto,
+    @UploadedFiles() files: UploadedImageFile[] | undefined,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.actividadesFontaneroService.entregarBorrador(
+      id,
+      dto,
+      user,
+      files ?? [],
+    );
+  }
+
+  @Delete('fontanero/actividades/:id/borrador')
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.FONTANERO)
+  @ApiOperation({ summary: 'Eliminar un borrador propio (Fontanero)' })
+  eliminarBorrador(
+    @Param('id', ActividadIdPipe) id: number,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.actividadesFontaneroService.eliminarBorrador(id, user);
   }
 
   @Patch('fontanero/actividades/:id/corregir')

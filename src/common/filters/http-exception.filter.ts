@@ -64,7 +64,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
     if (status >= 500) {
       this.logger.error(logLine);
     } else {
-      this.logger.warn(logLine);
+      const publicDetail = Array.isArray(message)
+        ? message.join(' | ')
+        : String(message);
+      this.logger.warn(`${logLine} ${publicDetail}`);
     }
 
     response.status(status).json({

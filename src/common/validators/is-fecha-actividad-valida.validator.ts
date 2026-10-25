@@ -101,6 +101,9 @@ export const IsFechaActividadValida = (
         },
         defaultMessage(args: ValidationArguments) {
           const error = getFechaActividadValidationError(args.value);
+          if (args.property === 'fechaFin' && error === 'futura') {
+            return 'La fecha de finalización no puede ser futura';
+          }
           return error
             ? defaultMessage(error)
             : 'La fecha de la actividad no es válida';
