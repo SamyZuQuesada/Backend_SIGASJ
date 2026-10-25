@@ -244,11 +244,14 @@ export class InventarioService {
         idProveedor: proveedor.id,
         proveedor,
         precioUnitario: dto.precioUnitario ?? null,
+        requiereFechaVencimiento:
+          dto.requiereFechaVencimiento ?? categoria.requiereFechaVencimiento,
         fechaVencimiento: validarFechaVencimientoMaterial(
-          dto.requiereFechaVencimiento ?? false,
-          dto.fechaVencimiento ?? null,
+          dto.requiereFechaVencimiento ?? categoria.requiereFechaVencimiento,
+          categoria.requiereFechaVencimiento
+            ? (dto.fechaVencimiento ?? null)
+            : null,
         ),
-        requiereFechaVencimiento: dto.requiereFechaVencimiento ?? false,
       });
 
       return await withDbRetry(() => this.materialRepository.save(material));
@@ -480,7 +483,19 @@ export class InventarioService {
       material.precioUnitario = dto.precioUnitario ?? null;
     }
 
-    if (dto.fechaVencimiento !== undefined) {
+    // Resuelve categoría efectiva para aplicar regla de vencimiento.
+    let categoriaEfectiva = material.categoria ?? null;
+    if (!categoriaEfectiva && material.idCategoria) {
+      categoriaEfectiva = await withDbRetry(() =>
+        this.categoriaRepository.findOne({
+          where: { id: material.idCategoria! },
+        }),
+      );
+    }
+
+    if (categoriaEfectiva && !categoriaEfectiva.requiereFechaVencimiento) {
+      material.fechaVencimiento = null;
+    } else if (dto.fechaVencimiento !== undefined) {
       material.fechaVencimiento = dto.fechaVencimiento ?? null;
     }
 
@@ -564,6 +579,7 @@ export class InventarioService {
         nombre: nombreNormalizado,
         descripcion: dto.descripcion ?? null,
         activo: true,
+        requiereFechaVencimiento: dto.requiereFechaVencimiento === true,
       });
 
       return await withDbRetry(() => this.categoriaRepository.save(categoria));
@@ -693,8 +709,33 @@ export class InventarioService {
       categoria.descripcion = dto.descripcion?.trim() || null;
     }
 
+    const desactivoVencimiento =
+      dto.requiereFechaVencimiento === false &&
+      categoria.requiereFechaVencimiento === true;
+
+    if (dto.requiereFechaVencimiento !== undefined) {
+      categoria.requiereFechaVencimiento = dto.requiereFechaVencimiento;
+    }
+
     try {
-      return await withDbRetry(() => this.categoriaRepository.save(categoria));
+      const guardada = await withDbRetry(() =>
+        this.categoriaRepository.save(categoria),
+      );
+
+      // Si la categoría deja de requerir vencimiento, limpia fechas en materiales.
+      if (desactivoVencimiento) {
+        await withDbRetry(() =>
+          this.materialRepository
+            .createQueryBuilder()
+            .update()
+            .set({ fechaVencimiento: null })
+            .where('idCategoria = :id', { id })
+            .andWhere('fechaVencimiento IS NOT NULL')
+            .execute(),
+        );
+      }
+
+      return guardada;
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -2567,7 +2608,10 @@ export class InventarioService {
           this.crearQueryMaterialesReporte(query)
             .andWhere('material.stockActual <= material.stockMinimo')
             .getCount(),
-          this.contarMovimientosReporte(query, TipoMovimientoInventario.ENTRADA),
+          this.contarMovimientosReporte(
+            query,
+            TipoMovimientoInventario.ENTRADA,
+          ),
           this.contarMovimientosReporte(query, TipoMovimientoInventario.SALIDA),
           this.crearQueryMaterialesReporte(query)
             .select(
@@ -2609,9 +2653,7 @@ export class InventarioService {
             .orderBy('material.nombre', 'ASC')
             .take(100)
             .getMany(),
-          this.crearQueryMovimientosReporte(query, true)
-            .take(100)
-            .getMany(),
+          this.crearQueryMovimientosReporte(query, true).take(100).getMany(),
         ]);
 
         const valorTotalInventario =

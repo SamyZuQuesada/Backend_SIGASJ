@@ -9,6 +9,7 @@ import {
   Index,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -18,6 +19,7 @@ import { TipoSolicitudAusencia } from '../../../common/enums/tipo-solicitud-ause
 import { aFechaIso } from '../../recursos-humanos/fecha-permiso';
 import { Colaborador } from '../../recursos-humanos/entities/colaborador.entity';
 import { Usuario } from '../../usuarios/entities/usuario.entity';
+import { DocumentoSolicitudAusencia } from './documento-solicitud-ausencia.entity';
 
 /**
  * Solicitud de permiso o vacaciones del Fontanero (persistencia épica 6.5).
@@ -134,6 +136,12 @@ export class SolicitudAusencia {
   @ApiPropertyOptional({ enum: TipoRegistroGeneradoAusencia, nullable: true })
   @Column({ type: 'varchar', length: 40, nullable: true })
   registroGeneradoTipo: TipoRegistroGeneradoAusencia | null;
+
+  @OneToMany(
+    () => DocumentoSolicitudAusencia,
+    (documento) => documento.solicitud,
+  )
+  documentos?: DocumentoSolicitudAusencia[];
 
   @ApiProperty()
   @CreateDateColumn()

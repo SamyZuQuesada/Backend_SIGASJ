@@ -33,5 +33,7 @@ export function isMotivoOtro(valor: string): boolean {
   if (!valor || typeof valor !== 'string') {
     return false;
   }
-  return valor.trim().toLowerCase() === MotivoConstanciaServicio.OTRO.toLowerCase();
+  return (
+    valor.trim().toLowerCase() === MotivoConstanciaServicio.OTRO.toLowerCase()
+  );
 }

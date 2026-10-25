@@ -74,6 +74,22 @@ export class HistorialSolicitud {
   @Column({ type: 'varchar', length: 500, nullable: true })
   descripcion: string;
 
+  @ApiPropertyOptional({
+    example: 'Su solicitud está en revisión.',
+    description: 'Texto visible al solicitante en seguimiento público',
+    nullable: true,
+  })
+  @Column({ type: 'varchar', length: 1000, nullable: true })
+  observacionPublica?: string | null;
+
+  @ApiPropertyOptional({
+    example: 'Pendiente validación interna.',
+    description: 'Nota administrativa interna (no expuesta al público)',
+    nullable: true,
+  })
+  @Column({ type: 'varchar', length: 1000, nullable: true })
+  notaInterna?: string | null;
+
   get comentario(): string | undefined {
     return this.descripcion;
   }

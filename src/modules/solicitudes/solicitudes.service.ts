@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -12,6 +13,7 @@ import { existsSync } from 'fs';
 import { resolve, sep } from 'path';
 import {
   Between,
+  Brackets,
   EntityManager,
   FindOptionsWhere,
   In,
@@ -21,7 +23,11 @@ import {
   MoreThanOrEqual,
   Repository,
 } from 'typeorm';
-import { EstadoSolicitud } from '../../common/enums/estado-solicitud.enum';
+import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
+import {
+  EstadoSolicitud,
+  isEstadoSolicitudValido,
+} from '../../common/enums/estado-solicitud.enum';
 import {
   isPlazoArregloPagoValido,
   PLAZOS_ARREGLO_PAGO_PERMITIDOS,
@@ -66,9 +72,17 @@ import { CreateSolicitudArregloPagoDto } from './dto/create-solicitud-arreglo-pa
 import { CreateSolicitudCambioTitularDto } from './dto/create-solicitud-cambio-titular.dto';
 import { CreateSolicitudDisponibilidadServiciosDto } from './dto/create-solicitud-disponibilidad-servicios.dto';
 import { CreateSolicitudInfraestructuraLinderosDto } from './dto/create-solicitud-infraestructura-linderos.dto';
+import { CambiarEstadoSolicitudDto } from './dto/cambiar-estado-solicitud.dto';
+import { CambioEstadoSolicitudResponseDto } from './dto/cambio-estado-solicitud.response';
+import { ConsultarSeguimientoSolicitudDto } from './dto/consultar-seguimiento-solicitud.dto';
+import { HistorialSolicitudItemDto } from './dto/historial-solicitud.response';
 import { CreateSolicitudConstanciaServicioDto } from './dto/create-solicitud-constancia-servicio.dto';
 import { DocumentoSolicitudReferenciaDto } from './dto/documento-solicitud-referencia.dto';
 import { QuerySolicitudesDto } from './dto/query-solicitudes.dto';
+import {
+  EventoSeguimientoPublicoDto,
+  SeguimientoSolicitudPublicoDto,
+} from './dto/seguimiento-solicitud-publico.response';
 import { SolicitudPendienteDto } from './dto/solicitud-pendiente.dto';
 import { SolicitudesAprobadaPendientesResponseDto } from './dto/solicitudes-aprobada-pendientes-response.dto';
 import { DocumentoSolicitud } from './entities/documento-solicitud.entity';
@@ -82,7 +96,10 @@ import { SolicitudConstanciaServicio } from './entities/solicitud-constancia-ser
 import { SolicitudServicio } from './entities/solicitud-servicio.entity';
 import { Solicitud } from './entities/solicitud.entity';
 import { TipoSolicitud } from './entities/tipo-solicitud.entity';
-import { SolicitudNoEncontradaException } from './errors/solicitud.errors';
+import {
+  SolicitudNoEncontradaException,
+  SolicitudSeguimientoNoEncontradaException,
+} from './errors/solicitud.errors';
 import { TiposSolicitudService } from './tipos-solicitud.service';
 
 export type DocumentoSolicitudUploadResponse = {
@@ -186,7 +203,8 @@ export class SolicitudesService {
 
   /**
    * Consulta una solicitud por su código de seguimiento alfanumérico único.
-   * Utilizado en la funcionalidad Card 8 para la consulta de avance por parte del ciudadano.
+   * Uso interno/administrativo. El endpoint público de seguimiento NO debe
+   * devolver datos con código solo (ver consultarSeguimientoPublico).
    *
    * @throws SolicitudNoEncontradaException si el código no existe.
    */
@@ -210,6 +228,92 @@ export class SolicitudesService {
     }
 
     return solicitud;
+  }
+
+  /**
+   * Seguimiento público seguro: exige correspondencia código + identificación
+   * del solicitante en la misma consulta (anti-enumeración).
+   * Devuelve únicamente DTO público (sin notaInterna, usuario, documentos, PII).
+   */
+  async consultarSeguimientoPublico(
+    dto: ConsultarSeguimientoSolicitudDto,
+  ): Promise<SeguimientoSolicitudPublicoDto> {
+    const codigo = dto.codigo.trim().toUpperCase();
+    const identificacion = dto.identificacion.trim();
+
+    let solicitud: Solicitud | null = null;
+    try {
+      solicitud = await this.solicitudRepo
+        .createQueryBuilder('s')
+        .leftJoinAndSelect('s.tipoSolicitud', 'tipo')
+        .leftJoin('s.detalleArregloPago', 'ap')
+        .leftJoin('s.detalleCambioTitular', 'ct')
+        .leftJoin('s.detalleInfraestructuraLinderos', 'infra')
+        .leftJoin('s.detalleAfiliacion', 'afi')
+        .leftJoin('s.detalleDisponibilidadServicios', 'disp')
+        .leftJoin('s.detalleConstanciaServicio', 'cons')
+        .where('s.codigoSeguimiento = :codigo', { codigo })
+        .andWhere('s.deletedAt IS NULL')
+        .andWhere(
+          new Brackets((qb) => {
+            qb.where('ap.cedula = :identificacion')
+              .orWhere('ct.identificacionSolicitante = :identificacion')
+              .orWhere('infra.identificacionFisica = :identificacion')
+              .orWhere('infra.cedulaJuridica = :identificacion')
+              .orWhere('afi.identificacion = :identificacion')
+              .orWhere('disp.identificacionFisica = :identificacion')
+              .orWhere('disp.identificacionJuridica = :identificacion')
+              .orWhere('cons.identificacionSolicitante = :identificacion');
+          }),
+        )
+        .setParameter('identificacion', identificacion)
+        .getOne();
+    } catch (error) {
+      this.logger.error(
+        'Error al consultar seguimiento público de solicitud',
+        error instanceof Error ? error.message : undefined,
+      );
+      throw new SolicitudSeguimientoNoEncontradaException();
+    }
+
+    if (!solicitud) {
+      this.logger.warn('Seguimiento público: combinación no localizada');
+      throw new SolicitudSeguimientoNoEncontradaException();
+    }
+
+    const historial = await this.mapHistorialPublico(solicitud.id);
+
+    return {
+      codigoSeguimiento: solicitud.codigoSeguimiento,
+      estado: solicitud.estado,
+      fechaIngreso: solicitud.fechaIngreso,
+      tipoSolicitud: solicitud.tipoSolicitud
+        ? {
+            nombre: solicitud.tipoSolicitud.nombre,
+            slug: solicitud.tipoSolicitud.slug,
+          }
+        : null,
+      historial,
+    };
+  }
+
+  /**
+   * Eventos públicos de HistorialSolicitud (ASC). Sin notaInterna ni usuario.
+   */
+  private async mapHistorialPublico(
+    solicitudId: number,
+  ): Promise<EventoSeguimientoPublicoDto[]> {
+    const eventos = await this.historialSolicitudRepo.find({
+      where: { solicitudId },
+      order: { fechaHora: 'ASC', id: 'ASC' },
+    });
+
+    return eventos.map((evento) => ({
+      fecha: evento.fechaHora,
+      estadoAnterior: evento.estadoAnterior ?? null,
+      estadoNuevo: evento.estadoNuevo,
+      observacionPublica: this.observacionPublicaHistorial(evento),
+    }));
   }
 
   /**
@@ -800,15 +904,107 @@ export class SolicitudesService {
   }
 
   /**
-   * Actualiza el estado de una solicitud dentro de su ciclo de vida.
+   * Cambia el estado de una Solicitud y registra HistorialSolicitud
+   * en la misma transacción. El usuario responsable sale del JWT.
+   *
+   * No hay matriz de transiciones documentada (Feature 12): solo se exige
+   * estado oficial distinto del actual. Creación inicial (PENDIENTE) no
+   * pasa por este método.
    */
   async actualizarEstado(
     id: number,
-    nuevoEstado: EstadoSolicitud,
-  ): Promise<Solicitud> {
-    const solicitud = await this.findById(id);
-    solicitud.estado = nuevoEstado;
-    return this.solicitudRepo.save(solicitud);
+    dto: CambiarEstadoSolicitudDto,
+    user: AuthenticatedUser,
+  ): Promise<CambioEstadoSolicitudResponseDto> {
+    if (!isEstadoSolicitudValido(dto.estadoNuevo)) {
+      throw new BadRequestException(
+        `El estado '${dto.estadoNuevo}' no es válido. Opciones: ${Object.values(EstadoSolicitud).join(', ')}`,
+      );
+    }
+
+    const idUsuario = user.idUsuario ?? Number(user.userId);
+    if (!Number.isInteger(idUsuario) || idUsuario <= 0) {
+      throw new BadRequestException(
+        'No se pudo determinar el usuario autenticado responsable del cambio.',
+      );
+    }
+
+    const observacionPublica = this.normalizarTextoHistorial(
+      dto.observacionPublica,
+    );
+    const notaInterna = this.normalizarTextoHistorial(dto.notaInterna);
+
+    return this.solicitudRepo.manager.transaction(async (manager) => {
+      const solicitudRepo = manager.getRepository(Solicitud);
+      const historialRepo = manager.getRepository(HistorialSolicitud);
+
+      const solicitud = await solicitudRepo.findOne({ where: { id } });
+      if (!solicitud) {
+        throw new SolicitudNoEncontradaException(id);
+      }
+
+      const estadoAnterior = solicitud.estado;
+      if (estadoAnterior === dto.estadoNuevo) {
+        throw new BadRequestException(
+          `La solicitud ya se encuentra en estado ${dto.estadoNuevo}.`,
+        );
+      }
+
+      // Claim atómico: evita que dos cambios concurrentes sobrescriban el historial.
+      const claim = await solicitudRepo
+        .createQueryBuilder()
+        .update(Solicitud)
+        .set({ estado: dto.estadoNuevo })
+        .where('id = :id', { id })
+        .andWhere('estado = :estadoAnterior', { estadoAnterior })
+        .execute();
+
+      if ((claim.affected ?? 0) !== 1) {
+        throw new ConflictException(
+          'La solicitud cambió de estado por otra operación concurrente. Reintente.',
+        );
+      }
+
+      const evento = historialRepo.create({
+        solicitudId: solicitud.id,
+        evento: 'CAMBIO_ESTADO',
+        tipoEvento: 'ESTADO',
+        descripcion: observacionPublica,
+        estadoAnterior,
+        estadoNuevo: dto.estadoNuevo,
+        observacionPublica,
+        notaInterna,
+        idUsuario,
+      });
+      const historialGuardado = await historialRepo.save(evento);
+
+      this.logger.log(
+        `Solicitud ${solicitud.id}: ${estadoAnterior} → ${dto.estadoNuevo} (usuario ${idUsuario})`,
+      );
+
+      return {
+        solicitudId: solicitud.id,
+        codigoSeguimiento: solicitud.codigoSeguimiento,
+        estadoAnterior,
+        estadoNuevo: dto.estadoNuevo,
+        observacionPublica,
+        notaInterna,
+        idUsuario,
+        fecha: historialGuardado.fechaHora,
+        historialId: historialGuardado.id,
+      };
+    });
+  }
+
+  /** Vacío / solo espacios → null; no mezcla pública ↔ interna. */
+  private normalizarTextoHistorial(
+    valor: string | null | undefined,
+  ): string | null {
+    if (valor === undefined || valor === null) {
+      return null;
+    }
+    const texto = valor.trim();
+    return texto.length > 0 ? texto : null;
   }
 
   /**
@@ -1775,7 +1971,7 @@ export class SolicitudesService {
             direccionExacta: dto.direccionExacta,
             motivo: dto.motivo,
             otroMotivo: isMotivoOtro(dto.motivo)
-              ? dto.otroMotivo?.trim() ?? null
+              ? (dto.otroMotivo?.trim() ?? null)
               : null,
             tramitePorRealizar: dto.tramitePorRealizar?.trim()
               ? dto.tramitePorRealizar.trim()
@@ -2144,22 +2340,52 @@ export class SolicitudesService {
   }
 
   /**
-   * Consulta el historial de trazabilidad y eventos de una solicitud.
+   * Historial de trazabilidad de una solicitud (cronológico ASC: antiguo → reciente).
+   * Incluye usuario responsable sin datos sensibles. Solo uso administrativo.
    */
   async findHistorialBySolicitudId(
     id: number,
-  ): Promise<HistorialSolicitud[] | any[]> {
-    const solicitud = await this.findById(id);
-    if (this.historialSolicitudRepository) {
-      const eventos = await this.historialSolicitudRepository.find({
-        where: { solicitudId: id },
-        order: { fechaHora: 'ASC', id: 'ASC' },
-      });
-      if (eventos && eventos.length > 0) {
-        return eventos;
-      }
+  ): Promise<HistorialSolicitudItemDto[]> {
+    await this.findById(id);
+    const eventos = await this.historialSolicitudRepo.find({
+      where: { solicitudId: id },
+      relations: { usuario: { rol: true } },
+      order: { fechaHora: 'ASC', id: 'ASC' },
+    });
+
+    return eventos.map((evento) => this.toHistorialSolicitudItemDto(evento));
+  }
+
+  private observacionPublicaHistorial(evento: HistorialSolicitud): string | null {
+    if (evento.observacionPublica?.trim()) {
+      return evento.observacionPublica.trim();
     }
-    return solicitud.historial || [];
+    if (evento.descripcion?.trim()) {
+      return evento.descripcion.trim();
+    }
+    return null;
+  }
+
+  private toHistorialSolicitudItemDto(
+    evento: HistorialSolicitud,
+  ): HistorialSolicitudItemDto {
+    return {
+      id: evento.id,
+      solicitudId: evento.solicitudId,
+      estadoAnterior: evento.estadoAnterior ?? null,
+      estadoNuevo: evento.estadoNuevo,
+      observacionPublica: this.observacionPublicaHistorial(evento),
+      notaInterna: evento.notaInterna ?? null,
+      idUsuario: evento.idUsuario ?? null,
+      usuario: evento.usuario
+        ? {
+            idUsuario: evento.usuario.idUsuario,
+            nombre: evento.usuario.nombre,
+            rol: evento.usuario.rol?.nombre ?? null,
+          }
+        : null,
+      fecha: evento.fechaHora,
+    };
   }
 
   /* =========================================================================

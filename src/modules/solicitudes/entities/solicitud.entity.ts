@@ -123,7 +123,8 @@ export class Solicitud {
   /* =========================================================================
    * RELACIÓN CON DOCUMENTOS E HISTORIAL:
    * =========================================================================
-   * Adjuntos ciudadanos (DocumentoSolicitud) y preparación de historial.
+   * Adjuntos ciudadanos (DocumentoSolicitud) y trazabilidad de estados
+   * (HistorialSolicitud: estado anterior/nuevo, observación pública, nota interna).
    * ========================================================================= */
   @OneToMany(() => DocumentoSolicitud, (documento) => documento.solicitud)
   documentos?: DocumentoSolicitud[];

@@ -608,6 +608,7 @@ describe('SolicitudesAusencia (épica 6.5)', () => {
             payloadBase(correlacion, {
               jotformSubmissionId: 'sub-ap-vac',
               tipo: 'VACACIONES',
+              // 1 dic es feriado CR → 5 calendario − 1 feriado = 4 netos
               fechaInicio: '2026-12-01',
               fechaFin: '2026-12-05',
               motivo: 'Vacaciones',
@@ -623,7 +624,7 @@ describe('SolicitudesAusencia (épica 6.5)', () => {
         where: { tipo: TipoMovimientoVacaciones.DISFRUTADO },
       });
       expect(disfrutados).toHaveLength(1);
-      expect(disfrutados[0].cantidadDias).toBe(5);
+      expect(disfrutados[0].cantidadDias).toBe(4);
       expect(disfrutados[0].colaboradorId).toBe(colaborador.id);
 
       await aprobar(created.id, adminToken).expect(409);

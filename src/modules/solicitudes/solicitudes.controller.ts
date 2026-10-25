@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
   Query,
   Res,
@@ -25,14 +26,20 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import type { Response } from 'express';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/enums/role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import {
   MAX_SOLICITUD_DOCUMENT_BYTES,
   type SolicitudDocumentFile,
 } from '../../common/media/public-media';
+import { CambiarEstadoSolicitudDto } from './dto/cambiar-estado-solicitud.dto';
+import { CambioEstadoSolicitudResponseDto } from './dto/cambio-estado-solicitud.response';
+import { ConsultarSeguimientoSolicitudDto } from './dto/consultar-seguimiento-solicitud.dto';
+import { HistorialSolicitudItemDto } from './dto/historial-solicitud.response';
 import { CreateSolicitudAfiliacionDto } from './dto/create-solicitud-afiliacion.dto';
 import { CreateSolicitudArregloPagoDto } from './dto/create-solicitud-arreglo-pago.dto';
 import { CreateSolicitudCambioTitularDto } from './dto/create-solicitud-cambio-titular.dto';
@@ -40,9 +47,11 @@ import { CreateSolicitudDisponibilidadServiciosDto } from './dto/create-solicitu
 import { CreateSolicitudInfraestructuraLinderosDto } from './dto/create-solicitud-infraestructura-linderos.dto';
 import { CreateSolicitudConstanciaServicioDto } from './dto/create-solicitud-constancia-servicio.dto';
 import { QuerySolicitudesDto } from './dto/query-solicitudes.dto';
+import { SeguimientoSolicitudPublicoDto } from './dto/seguimiento-solicitud-publico.response';
 
 import { SolicitudesAprobadaPendientesResponseDto } from './dto/solicitudes-aprobada-pendientes-response.dto';
 import { Solicitud } from './entities/solicitud.entity';
+import { SolicitudSeguimientoNoEncontradaException } from './errors/solicitud.errors';
 import { SolicitudesService } from './solicitudes.service';
 
 @ApiTags('Solicitudes')
@@ -269,26 +278,59 @@ export class SolicitudesController {
     return this.solicitudesService.findAprobadasPendientes();
   }
 
-  @Get('seguimiento/:codigoSeguimiento')
+  @Post('seguimiento')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary:
-      'Consultar avance de solicitud por código de seguimiento (Público)',
+    summary: 'Consultar avance de solicitud (público, seguro)',
     description:
-      'Permite a los ciudadanos consultar el estado y avance de su trámite mediante su código único (Card 8).',
+      'Requiere código de seguimiento + identificación del solicitante. ' +
+      'Valida la combinación en una sola consulta (anti-enumeración). ' +
+      'Devuelve únicamente datos públicos: estado, tipo, fecha e historial con observacionPublica. ' +
+      'Nunca expone notaInterna, usuarios administrativos, documentos ni datos personales.',
   })
+  @ApiBody({ type: ConsultarSeguimientoSolicitudDto })
   @ApiResponse({
     status: 200,
-    description: 'Información actual de la solicitud',
-    type: Solicitud,
+    description: 'Datos públicos de seguimiento',
+    type: SeguimientoSolicitudPublicoDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'DTO inválido (faltan campos o formato incorrecto)',
   })
   @ApiResponse({
     status: 404,
-    description: 'Solicitud no encontrada para el código especificado',
+    description:
+      'Combinación no localizada (mismo mensaje genérico si el código o la identificación no corresponden)',
+  })
+  consultarSeguimientoPublico(
+    @Body() dto: ConsultarSeguimientoSolicitudDto,
+  ): Promise<SeguimientoSolicitudPublicoDto> {
+    return this.solicitudesService.consultarSeguimientoPublico(dto);
+  }
+
+  /**
+   * El seguimiento por código solo (4.11.2) revelaba existencia de solicitudes.
+   * Se mantiene la ruta para no romper clientes, pero ya no devuelve datos:
+   * use POST /solicitudes/seguimiento con código + identificación.
+   */
+  @Get('seguimiento/:codigoSeguimiento')
+  @ApiOperation({
+    summary: 'Seguimiento por código solo (retirado por privacidad)',
+    description:
+      'Un código por sí solo no permite obtener información. ' +
+      'Use POST /solicitudes/seguimiento con código e identificación.',
+    deprecated: true,
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Respuesta genérica; no revela si el código existe',
   })
   findByCodigoSeguimiento(
     @Param('codigoSeguimiento') codigoSeguimiento: string,
-  ): Promise<Solicitud> {
-    return this.solicitudesService.findByCodigoSeguimiento(codigoSeguimiento);
+  ): never {
+    void codigoSeguimiento;
+    throw new SolicitudSeguimientoNoEncontradaException();
   }
 
   @Get([':solicitudId/documentos/:documentoId/descargar', ':solicitudId/documentos/:documentoId'])
@@ -390,6 +432,69 @@ export class SolicitudesController {
   @ApiResponse({ status: 404, description: 'Solicitud no encontrada' })
   findById(@Param('id', ParseIntPipe) id: number): Promise<Solicitud> {
     return this.solicitudesService.findById(id);
+  }
+
+  @Get(':id/historial')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @ApiOperation({
+    summary: 'Historial cronológico de una solicitud (admin)',
+    description:
+      'Devuelve eventos de HistorialSolicitud ordenados de antiguo a reciente. ' +
+      'Incluye observacionPublica y notaInterna (solo roles administrativos).',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de eventos (puede ser vacía)',
+    type: [HistorialSolicitudItemDto],
+  })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
+  @ApiResponse({
+    status: 403,
+    description: 'Sin rol ADMINISTRADORA ni SECRETARIA',
+  })
+  @ApiResponse({ status: 404, description: 'Solicitud no encontrada' })
+  findHistorial(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<HistorialSolicitudItemDto[]> {
+    return this.solicitudesService.findHistorialBySolicitudId(id);
+  }
+
+  @Patch(':id/estado')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @ApiOperation({
+    summary: 'Cambiar estado de una solicitud con trazabilidad',
+    description:
+      'Actualiza Solicitud.estado y crea HistorialSolicitud en la misma transacción. ' +
+      'El responsable se toma del JWT (sub/idUsuario). No enviar usuarioId, estadoAnterior ni fecha. ' +
+      'Roles: ADMINISTRADORA, SECRETARIA.',
+  })
+  @ApiBody({ type: CambiarEstadoSolicitudDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Estado actualizado e historial registrado',
+    type: CambioEstadoSolicitudResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Estado inválido o sin cambio' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
+  @ApiResponse({
+    status: 403,
+    description: 'Sin rol ADMINISTRADORA ni SECRETARIA',
+  })
+  @ApiResponse({ status: 404, description: 'Solicitud no encontrada' })
+  @ApiResponse({
+    status: 409,
+    description: 'Conflicto por cambio concurrente de estado',
+  })
+  cambiarEstado(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CambiarEstadoSolicitudDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<CambioEstadoSolicitudResponseDto> {
+    return this.solicitudesService.actualizarEstado(id, dto, user);
   }
 
   @Get()

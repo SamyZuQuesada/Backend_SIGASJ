@@ -3,6 +3,7 @@ import { PlazoArregloPago } from '../../../common/enums/plazo-arreglo-pago.enum'
 import { TipoDocumentoSolicitud } from '../../../common/enums/tipo-documento-solicitud.enum';
 import { TipoSolicitudSlug } from '../../../common/enums/tipo-solicitud-slug.enum';
 import { DocumentoSolicitud } from './documento-solicitud.entity';
+import { HistorialSolicitud } from './historial-solicitud.entity';
 import { SolicitudAfiliacion } from './solicitud-afiliacion.entity';
 import { SolicitudArregloPago } from './solicitud-arreglo-pago.entity';
 import { SolicitudCambioTitular } from './solicitud-cambio-titular.entity';
@@ -173,22 +174,25 @@ describe('Solicitud Entity (Encabezado central)', () => {
     expect(solicitud6.detalleServicioExistente).toBeDefined();
   });
 
-  it('debe tener la relación OneToMany con DocumentoSolicitud e historial', () => {
+  it('debe tener la relación OneToMany con DocumentoSolicitud e HistorialSolicitud', () => {
     const solicitud = new Solicitud();
     const documento = new DocumentoSolicitud();
     documento.id = 1;
     documento.nombreOriginal = 'cedula.pdf';
     documento.tipoDocumento = TipoDocumentoSolicitud.IDENTIFICACION;
     solicitud.documentos = [documento];
-    solicitud.historial = [
-      {
-        id: 1,
-        estadoAnterior: EstadoSolicitud.PENDIENTE,
-        estadoNuevo: EstadoSolicitud.EN_REVISION,
-      },
-    ];
+
+    const evento = new HistorialSolicitud();
+    evento.id = 1;
+    evento.solicitudId = 10;
+    evento.estadoAnterior = EstadoSolicitud.PENDIENTE;
+    evento.estadoNuevo = EstadoSolicitud.EN_REVISION;
+    solicitud.historial = [evento];
 
     expect(solicitud.documentos).toHaveLength(1);
     expect(solicitud.historial).toHaveLength(1);
+    expect(solicitud.historial[0].estadoNuevo).toBe(
+      EstadoSolicitud.EN_REVISION,
+    );
   });
 });

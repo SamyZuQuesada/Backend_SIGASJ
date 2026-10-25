@@ -1,6 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, type TransformFnParams } from 'class-transformer';
-import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 
 const rawValue = ({ value, obj, key }: TransformFnParams): unknown => {
   if (obj && typeof obj === 'object' && key in obj) {
@@ -57,4 +63,16 @@ export class CreateCategoriaDto {
     message: 'La descripción no puede exceder 500 caracteres',
   })
   descripcion?: string | null;
+
+  @ApiPropertyOptional({
+    description:
+      'Si los materiales de esta categoría usan fecha de vencimiento (químicos sí; tubería PVC no)',
+    example: false,
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean({
+    message: 'requiereFechaVencimiento debe ser verdadero o falso',
+  })
+  requiereFechaVencimiento?: boolean;
 }
