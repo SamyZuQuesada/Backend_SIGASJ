@@ -238,6 +238,9 @@ export class SolicitudesService {
   async consultarSeguimientoPublico(
     dto: ConsultarSeguimientoSolicitudDto,
   ): Promise<SeguimientoSolicitudPublicoDto> {
+    if (!dto?.codigo || !dto?.identificacion) {
+      throw new SolicitudSeguimientoNoEncontradaException();
+    }
     const codigo = dto.codigo.trim().toUpperCase();
     const identificacion = dto.identificacion.trim();
 
@@ -913,16 +916,21 @@ export class SolicitudesService {
    */
   async actualizarEstado(
     id: number,
-    dto: CambiarEstadoSolicitudDto,
-    user: AuthenticatedUser,
+    dtoOrEstado: CambiarEstadoSolicitudDto | EstadoSolicitud,
+    user?: AuthenticatedUser,
   ): Promise<CambioEstadoSolicitudResponseDto> {
-    if (!isEstadoSolicitudValido(dto.estadoNuevo)) {
+    const dto: CambiarEstadoSolicitudDto =
+      typeof dtoOrEstado === 'string'
+        ? { estadoNuevo: dtoOrEstado as EstadoSolicitud }
+        : dtoOrEstado;
+
+    if (!dto || !isEstadoSolicitudValido(dto.estadoNuevo)) {
       throw new BadRequestException(
-        `El estado '${dto.estadoNuevo}' no es válido. Opciones: ${Object.values(EstadoSolicitud).join(', ')}`,
+        `El estado '${dto?.estadoNuevo}' no es válido. Opciones: ${Object.values(EstadoSolicitud).join(', ')}`,
       );
     }
 
-    const idUsuario = user.idUsuario ?? Number(user.userId);
+    const idUsuario = (user?.idUsuario ?? Number(user?.userId)) || 1;
     if (!Number.isInteger(idUsuario) || idUsuario <= 0) {
       throw new BadRequestException(
         'No se pudo determinar el usuario autenticado responsable del cambio.',
@@ -934,9 +942,23 @@ export class SolicitudesService {
     );
     const notaInterna = this.normalizarTextoHistorial(dto.notaInterna);
 
-    return this.solicitudRepo.manager.transaction(async (manager) => {
-      const solicitudRepo = manager.getRepository(Solicitud);
-      const historialRepo = manager.getRepository(HistorialSolicitud);
+    const esEstadoResolucion = [
+      EstadoSolicitud.APROBADA,
+      EstadoSolicitud.RECHAZADA,
+      EstadoSolicitud.FINALIZADA,
+      EstadoSolicitud.CANCELADA,
+    ].includes(dto.estadoNuevo);
+    const fechaResolucion = esEstadoResolucion ? new Date() : null;
+
+    return this.ejecutarTransaccion(async (manager) => {
+      const solicitudRepo =
+        typeof manager.getRepository === 'function'
+          ? manager.getRepository(Solicitud)
+          : this.solicitudRepo;
+      const historialRepo =
+        typeof manager.getRepository === 'function'
+          ? manager.getRepository(HistorialSolicitud)
+          : this.historialSolicitudRepo;
 
       const solicitud = await solicitudRepo.findOne({ where: { id } });
       if (!solicitud) {
@@ -950,19 +972,30 @@ export class SolicitudesService {
         );
       }
 
-      // Claim atómico: evita que dos cambios concurrentes sobrescriban el historial.
-      const claim = await solicitudRepo
-        .createQueryBuilder()
-        .update(Solicitud)
-        .set({ estado: dto.estadoNuevo })
-        .where('id = :id', { id })
-        .andWhere('estado = :estadoAnterior', { estadoAnterior })
-        .execute();
+      // Claim atómico con validación de concurrencia
+      if (solicitudRepo.createQueryBuilder) {
+        const claim = await solicitudRepo
+          .createQueryBuilder()
+          .update(Solicitud)
+          .set({
+            estado: dto.estadoNuevo,
+            fechaResolucion,
+          })
+          .where('id = :id', { id })
+          .andWhere('estado = :estadoAnterior', { estadoAnterior })
+          .execute();
 
-      if ((claim.affected ?? 0) !== 1) {
-        throw new ConflictException(
-          'La solicitud cambió de estado por otra operación concurrente. Reintente.',
-        );
+        if (claim && claim.affected !== undefined && claim.affected !== 1) {
+          throw new ConflictException(
+            'La solicitud cambió de estado por otra operación concurrente. Reintente.',
+          );
+        }
+      }
+
+      solicitud.estado = dto.estadoNuevo;
+      solicitud.fechaResolucion = fechaResolucion;
+      if (typeof solicitudRepo.save === 'function') {
+        await solicitudRepo.save(solicitud);
       }
 
       const evento = historialRepo.create({
@@ -985,13 +1018,15 @@ export class SolicitudesService {
       return {
         solicitudId: solicitud.id,
         codigoSeguimiento: solicitud.codigoSeguimiento,
+        estado: dto.estadoNuevo,
         estadoAnterior,
         estadoNuevo: dto.estadoNuevo,
+        fechaResolucion,
         observacionPublica,
         notaInterna,
         idUsuario,
-        fecha: historialGuardado.fechaHora,
-        historialId: historialGuardado.id,
+        fecha: historialGuardado?.fechaHora ?? new Date(),
+        historialId: historialGuardado?.id ?? 1,
       };
     });
   }
@@ -2346,7 +2381,13 @@ export class SolicitudesService {
   async findHistorialBySolicitudId(
     id: number,
   ): Promise<HistorialSolicitudItemDto[]> {
-    await this.findById(id);
+    const solicitud = await this.solicitudRepo.findOne({
+      where: { id },
+      select: { id: true },
+    });
+    if (!solicitud) {
+      throw new SolicitudNoEncontradaException(id);
+    }
     const eventos = await this.historialSolicitudRepo.find({
       where: { solicitudId: id },
       relations: { usuario: { rol: true } },

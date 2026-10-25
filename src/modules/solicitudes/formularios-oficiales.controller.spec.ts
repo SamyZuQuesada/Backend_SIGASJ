@@ -81,6 +81,31 @@ describe('FormulariosOficialesController', () => {
     });
   });
 
+  describe('GET /solicitudes/formularios-oficiales (Catálogo público)', () => {
+    it('debe devolver el listado público de los trámites con sus enlaces de descarga', async () => {
+      const mockListado = [
+        {
+          tipoSolicitudId: 1,
+          nombre: 'Solicitud de Arreglo de Pago Domiciliar',
+          slug: TipoSolicitudSlug.ARREGLO_PAGO,
+          tienePdf: true,
+          nombreArchivo: 'formulario-arreglo-pago.pdf',
+          fechaActualizacion: new Date(),
+          urlDescarga: '/solicitudes/arreglo-pago/formulario-oficial',
+        },
+      ];
+
+      service.listarFormulariosOficialesAdmin.mockResolvedValue(
+        mockListado as any,
+      );
+
+      const result = await controller.listarFormulariosPublicos();
+
+      expect(result).toEqual(mockListado);
+      expect(service.listarFormulariosOficialesAdmin).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('PUT /solicitudes/admin/formularios-oficiales/:tipoSolicitudId', () => {
     it('debe invocar al servicio para subir o reemplazar el PDF', async () => {
       const fileMock: UploadedPdfFile = {
