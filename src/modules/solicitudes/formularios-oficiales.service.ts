@@ -80,6 +80,9 @@ export class FormulariosOficialesService {
         nombreArchivo: form?.nombreArchivoOriginal ?? null,
         tamano: form?.tamano ?? null,
         fechaActualizacion: form?.fechaCarga ?? null,
+        urlDescarga: form
+          ? `/solicitudes/${tipo.slug}/formulario-oficial`
+          : null,
       };
     });
   }
@@ -251,6 +254,7 @@ export class FormulariosOficialesService {
         nombreArchivo: formularioPersistido.nombreArchivoOriginal,
         tamano: formularioPersistido.tamano,
         fechaActualizacion: formularioPersistido.fechaCarga,
+        urlDescarga: `/solicitudes/${tipo.slug}/formulario-oficial`,
       };
     } catch (dbError) {
       // Si la persistencia en DB falla, eliminar el archivo nuevo para no dejar archivos huérfanos

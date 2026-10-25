@@ -12,11 +12,25 @@ export class CambioEstadoSolicitudResponseDto {
   @ApiProperty({ example: 'SOL-2026-ABCD12' })
   codigoSeguimiento!: string;
 
+  @ApiProperty({
+    enum: EstadoSolicitud,
+    example: EstadoSolicitud.RECHAZADA,
+    description: 'Estado actual persistido de la solicitud',
+  })
+  estado!: EstadoSolicitud;
+
   @ApiProperty({ enum: EstadoSolicitud, nullable: true })
   estadoAnterior!: EstadoSolicitud | null;
 
   @ApiProperty({ enum: EstadoSolicitud })
   estadoNuevo!: EstadoSolicitud;
+
+  @ApiPropertyOptional({
+    example: '2026-10-25T14:30:00.000Z',
+    description: 'Fecha de resolución de la solicitud si aplica',
+    nullable: true,
+  })
+  fechaResolucion?: Date | null;
 
   @ApiPropertyOptional({ nullable: true })
   observacionPublica!: string | null;

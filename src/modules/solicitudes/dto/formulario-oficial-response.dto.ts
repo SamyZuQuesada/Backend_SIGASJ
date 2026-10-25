@@ -45,4 +45,11 @@ export class FormularioOficialItemDto {
     nullable: true,
   })
   fechaActualizacion: Date | null;
+
+  @ApiPropertyOptional({
+    example: '/solicitudes/arreglo-pago/formulario-oficial',
+    description: 'Ruta relativa de descarga pública directa del PDF oficial',
+    nullable: true,
+  })
+  urlDescarga?: string | null;
 }

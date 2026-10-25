@@ -48,13 +48,14 @@ describe('TiposSolicitudService', () => {
   });
 
   describe('findActivos', () => {
-    it('debe consultar únicamente los tipos activos ordenados por ID', async () => {
+    it('debe consultar únicamente los tipos activos ordenados por ID con su formulario oficial', async () => {
       find.mockResolvedValue([mockTipo]);
 
       const result = await service.findActivos();
 
       expect(find).toHaveBeenCalledWith({
         where: { activo: true },
+        relations: { formularioOficial: true },
         order: { id: 'ASC' },
       });
       expect(result).toEqual([mockTipo]);
@@ -69,6 +70,7 @@ describe('TiposSolicitudService', () => {
 
       expect(findOne).toHaveBeenCalledWith({
         where: { slug: 'arreglo-pago', activo: true },
+        relations: { formularioOficial: true },
       });
       expect(result).toEqual(mockTipo);
     });
@@ -80,6 +82,7 @@ describe('TiposSolicitudService', () => {
 
       expect(findOne).toHaveBeenCalledWith({
         where: { slug: 'arreglo-pago', activo: true },
+        relations: { formularioOficial: true },
       });
     });
 
@@ -100,6 +103,7 @@ describe('TiposSolicitudService', () => {
 
       expect(findOne).toHaveBeenCalledWith({
         where: { id: 1 },
+        relations: { formularioOficial: true },
       });
       expect(result).toEqual(mockTipo);
     });

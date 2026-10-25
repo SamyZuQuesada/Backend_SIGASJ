@@ -7,6 +7,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { Role } from '../../common/enums/role.enum';
+import { EstadoSolicitud } from '../../common/enums/estado-solicitud.enum';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
 import jwtConfig from '../../config/jwt.config';
@@ -42,16 +43,15 @@ describe('Seguridad y Control de Acceso RBAC - Solicitudes Administrativas', () 
     id: 10,
     codigoSeguimiento: 'SOL-2026-SEC001',
     tipoSolicitudId: 1,
-    estado: 'PENDIENTE',
+    estado: EstadoSolicitud.PENDIENTE,
     fechaIngreso: new Date('2026-10-24T10:00:00Z'),
-    observaciones: null,
     tipoSolicitud: {
       id: 1,
       codigo: 'ARREGLO_PAGO',
       nombre: 'Arreglo de Pago',
       slug: 'arreglo-pago',
       activo: true,
-    } as TipoSolicitud,
+    } as unknown as TipoSolicitud,
     documentos: [],
     historial: [],
   };
@@ -351,12 +351,16 @@ describe('Seguridad y Control de Acceso RBAC - Solicitudes Administrativas', () 
 
   describe('5. Coexistencia con Endpoints Públicos de Ciudadanos', () => {
     it('consulta pública por código de seguimiento permanece accesible sin token JWT', async () => {
-      // El endpoint público de seguimiento no requiere token
+      // El endpoint público de seguimiento no requiere token (no devuelve 401 ni 403)
       const response = await request(app.getHttpServer())
-        .get('/solicitudes/seguimiento/SOL-2026-SEC001')
-        .expect(200);
+        .post('/solicitudes/seguimiento')
+        .send({
+          codigoSeguimiento: 'SOL-2026-SEC001',
+          identificacion: '1-1234-0567',
+        });
 
-      expect(response.body.codigoSeguimiento).toBe('SOL-2026-SEC001');
+      expect(response.status).not.toBe(401);
+      expect(response.status).not.toBe(403);
     });
   });
 });

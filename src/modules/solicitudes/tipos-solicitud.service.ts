@@ -20,6 +20,7 @@ export class TiposSolicitudService {
   async findActivos(): Promise<TipoSolicitud[]> {
     return this.tipoSolicitudRepository.find({
       where: { activo: true },
+      relations: { formularioOficial: true },
       order: { id: 'ASC' },
     });
   }
@@ -29,6 +30,7 @@ export class TiposSolicitudService {
    */
   async findAll(): Promise<TipoSolicitud[]> {
     return this.tipoSolicitudRepository.find({
+      relations: { formularioOficial: true },
       order: { id: 'ASC' },
     });
   }
@@ -49,6 +51,7 @@ export class TiposSolicitudService {
 
     const tipo = await this.tipoSolicitudRepository.findOne({
       where,
+      relations: { formularioOficial: true },
     });
 
     if (!tipo) {
@@ -69,6 +72,7 @@ export class TiposSolicitudService {
   async findById(id: number): Promise<TipoSolicitud> {
     const tipo = await this.tipoSolicitudRepository.findOne({
       where: { id },
+      relations: { formularioOficial: true },
     });
 
     if (!tipo) {
