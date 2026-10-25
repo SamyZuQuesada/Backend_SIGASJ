@@ -20,6 +20,7 @@ import {
 } from '../../common/enums/estado-reposicion-material.transitions';
 import { OrigenReposicionMaterial } from '../../common/enums/origen-reposicion-material.enum';
 import { EstadoSolicitudMaterial } from '../../common/enums/estado-solicitud-material.enum';
+import { validarFechaVencimientoMaterial } from './validar-vencimiento-material';
 import { Role } from '../../common/enums/role.enum';
 import { TipoMovimientoInventario } from '../../common/enums/tipo-movimiento-inventario.enum';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
@@ -243,7 +244,10 @@ export class InventarioService {
         idProveedor: proveedor.id,
         proveedor,
         precioUnitario: dto.precioUnitario ?? null,
-        fechaVencimiento: dto.fechaVencimiento ?? null,
+        fechaVencimiento: validarFechaVencimientoMaterial(
+          dto.requiereFechaVencimiento ?? false,
+          dto.fechaVencimiento ?? null,
+        ),
         requiereFechaVencimiento: dto.requiereFechaVencimiento ?? false,
       });
 
@@ -483,6 +487,11 @@ export class InventarioService {
     if (dto.requiereFechaVencimiento !== undefined) {
       material.requiereFechaVencimiento = dto.requiereFechaVencimiento;
     }
+
+    material.fechaVencimiento = validarFechaVencimientoMaterial(
+      material.requiereFechaVencimiento ?? false,
+      material.fechaVencimiento ?? null,
+    );
 
     // Regla de negocio: stockActual se preserva intacto
     try {
