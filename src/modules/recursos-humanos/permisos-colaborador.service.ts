@@ -1,11 +1,20 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
+import { EstadoSolicitudAusencia } from '../../common/enums/estado-solicitud-ausencia.enum';
+import { TipoMovimientoVacaciones } from '../../common/enums/tipo-movimiento-vacaciones.enum';
+import { SolicitudAusencia } from '../solicitudes-ausencia/entities/solicitud-ausencia.entity';
+import {
+  diasAusenciaSinFeriados,
+  esFeriadoCostaRica,
+} from '../solicitudes-ausencia/feriados-costa-rica';
+import { rangosCalendarioSeSolapan } from '../solicitudes-ausencia/solape-ausencia.util';
 import { CreatePermisoColaboradorDto } from './dto/create-permiso-colaborador.dto';
 import {
   PERMISOS_LIMIT_DEFAULT,
@@ -14,6 +23,7 @@ import {
 } from './dto/query-permisos-colaborador.dto';
 import { UpdatePermisoColaboradorDto } from './dto/update-permiso-colaborador.dto';
 import { Colaborador } from './entities/colaborador.entity';
+import { MovimientoVacaciones } from './entities/movimiento-vacaciones.entity';
 import { PermisoColaborador } from './entities/permiso-colaborador.entity';
 import { compararFechasIso, esFechaCalendario } from './fecha-permiso';
 
@@ -54,6 +64,12 @@ export class PermisosColaboradorService {
       }
 
       const permisoRepo = manager.getRepository(PermisoColaborador);
+      await this.assertSinSolape(
+        manager,
+        dto.colaboradorId,
+        dto.fechaInicio,
+        dto.fechaFin,
+      );
       const permiso = permisoRepo.create({
         colaboradorId: dto.colaboradorId,
         fechaInicio: dto.fechaInicio,
@@ -170,6 +186,13 @@ export class PermisosColaboradorService {
       permiso.fechaFin = dto.fechaFin;
     }
     this.validarRango(permiso.fechaInicio, permiso.fechaFin);
+    await this.assertSinSolape(
+      this.permisoRepository.manager,
+      permiso.colaboradorId,
+      permiso.fechaInicio,
+      permiso.fechaFin,
+      permiso.id,
+    );
 
     if (dto.motivo !== undefined) {
       permiso.motivo = dto.motivo;
@@ -214,6 +237,84 @@ export class PermisosColaboradorService {
     if (compararFechasIso(fechaInicio, fechaFin) > 0) {
       throw new BadRequestException(
         'La fecha de fin no puede ser anterior a la fecha de inicio',
+      );
+    }
+    if (esFeriadoCostaRica(fechaInicio)) {
+      throw new BadRequestException(
+        'La fecha de inicio no puede ser un feriado',
+      );
+    }
+    if (esFeriadoCostaRica(fechaFin)) {
+      throw new BadRequestException('La fecha de fin no puede ser un feriado');
+    }
+    if (diasAusenciaSinFeriados(fechaInicio, fechaFin) < 1) {
+      throw new BadRequestException(
+        'El periodo no incluye días hábiles: solo hay feriados en ese rango',
+      );
+    }
+  }
+
+  private async assertSinSolape(
+    manager: EntityManager,
+    colaboradorId: number,
+    fechaInicio: string,
+    fechaFin: string,
+    excluirPermisoId?: number,
+  ): Promise<void> {
+    const permisos = await manager.getRepository(PermisoColaborador).find({
+      where: { colaboradorId },
+    });
+    if (
+      permisos.some(
+        (item) =>
+          item.id !== excluirPermisoId &&
+          rangosCalendarioSeSolapan(
+            fechaInicio,
+            fechaFin,
+            item.fechaInicio,
+            item.fechaFin,
+          ),
+      )
+    ) {
+      throw new ConflictException(
+        'Ya existe un permiso registrado en ese periodo',
+      );
+    }
+
+    const pendientes = await manager.getRepository(SolicitudAusencia).find({
+      where: {
+        colaboradorId,
+        estado: EstadoSolicitudAusencia.PENDIENTE,
+      },
+    });
+    if (
+      pendientes.some((item) =>
+        rangosCalendarioSeSolapan(
+          fechaInicio,
+          fechaFin,
+          item.fechaInicio,
+          item.fechaFin,
+        ),
+      )
+    ) {
+      throw new ConflictException(
+        'Hay una solicitud de ausencia pendiente en ese periodo',
+      );
+    }
+
+    const movimientos = await manager.getRepository(MovimientoVacaciones).find({
+      where: {
+        colaboradorId,
+        tipo: TipoMovimientoVacaciones.DISFRUTADO,
+      },
+    });
+    if (
+      movimientos.some(
+        (item) => item.fecha >= fechaInicio && item.fecha <= fechaFin,
+      )
+    ) {
+      throw new ConflictException(
+        'Ya existe un disfrute de vacaciones en ese periodo',
       );
     }
   }

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Usuario } from '../usuarios/entities/usuario.entity';
+import { SolicitudAusencia } from '../solicitudes-ausencia/entities/solicitud-ausencia.entity';
 import { ColaboradoresController } from './colaboradores.controller';
 import { ColaboradoresService } from './colaboradores.service';
 import { Colaborador } from './entities/colaborador.entity';
@@ -27,6 +28,7 @@ import { VacacionesService } from './vacaciones.service';
       Incapacidad,
       Puesto,
       Usuario,
+      SolicitudAusencia,
     ]),
   ],
   controllers: [

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -7,10 +8,14 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
+import { EstadoSolicitudAusencia } from '../../common/enums/estado-solicitud-ausencia.enum';
 import {
   TIPOS_MOVIMIENTO_VACACIONES,
   TipoMovimientoVacaciones,
 } from '../../common/enums/tipo-movimiento-vacaciones.enum';
+import { SolicitudAusencia } from '../solicitudes-ausencia/entities/solicitud-ausencia.entity';
+import { esFeriadoCostaRica } from '../solicitudes-ausencia/feriados-costa-rica';
+import { rangosCalendarioSeSolapan } from '../solicitudes-ausencia/solape-ausencia.util';
 import { CreateMovimientoVacacionesDto } from './dto/create-movimiento-vacaciones.dto';
 import {
   MOVIMIENTOS_VACACIONES_LIMIT_DEFAULT,
@@ -20,6 +25,7 @@ import {
 import { ColaboradoresService } from './colaboradores.service';
 import { Colaborador } from './entities/colaborador.entity';
 import { MovimientoVacaciones } from './entities/movimiento-vacaciones.entity';
+import { PermisoColaborador } from './entities/permiso-colaborador.entity';
 import { compararFechasIso, esFechaCalendario } from './fecha-permiso';
 import { calcularSaldoVacaciones, SaldoVacaciones } from './saldo-vacaciones';
 
@@ -107,9 +113,62 @@ export class VacacionesService {
 
       const saldo = await this.obtenerSaldo(input.colaboradorId, manager);
       if (input.tipo === TipoMovimientoVacaciones.DISFRUTADO) {
+        if (esFeriadoCostaRica(input.fecha)) {
+          throw new BadRequestException(
+            'La fecha de disfrute no puede ser un feriado',
+          );
+        }
         if (input.cantidadDias > saldo.diasDisponibles) {
           throw new BadRequestException(
             `El colaborador no tiene saldo suficiente de vacaciones: dispone de ${saldo.diasDisponibles} día(s) y se intentan disfrutar ${input.cantidadDias}`,
+          );
+        }
+        const solicitudes = await manager.getRepository(SolicitudAusencia).find({
+          where: {
+            colaboradorId: input.colaboradorId,
+            estado: EstadoSolicitudAusencia.PENDIENTE,
+          },
+        });
+        if (
+          solicitudes.some((item) =>
+            rangosCalendarioSeSolapan(
+              input.fecha,
+              input.fecha,
+              item.fechaInicio,
+              item.fechaFin,
+            ),
+          )
+        ) {
+          throw new ConflictException(
+            'Hay una solicitud de ausencia pendiente en esa fecha',
+          );
+        }
+        const permisos = await manager
+          .getRepository(PermisoColaborador)
+          .find({ where: { colaboradorId: input.colaboradorId } });
+        if (
+          permisos.some((item) =>
+            rangosCalendarioSeSolapan(
+              input.fecha,
+              input.fecha,
+              item.fechaInicio,
+              item.fechaFin,
+            ),
+          )
+        ) {
+          throw new ConflictException(
+            'Ya existe un permiso registrado en esa fecha',
+          );
+        }
+        const disfrutados = await manager.getRepository(MovimientoVacaciones).find({
+          where: {
+            colaboradorId: input.colaboradorId,
+            tipo: TipoMovimientoVacaciones.DISFRUTADO,
+          },
+        });
+        if (disfrutados.some((item) => item.fecha === input.fecha)) {
+          throw new ConflictException(
+            'Ya existe un disfrute de vacaciones en esa fecha',
           );
         }
       }

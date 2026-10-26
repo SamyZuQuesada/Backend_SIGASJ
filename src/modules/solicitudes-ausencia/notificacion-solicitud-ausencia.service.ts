@@ -38,6 +38,17 @@ export class NotificacionSolicitudAusenciaService {
   ) {}
 
   async notificarAprobacion(solicitud: SolicitudAusencia): Promise<void> {
+    await this.notificarDecision(solicitud, 'aprobada');
+  }
+
+  async notificarRechazo(solicitud: SolicitudAusencia): Promise<void> {
+    await this.notificarDecision(solicitud, 'rechazada');
+  }
+
+  private async notificarDecision(
+    solicitud: SolicitudAusencia,
+    decision: 'aprobada' | 'rechazada',
+  ): Promise<void> {
     const colaborador =
       solicitud.colaborador ??
       (await this.colaboradorRepository.findOne({
@@ -53,7 +64,7 @@ export class NotificacionSolicitudAusenciaService {
 
     if (!destino) {
       this.logger.warn(
-        `Aprobación id=${solicitud.id}: sin correo de notificación; no se envía aviso.`,
+        `${decision} id=${solicitud.id}: sin correo de notificación; no se envía aviso.`,
       );
       return;
     }
@@ -79,15 +90,17 @@ export class NotificacionSolicitudAusenciaService {
       fechaFin: solicitud.fechaFin,
       motivo: solicitud.motivo,
       urlMisSolicitudes,
+      decision,
+      comentarioRechazo: solicitud.motivoRechazo,
     };
-    const asunto = `Su solicitud de ${tipoLabel} fue aprobada — SIGASJ`;
+    const asunto = `Su solicitud de ${tipoLabel} fue ${decision} — SIGASJ`;
     const text = construirTextoAprobacionAusencia(datosCorreo);
     const html = construirHtmlAprobacionAusencia(datosCorreo);
 
     const enabled = this.configService.get<boolean>('mail.enabled') === true;
     if (!enabled) {
       this.logger.log(
-        `MAIL_ENABLED=false — notificación omitida (aprobación id=${solicitud.id} → ${destino}).`,
+        `MAIL_ENABLED=false — notificación omitida (${decision} id=${solicitud.id} → ${destino}).`,
       );
       return;
     }
@@ -100,12 +113,10 @@ export class NotificacionSolicitudAusenciaService {
         );
         return;
       }
-      const from =
-        this.configService.get<string>('mail.from') ??
-        'SIGASJ ASADA <noreply@asadasanjuan.cr>';
+      const from = this.resolverRemitente();
       const info: SentMessageInfo = await transporter.sendMail({
         from,
-        to: destino,
+        to: destinos,
         subject: asunto,
         text,
         html,
@@ -117,13 +128,13 @@ export class NotificacionSolicitudAusenciaService {
         );
       } else {
         this.logger.log(
-          `Correo de aprobación enviado: solicitud=${solicitud.id} → ${destino}`,
+          `Correo de ${decision} enviado: solicitud=${solicitud.id} → ${destino}`,
         );
       }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(
-        `No se pudo enviar correo de aprobación id=${solicitud.id}: ${message}`,
+        `No se pudo enviar correo de ${decision} id=${solicitud.id}: ${message}`,
       );
     }
   }
@@ -146,12 +157,23 @@ export class NotificacionSolicitudAusenciaService {
     const secure = this.configService.get<boolean>('mail.secure') === true;
 
     if (host && user && password) {
-      this.transporter = createTransport({
-        host,
-        port,
-        secure,
-        auth: { user, pass: password },
-      });
+      const esGmail =
+        host.toLowerCase().includes('gmail') ||
+        user.toLowerCase().endsWith('@gmail.com');
+      this.transporter = esGmail
+        ? createTransport({
+            service: 'gmail',
+            auth: { user, pass: password },
+            connectionTimeout: 12_000,
+          })
+        : createTransport({
+            host,
+            port,
+            secure,
+            requireTLS: !secure && port === 587,
+            auth: { user, pass: password },
+            connectionTimeout: 12_000,
+          });
       return this.transporter;
     }
 
@@ -177,5 +199,26 @@ export class NotificacionSolicitudAusenciaService {
     }
 
     return null;
+  }
+
+  /**
+   * Gmail rechaza un From de otro dominio (p. ej. noreply@asadasanjuan.cr).
+   */
+  private resolverRemitente(): string {
+    const from =
+      this.configService.get<string>('mail.from')?.trim() ||
+      'SIGASJ ASADA <noreply@asadasanjuan.cr>';
+    const user = this.configService.get<string>('mail.user')?.trim() ?? '';
+    if (!user) {
+      return from;
+    }
+    const fromLower = from.toLowerCase();
+    if (fromLower.includes(user.toLowerCase())) {
+      return from;
+    }
+    if (user.toLowerCase().endsWith('@gmail.com')) {
+      return `SIGASJ ASADA <${user}>`;
+    }
+    return from;
   }
 }

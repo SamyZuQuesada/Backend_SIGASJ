@@ -5,7 +5,7 @@ import {
   resumenDiasVacaciones,
   type ResumenDiasVacaciones,
 } from '../dias-periodo-ausencia';
-import { DocumentoSolicitudAusencia } from '../entities/documento-solicitud-ausencia.entity';
+import { fusionarDocumentosAusencia } from '../adjuntos-ausencia';
 import { SolicitudAusencia } from '../entities/solicitud-ausencia.entity';
 
 export class DocumentoAusenciaFontaneroResponse {
@@ -89,17 +89,6 @@ export class SolicitudAusenciaFontaneroResponse {
   updatedAt: Date;
 }
 
-const toDocumento = (
-  documento: DocumentoSolicitudAusencia,
-): DocumentoAusenciaFontaneroResponse => ({
-  id: documento.id,
-  nombreOriginal: documento.nombreOriginal,
-  tipoArchivo: documento.tipoArchivo,
-  rutaReferenciaArchivo: documento.rutaReferenciaArchivo,
-  tamanio: documento.tamanio,
-  fechaCarga: documento.fechaCarga,
-});
-
 export const toSolicitudAusenciaFontaneroResponse = (
   solicitud: SolicitudAusencia,
 ): SolicitudAusenciaFontaneroResponse => ({
@@ -113,7 +102,12 @@ export const toSolicitudAusenciaFontaneroResponse = (
   estado: solicitud.estado,
   motivoRechazo: solicitud.motivoRechazo,
   reviewedAt: solicitud.reviewedAt,
-  documentos: (solicitud.documentos ?? []).map(toDocumento),
+  documentos: fusionarDocumentosAusencia(
+    solicitud.id,
+    solicitud.documentos ?? [],
+    solicitud.adjuntosJson,
+    solicitud.createdAt ?? new Date(),
+  ),
   resumenVacaciones:
     solicitud.tipo === TipoSolicitudAusencia.VACACIONES
       ? resumenDiasVacaciones(solicitud.fechaInicio, solicitud.fechaFin)

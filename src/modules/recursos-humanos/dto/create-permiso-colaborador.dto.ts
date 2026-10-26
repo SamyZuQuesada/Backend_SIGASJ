@@ -77,7 +77,7 @@ export class CreatePermisoColaboradorDto {
   @Transform(trimString)
   @IsString({ message: 'El motivo debe ser una cadena de texto' })
   @IsNotEmpty({ message: 'El motivo es obligatorio' })
-  @MaxLength(200, { message: 'El motivo no puede exceder 200 caracteres' })
+  @MaxLength(500, { message: 'El motivo no puede exceder 500 caracteres' })
   motivo: string;
 
   @ApiPropertyOptional({

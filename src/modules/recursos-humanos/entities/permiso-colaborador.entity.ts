@@ -65,7 +65,7 @@ export class PermisoColaborador {
     example: 'Cita médica',
     description: 'Motivo del permiso',
   })
-  @Column({ type: 'varchar', length: 200 })
+  @Column({ type: 'varchar', length: 500 })
   motivo: string;
 
   @ApiPropertyOptional({

@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -35,6 +36,7 @@ import { ActividadFontanero } from './entities/actividad-fontanero.entity';
 import { DocumentoActividadFontanero } from './entities/documento-actividad-fontanero.entity';
 import { TipoActividadFontanero } from './entities/tipo-actividad-fontanero.entity';
 import { withDbRetry } from '../../common/persistence/with-db-retry';
+import { NotificacionesAveriasService } from '../notificaciones/notificaciones-averias.service';
 
 export type ActividadFontaneroResponse = {
   id: number;
@@ -150,6 +152,8 @@ type FiltroFechaActividad = {
 
 @Injectable()
 export class ActividadesFontaneroService {
+  private readonly logger = new Logger(ActividadesFontaneroService.name);
+
   constructor(
     @InjectRepository(ActividadFontanero)
     private readonly actividadRepository: Repository<ActividadFontanero>,
@@ -157,6 +161,7 @@ export class ActividadesFontaneroService {
     private readonly tipoActividadRepository: Repository<TipoActividadFontanero>,
     @InjectRepository(DocumentoActividadFontanero)
     private readonly documentoRepository: Repository<DocumentoActividadFontanero>,
+    private readonly notificacionesAveriasService: NotificacionesAveriasService,
   ) {}
 
   async listarTipos(): Promise<ListadoTiposActividadResponse> {
@@ -587,18 +592,8 @@ export class ActividadesFontaneroService {
     }
     for (const file of files) validateActividadDocument(file);
 
-    const horarioPrevio = this.horarioDesdeDatos(actividad.datosEspecificos);
     const documentosPrevios = actividad.datosEspecificos?.documentos;
     const datosEspecificos = this.extractDatosEspecificos(dto);
-    if (horarioPrevio.horaInicio) {
-      datosEspecificos.horaInicio = horarioPrevio.horaInicio;
-    }
-    if (horarioPrevio.fechaFin) {
-      datosEspecificos.fechaFin = horarioPrevio.fechaFin;
-    }
-    if (horarioPrevio.horaFin) {
-      datosEspecificos.horaFin = horarioPrevio.horaFin;
-    }
     const previos = [...(actividad.documentos ?? [])];
     const eliminarIds = new Set(dto.documentosEliminarIds ?? []);
     const aEliminar = previos.filter((documento) =>
@@ -1086,11 +1081,33 @@ export class ActividadesFontaneroService {
     return withDbRetry(async () => {
       const actividad = await this.requireActividad(id);
       actividad.estado = EstadoActividadFontanero.REQUIERE_CORRECCION;
+      actividad.estadoRevision = 'REQUIERE_CORRECCION';
       actividad.observacionCorreccion = dto.observacion;
       actividad.revisadoPorId = user.userId;
 
       const saved = await this.actividadRepository.save(actividad);
-      return this.toAdminResponse(await this.requireActividad(saved.id));
+      const detalle = await this.requireActividad(saved.id);
+      const destinatario =
+        detalle.fontanero?.idUsuario ??
+        this.parseOptionalUsuarioId(detalle.fontaneroId);
+      if (destinatario) {
+        try {
+          await this.notificacionesAveriasService.notificarFontaneroCorreccionActividad(
+            {
+              idActividad: detalle.id,
+              idUsuarioDestinatario: destinatario,
+              observacion: dto.observacion,
+            },
+          );
+        } catch (error) {
+          this.logger.warn(
+            `No se pudo notificar la corrección de la actividad ${detalle.id}: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+        }
+      }
+      return this.toAdminResponse(detalle);
     });
   }
 
@@ -1102,7 +1119,10 @@ export class ActividadesFontaneroService {
       if (!tipo) {
         throw new NotFoundException(ACTIVIDADES_MSG.tipoNotFound);
       }
-      if (!tipo.activo) {
+      if (
+        !tipo.activo ||
+        !esTipoActividadOfrecidoEnRegistro(tipo.codigo)
+      ) {
         throw new BadRequestException(ACTIVIDADES_MSG.tipoInactivo);
       }
       return tipo;

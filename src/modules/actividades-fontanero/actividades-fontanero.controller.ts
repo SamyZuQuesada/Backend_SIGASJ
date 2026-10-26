@@ -112,7 +112,7 @@ export class ActividadesFontaneroController {
   @ApiOperation({
     summary: 'Consultar historial propio (Fontanero)',
     description:
-      'Actividades APROBADA, RECHAZADA o CORREGIDA del fontanero autenticado. ' +
+      'Actividades del fontanero autenticado que no están en borrador. ' +
       'Filtro de periodo inclusivo sobre fechaActividad. Paginación en servidor.',
   })
   @ApiQuery({ name: 'fechaInicio', required: false, example: '2026-09-01' })
@@ -397,7 +397,10 @@ export class ActividadesFontaneroController {
     return this.actividadesFontaneroService.revisar(id, dto, user);
   }
 
-  @Patch('admin/actividades/:id/solicitar-correccion')
+  @Patch([
+    'admin/actividades/:id/solicitar-correccion',
+    'admin/actividades-fontanero/:id/solicitar-correccion',
+  ])
   @HttpCode(HttpStatus.OK)
   @Roles(Role.ADMINISTRADORA)
   @ApiOperation({

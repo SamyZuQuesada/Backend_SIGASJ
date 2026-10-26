@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import { EstadoSolicitudAusencia } from '../../common/enums/estado-solicitud-ausencia.enum';
 import { TipoMovimientoVacaciones } from '../../common/enums/tipo-movimiento-vacaciones.enum';
 import { TipoRegistroGeneradoAusencia } from '../../common/enums/tipo-registro-generado-ausencia.enum';
@@ -17,6 +17,8 @@ import { TipoSolicitudAusencia } from '../../common/enums/tipo-solicitud-ausenci
 import { NotificacionesAveriasService } from '../notificaciones/notificaciones-averias.service';
 import { ColaboradoresService } from '../recursos-humanos/colaboradores.service';
 import { Colaborador } from '../recursos-humanos/entities/colaborador.entity';
+import { MovimientoVacaciones } from '../recursos-humanos/entities/movimiento-vacaciones.entity';
+import { PermisoColaborador } from '../recursos-humanos/entities/permiso-colaborador.entity';
 import {
   compararFechasIso,
   esFechaCalendario,
@@ -34,9 +36,10 @@ import {
   validateActividadDocument,
 } from '../../common/media/public-media';
 import {
-  persistirAdjuntosSolicitudAusencia,
+  fusionarDocumentosAusencia,
   type AdjuntoSolicitudAusencia,
 } from './adjuntos-ausencia';
+import { rangosCalendarioSeSolapan } from './solape-ausencia.util';
 import {
   diasVacacionesNetos,
   resumenDiasVacaciones,
@@ -230,13 +233,23 @@ export class SolicitudesAusenciaService {
     mimeType: string;
     documento: DocumentoSolicitudAusencia;
   }> {
-    const docs = await this.documentoRepository.find({
-      where: { solicitudId },
-      relations: { solicitud: true },
+    const solicitud = await this.solicitudRepository.findOne({
+      where: { id: solicitudId },
+      relations: { documentos: true },
     });
-    const match =
-      docs.find((d) => d.rutaReferenciaArchivo.endsWith(`/${filename}`)) ??
-      null;
+    if (!solicitud) {
+      throw new NotFoundException('Documento de evidencia no encontrado');
+    }
+
+    const visibles = fusionarDocumentosAusencia(
+      solicitudId,
+      solicitud.documentos ?? [],
+      solicitud.adjuntosJson,
+      solicitud.createdAt,
+    );
+    const match = visibles.find((d) =>
+      d.rutaReferenciaArchivo.endsWith(`/${filename}`),
+    );
     if (!match) {
       throw new NotFoundException('Documento de evidencia no encontrado');
     }
@@ -248,7 +261,7 @@ export class SolicitudesAusenciaService {
       const colaborador = await this.obtenerColaboradorDelUsuarioAutenticado(
         opts.usuarioId,
       );
-      if (match.solicitud.colaboradorId !== colaborador.id) {
+      if (solicitud.colaboradorId !== colaborador.id) {
         throw new NotFoundException('Documento de evidencia no encontrado');
       }
     }
@@ -257,7 +270,13 @@ export class SolicitudesAusenciaService {
       solicitudId,
       filename,
     );
-    return { absolutePath, mimeType, documento: match };
+    return {
+      absolutePath,
+      mimeType,
+      documento: {
+        nombreOriginal: match.nombreOriginal,
+      } as DocumentoSolicitudAusencia,
+    };
   }
 
   /**
@@ -299,12 +318,33 @@ export class SolicitudesAusenciaService {
       );
 
     if (creada && archivos.length > 0) {
-      const adjuntos = persistirAdjuntosSolicitudAusencia(
-        solicitud.id,
-        archivos,
-      );
-      solicitud.adjuntosJson = JSON.stringify(adjuntos);
-      await this.solicitudRepository.save(solicitud);
+      const guardados: DocumentoSolicitudAusencia[] = [];
+      for (const file of archivos) {
+        const { rutaReferenciaArchivo } = saveAusenciaDocument(
+          solicitud.id,
+          file,
+        );
+        try {
+          const documento = await this.documentoRepository.save(
+            this.documentoRepository.create({
+              solicitudId: solicitud.id,
+              nombreOriginal: file.originalname,
+              tipoArchivo: file.mimetype,
+              rutaReferenciaArchivo,
+              tamanio: file.size,
+            }),
+          );
+          guardados.push(documento);
+        } catch (error) {
+          try {
+            deleteAusenciaDocument(solicitud.id, rutaReferenciaArchivo);
+          } catch {
+            // Se conserva el error original de persistencia.
+          }
+          throw error;
+        }
+      }
+      solicitud.documentos = guardados;
     }
 
     if (creada) {
@@ -363,6 +403,13 @@ export class SolicitudesAusenciaService {
     manager: EntityManager;
   }): Promise<{ solicitud: SolicitudAusencia; creada: boolean }> {
     this.validarFechas(input.fechaInicio, input.fechaFin);
+    await this.assertPeriodoLibre(
+      input.manager,
+      input.colaboradorId,
+      input.tipo,
+      input.fechaInicio,
+      input.fechaFin,
+    );
 
     const repo = input.manager.getRepository(SolicitudAusencia);
     const existente = await repo.findOne({
@@ -474,6 +521,12 @@ export class SolicitudesAusenciaService {
     if (!solicitud) {
       throw new NotFoundException(`No existe la solicitud de ausencia ${id}`);
     }
+    solicitud.documentos = fusionarDocumentosAusencia(
+      solicitud.id,
+      solicitud.documentos ?? [],
+      solicitud.adjuntosJson,
+      solicitud.createdAt,
+    ) as DocumentoSolicitudAusencia[];
     return solicitud;
   }
 
@@ -508,6 +561,14 @@ export class SolicitudesAusenciaService {
         }
 
         this.validarFechas(solicitud.fechaInicio, solicitud.fechaFin);
+        await this.assertPeriodoLibre(
+          manager,
+          solicitud.colaboradorId,
+          solicitud.tipo,
+          solicitud.fechaInicio,
+          solicitud.fechaFin,
+          solicitud.id,
+        );
 
         // Claim atómico: solo una aprobación gana el UPDATE (anti-concurrencia).
         const claim = await repo
@@ -567,7 +628,7 @@ export class SolicitudesAusenciaService {
               fecha: solicitud.fechaInicio,
               observaciones:
                 solicitud.motivo?.trim() ||
-                `Disfrute por SolicitudAusencia #${solicitud.id}`,
+                `Disfrute ${solicitud.fechaInicio} – ${solicitud.fechaFin} por SolicitudAusencia #${solicitud.id}`,
               registradoPorUsuarioId: reviewedByUsuarioId,
             },
             manager,
@@ -596,16 +657,19 @@ export class SolicitudesAusenciaService {
     );
 
     // Fuera de la transacción: un fallo de correo no revierte la aprobación.
-    void this.notificacionSolicitudAusencia
-      .notificarAprobacion(actualizada)
-      .catch((error: unknown) => {
-        const message = error instanceof Error ? error.message : String(error);
-        this.logger.warn(
-          `Notificación de aprobación omitida id=${id}: ${message}`,
-        );
-      });
+    try {
+      await this.notificacionSolicitudAusencia.notificarAprobacion(
+        actualizada,
+      );
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `Notificación de aprobación omitida id=${id}: ${message}`,
+      );
+    }
+    await this.avisarFontaneroDecision(actualizada, 'aprobada');
 
-    return actualizada;
+    return this.findOne(id);
   }
 
   async rechazar(
@@ -613,7 +677,7 @@ export class SolicitudesAusenciaService {
     reviewedByUsuarioId: number,
     dto: RechazarSolicitudAusenciaDto = {},
   ): Promise<SolicitudAusencia> {
-    return this.solicitudRepository.manager.transaction(async (manager) => {
+    await this.solicitudRepository.manager.transaction(async (manager) => {
       const repo = manager.getRepository(SolicitudAusencia);
       const claim = await repo
         .createQueryBuilder()
@@ -645,15 +709,105 @@ export class SolicitudesAusenciaService {
       }
 
       this.logger.log(`SolicitudAusencia RECHAZADA id=${id}`);
-      const actualizada = await repo.findOne({
-        where: { id },
-        relations: { colaborador: true },
-      });
-      if (!actualizada) {
-        throw new NotFoundException(`No existe la solicitud de ausencia ${id}`);
-      }
-      return actualizada;
     });
+    const rechazada = await this.findOne(id);
+    try {
+      await this.notificacionSolicitudAusencia.notificarRechazo(rechazada);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `Notificación de rechazo omitida id=${id}: ${message}`,
+      );
+    }
+    await this.avisarFontaneroDecision(rechazada, 'rechazada');
+    return rechazada;
+  }
+
+  private async avisarFontaneroDecision(
+    solicitud: SolicitudAusencia,
+    decision: 'aprobada' | 'rechazada',
+  ): Promise<void> {
+    if (!this.notificacionesCampana) {
+      return;
+    }
+    try {
+      await this.notificacionesCampana.notificarFontaneroSolicitudAusencia(
+        solicitud,
+        decision,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `No se pudo notificar al Fontanero la solicitud ${solicitud.id}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  private async assertPeriodoLibre(
+    manager: EntityManager,
+    colaboradorId: number,
+    _tipo: TipoSolicitudAusencia,
+    fechaInicio: string,
+    fechaFin: string,
+    excluirSolicitudId?: number,
+  ): Promise<void> {
+    const solicitudes = await manager.getRepository(SolicitudAusencia).find({
+      where: {
+        colaboradorId,
+        estado: In([
+          EstadoSolicitudAusencia.PENDIENTE,
+          EstadoSolicitudAusencia.APROBADA,
+        ]),
+      },
+    });
+    const choqueSolicitud = solicitudes.find(
+      (item) =>
+        item.id !== excluirSolicitudId &&
+        rangosCalendarioSeSolapan(
+          fechaInicio,
+          fechaFin,
+          item.fechaInicio,
+          item.fechaFin,
+        ),
+    );
+    if (choqueSolicitud) {
+      throw new ConflictException(
+        'Ya existe una solicitud de ausencia en ese periodo para este colaborador',
+      );
+    }
+
+    const permisos = await manager.getRepository(PermisoColaborador).find({
+      where: { colaboradorId },
+    });
+    const choquePermiso = permisos.find((item) =>
+      rangosCalendarioSeSolapan(
+        fechaInicio,
+        fechaFin,
+        item.fechaInicio,
+        item.fechaFin,
+      ),
+    );
+    if (choquePermiso) {
+      throw new ConflictException(
+        'Ya existe un permiso registrado en ese periodo',
+      );
+    }
+
+    const movimientos = await manager.getRepository(MovimientoVacaciones).find({
+      where: {
+        colaboradorId,
+        tipo: TipoMovimientoVacaciones.DISFRUTADO,
+      },
+    });
+    const choqueMovimiento = movimientos.find(
+      (item) => item.fecha >= fechaInicio && item.fecha <= fechaFin,
+    );
+    if (choqueMovimiento) {
+      throw new ConflictException(
+        'Ya existe un disfrute de vacaciones en ese periodo',
+      );
+    }
   }
 
   private validarFechas(fechaInicio: string, fechaFin: string): void {

@@ -28,6 +28,7 @@ export type NotificacionAveriaItem = {
   idSolicitudMateriales: number | null;
   idSalidaInventario: number | null;
   idReposicion: number | null;
+  idActividad: number | null;
   tipo: TipoNotificacionAveria;
   titulo: string;
   mensaje: string;
@@ -52,6 +53,7 @@ const toItem = (row: NotificacionAveria): NotificacionAveriaItem => ({
   idSolicitudMateriales: row.idSolicitudMateriales ?? null,
   idSalidaInventario: row.idSalidaInventario ?? null,
   idReposicion: row.idReposicion ?? null,
+  idActividad: row.idActividad ?? null,
   tipo: row.tipo,
   titulo: row.titulo,
   mensaje: row.mensaje,
@@ -76,6 +78,7 @@ export type RegistrarNotificacionInput = {
   idSolicitudMateriales?: number | null;
   idSalidaInventario?: number | null;
   idReposicion?: number | null;
+  idActividad?: number | null;
   tipo: TipoNotificacionAveria;
   titulo: string;
   mensaje: string;
@@ -119,6 +122,10 @@ export class NotificacionesAveriasService {
       input.idReposicion != null && Number.isInteger(input.idReposicion)
         ? input.idReposicion
         : null;
+    const idActividad =
+      input.idActividad != null && Number.isInteger(input.idActividad)
+        ? input.idActividad
+        : null;
 
     const refs = [
       idAveria,
@@ -126,6 +133,7 @@ export class NotificacionesAveriasService {
       idSolicitudMateriales,
       idSalidaInventario,
       idReposicion,
+      idActividad,
     ].filter((r) => r != null);
 
     if (refs.length !== 1) {
@@ -158,6 +166,7 @@ export class NotificacionesAveriasService {
     if (idSalidaInventario != null)
       where.idSalidaInventario = idSalidaInventario;
     if (idReposicion != null) where.idReposicion = idReposicion;
+    if (idActividad != null) where.idActividad = idActividad;
 
     const notifRepo =
       manager && typeof manager.getRepository === 'function'
@@ -176,6 +185,7 @@ export class NotificacionesAveriasService {
       idSolicitudMateriales,
       idSalidaInventario,
       idReposicion,
+      idActividad,
     };
 
     try {
@@ -212,6 +222,7 @@ export class NotificacionesAveriasService {
       idSolicitudMateriales: input.idSolicitudMateriales ?? null,
       idSalidaInventario: input.idSalidaInventario ?? null,
       idReposicion: input.idReposicion ?? null,
+      idActividad: input.idActividad ?? null,
       tipo: input.tipo,
       titulo: input.titulo,
       mensaje: input.mensaje,
@@ -357,6 +368,60 @@ export class NotificacionesAveriasService {
         mensaje,
       });
     }
+  }
+
+  async notificarFontaneroSolicitudAusencia(
+    solicitud: SolicitudAusencia,
+    decision: 'aprobada' | 'rechazada',
+  ): Promise<void> {
+    let usuarioId = solicitud.colaborador?.usuarioId ?? null;
+    if (!usuarioId) {
+      const colaborador = await this.usuarioRepository.manager
+        .getRepository(SolicitudAusencia)
+        .findOne({
+          where: { id: solicitud.id },
+          relations: { colaborador: true },
+        });
+      usuarioId = colaborador?.colaborador?.usuarioId ?? null;
+    }
+    if (!usuarioId) {
+      return;
+    }
+    const tipoEtiqueta =
+      solicitud.tipo === TipoSolicitudAusencia.VACACIONES
+        ? 'vacaciones'
+        : 'permiso';
+    const aprobada = decision === 'aprobada';
+    await this.registrarSiNoExiste({
+      idUsuarioDestinatario: usuarioId,
+      idSolicitudAusencia: solicitud.id,
+      tipo: aprobada
+        ? TipoNotificacionAveria.SOLICITUD_AUSENCIA_APROBADA_FONTANERO
+        : TipoNotificacionAveria.SOLICITUD_AUSENCIA_RECHAZADA_FONTANERO,
+      titulo: aprobada
+        ? `Solicitud de ${tipoEtiqueta} aprobada`
+        : `Solicitud de ${tipoEtiqueta} rechazada`,
+      mensaje: aprobada
+        ? `Su solicitud de ${tipoEtiqueta} (${solicitud.fechaInicio} – ${solicitud.fechaFin}) fue aprobada.`
+        : `Su solicitud de ${tipoEtiqueta} (${solicitud.fechaInicio} – ${solicitud.fechaFin}) fue rechazada.`,
+    });
+  }
+
+  async notificarFontaneroCorreccionActividad(input: {
+    idActividad: number;
+    idUsuarioDestinatario: number;
+    observacion: string;
+  }): Promise<void> {
+    const recorte = input.observacion.trim().slice(0, 280);
+    await this.registrarSiNoExiste({
+      idUsuarioDestinatario: input.idUsuarioDestinatario,
+      idActividad: input.idActividad,
+      tipo: TipoNotificacionAveria.ACTIVIDAD_REQUIERE_CORRECCION_FONTANERO,
+      titulo: 'Debe corregir una actividad',
+      mensaje: recorte
+        ? `La administradora pidió correcciones: ${recorte}`
+        : 'La administradora pidió correcciones en una actividad.',
+    });
   }
 
   async notificarAdministradorasSolicitudMaterialesPendiente(

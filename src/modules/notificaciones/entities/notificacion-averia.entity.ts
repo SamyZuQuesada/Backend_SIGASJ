@@ -37,6 +37,11 @@ import { Usuario } from '../../usuarios/entities/usuario.entity';
   ['idUsuarioDestinatario', 'idReposicion', 'tipo'],
   { unique: true, where: '"idReposicion" IS NOT NULL' },
 )
+@Index(
+  'UQ_NotificacionAveria_destinatario_actividad_tipo',
+  ['idUsuarioDestinatario', 'idActividad', 'tipo'],
+  { unique: true, where: '"idActividad" IS NOT NULL' },
+)
 @Index('IX_NotificacionAveria_destinatario_leida_fecha', [
   'idUsuarioDestinatario',
   'leida',
@@ -90,6 +95,11 @@ export class NotificacionAveria {
   @Index('IX_NotificacionAveria_idReposicion')
   @Column({ type: 'int', nullable: true })
   idReposicion: number | null;
+
+  /** FK a ActividadFontanero (migración). Sin @ManyToOne para no acoplar el grafo. */
+  @Index('IX_NotificacionAveria_idActividad')
+  @Column({ type: 'int', nullable: true })
+  idActividad: number | null;
 
   @Column({ type: 'varchar', length: 80 })
   tipo: TipoNotificacionAveria;

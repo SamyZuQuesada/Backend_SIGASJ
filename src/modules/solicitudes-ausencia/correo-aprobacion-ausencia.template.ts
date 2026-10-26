@@ -6,6 +6,8 @@ export type CorreoAprobacionAusenciaDatos = {
   fechaFin: string;
   motivo: string | null;
   urlMisSolicitudes?: string | null;
+  decision?: 'aprobada' | 'rechazada';
+  comentarioRechazo?: string | null;
 };
 
 const escapeHtml = (value: string): string =>
@@ -28,12 +30,16 @@ export const construirTextoAprobacionAusencia = (
 ): string => {
   const saludo = datos.nombre ? `Hola ${datos.nombre},` : 'Hola,';
   const periodo = `${formatearFechaCorreo(datos.fechaInicio)} — ${formatearFechaCorreo(datos.fechaFin)}`;
+  const decision = datos.decision === 'rechazada' ? 'rechazada' : 'aprobada';
   const lineas = [
     saludo,
     '',
-    `Su solicitud de ${datos.tipoLabel} (#${datos.solicitudId}) fue aprobada.`,
+    `Su solicitud de ${datos.tipoLabel} (#${datos.solicitudId}) fue ${decision}.`,
     `Periodo: ${periodo}.`,
     datos.motivo?.trim() ? `Motivo: ${datos.motivo.trim()}.` : null,
+    decision === 'rechazada' && datos.comentarioRechazo?.trim()
+      ? `Comentario: ${datos.comentarioRechazo.trim()}.`
+      : null,
     '',
     datos.urlMisSolicitudes
       ? `Consúltela aquí: ${datos.urlMisSolicitudes}`
@@ -57,6 +63,10 @@ export const construirHtmlAprobacionAusencia = (
     `${formatearFechaCorreo(datos.fechaInicio)} — ${formatearFechaCorreo(datos.fechaFin)}`,
   );
   const motivo = datos.motivo?.trim() ? escapeHtml(datos.motivo.trim()) : null;
+  const rechazada = datos.decision === 'rechazada';
+  const comentario = datos.comentarioRechazo?.trim()
+    ? escapeHtml(datos.comentarioRechazo.trim())
+    : null;
   const url = datos.urlMisSolicitudes?.trim() || '';
   const cta = url
     ? `<a href="${escapeHtml(url)}" style="display:inline-block;background:#1d6fd8;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:14px 28px;border-radius:10px;">Ver mis solicitudes</a>`
@@ -67,7 +77,7 @@ export const construirHtmlAprobacionAusencia = (
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Solicitud aprobada — SIGASJ</title>
+  <title>Solicitud ${rechazada ? 'rechazada' : 'aprobada'} — SIGASJ</title>
 </head>
 <body style="margin:0;padding:0;background:#eef4fb;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1e293b;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef4fb;padding:28px 12px;">
@@ -83,9 +93,9 @@ export const construirHtmlAprobacionAusencia = (
           </tr>
           <tr>
             <td style="padding:28px 28px 8px;">
-              <span style="display:inline-block;background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;border-radius:999px;padding:6px 14px;font-size:12px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;">Aprobada</span>
-              <h2 style="margin:16px 0 8px;font-size:22px;line-height:1.3;color:#062e63;font-weight:800;">Su solicitud de ${tipo} fue aprobada</h2>
-              <p style="margin:0 0 20px;font-size:16px;line-height:1.55;color:#334155;">Hola ${nombre}, le confirmamos que su solicitud <strong style="color:#062e63;">#${datos.solicitudId}</strong> ya fue revisada y aprobada por la Administración.</p>
+              <span style="display:inline-block;background:${rechazada ? '#fff1f2' : '#ecfdf5'};color:${rechazada ? '#be123c' : '#047857'};border:1px solid ${rechazada ? '#fecdd3' : '#a7f3d0'};border-radius:999px;padding:6px 14px;font-size:12px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;">${rechazada ? 'Rechazada' : 'Aprobada'}</span>
+              <h2 style="margin:16px 0 8px;font-size:22px;line-height:1.3;color:#062e63;font-weight:800;">Su solicitud de ${tipo} fue ${rechazada ? 'rechazada' : 'aprobada'}</h2>
+              <p style="margin:0 0 20px;font-size:16px;line-height:1.55;color:#334155;">Hola ${nombre}, le confirmamos que su solicitud <strong style="color:#062e63;">#${datos.solicitudId}</strong> ya fue revisada y ${rechazada ? 'rechazada' : 'aprobada'} por la Administración.${comentario ? ` Comentario: ${comentario}.` : ''}</p>
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fbff;border:1px solid #e2eef9;border-radius:14px;">
                 <tr>
                   <td style="padding:16px 18px;border-bottom:1px solid #e2eef9;">
