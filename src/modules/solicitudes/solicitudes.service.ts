@@ -1002,7 +1002,9 @@ export class SolicitudesService {
         solicitudId: solicitud.id,
         evento: 'CAMBIO_ESTADO',
         tipoEvento: 'ESTADO',
-        descripcion: observacionPublica,
+        descripcion:
+          observacionPublica ??
+          `Cambio de estado: ${estadoAnterior} → ${dto.estadoNuevo}`,
         estadoAnterior,
         estadoNuevo: dto.estadoNuevo,
         observacionPublica,
