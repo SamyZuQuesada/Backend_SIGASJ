@@ -39,9 +39,11 @@ import { TiposSolicitudService } from './tipos-solicitud.service';
     ]),
   ],
   controllers: [
-    SolicitudesController,
-    TiposSolicitudController,
+    // Rutas estáticas (formularios-oficiales) antes de SolicitudesController (:id),
+    // si no Nest trata "formularios-oficiales" como id y ParseIntPipe responde 400.
     FormulariosOficialesController,
+    TiposSolicitudController,
+    SolicitudesController,
   ],
   providers: [
     SolicitudesService,
