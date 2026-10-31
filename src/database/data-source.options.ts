@@ -1,27 +1,16 @@
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import type { DataSourceOptions } from 'typeorm';
+import {
+  assertProductionDatabaseEnv,
+  buildMssqlExtra,
+  parseDbPort,
+  resolveMssqlDriverOptions,
+} from '../config/mssql-connection';
 
 const nodeRequire = createRequire(__filename);
 
-const mssqlPool = {
-  max: 10,
-  min: 0,
-  idleTimeoutMillis: 30_000,
-  acquireTimeoutMillis: 30_000,
-};
-
-const mssqlOptions = {
-  encrypt: false,
-  trustServerCertificate: true,
-  enableArithAbort: true,
-  connectTimeout: 30_000,
-  requestTimeout: 30_000,
-  enableKeepAlive: true,
-  keepAliveInitialDelay: 10_000,
-};
-
-const tryLoadMssqlNativeDriver = (): unknown | undefined => {
+const tryLoadMssqlNativeDriver = (): unknown => {
   try {
     return nodeRequire('mssql/msnodesqlv8');
   } catch {
@@ -29,21 +18,29 @@ const tryLoadMssqlNativeDriver = (): unknown | undefined => {
   }
 };
 
-export function buildMigrationDataSourceOptions(): DataSourceOptions {
+/**
+ * Misma fuente de variables que Nest (`database` config).
+ * CLI / migraciones / probe deben usar esto — no hardcodear localhost productivo.
+ */
+export function buildMigrationDataSourceOptions(
+  env: NodeJS.ProcessEnv = process.env,
+): DataSourceOptions {
+  assertProductionDatabaseEnv(env);
+
   const dbType =
-    (process.env.DB_TYPE as 'postgres' | 'mysql' | 'mariadb' | 'mssql') ||
-    'mssql';
+    (env.DB_TYPE as 'postgres' | 'mysql' | 'mariadb' | 'mssql') || 'mssql';
   const defaultPort =
     dbType === 'mssql' ? 1433 : dbType === 'mysql' ? 3306 : 5432;
-  const host = process.env.DB_HOST || 'localhost';
-  const port = parseInt(process.env.DB_PORT || String(defaultPort), 10);
+  const host = env.DB_HOST || 'localhost';
+  const port = parseDbPort(env.DB_PORT, defaultPort);
   const database =
-    process.env.NODE_ENV === 'test' && process.env.DB_DATABASE_TEST
-      ? process.env.DB_DATABASE_TEST
-      : process.env.DB_DATABASE || 'sigasj_db';
-  const trustedConnection = process.env.DB_TRUSTED_CONNECTION === 'true';
+    env.NODE_ENV === 'test' && env.DB_DATABASE_TEST
+      ? env.DB_DATABASE_TEST
+      : env.DB_DATABASE || 'sigasj_db';
+  const trustedConnection = env.DB_TRUSTED_CONNECTION === 'true';
   const isLocalDb =
     dbType === 'mssql' && host.toLowerCase().includes('localdb');
+  const mssqlOptions = resolveMssqlDriverOptions(env);
 
   const base: DataSourceOptions = {
     type: dbType,
@@ -52,11 +49,10 @@ export function buildMigrationDataSourceOptions(): DataSourceOptions {
     database,
     entities: [join(__dirname, '..', '**', '*.entity{.ts,.js}')],
     migrations: [join(__dirname, 'migrations', '*.{ts,js}')],
-    // Mismas fechas de auditoría que el API (UTC real escrito desde la aplicación).
     subscribers: [join(__dirname, 'subscribers', '*.subscriber.{ts,js}')],
     migrationsTableName: 'typeorm_migrations',
     synchronize: false,
-    logging: process.env.NODE_ENV === 'development',
+    logging: env.NODE_ENV === 'development',
   };
 
   if (dbType === 'mssql' && (trustedConnection || isLocalDb)) {
@@ -74,27 +70,23 @@ export function buildMigrationDataSourceOptions(): DataSourceOptions {
       type: 'mssql',
       driver,
       extra: {
-        connectionString: `Driver={ODBC Driver 17 for SQL Server};Server=${server};Database=${database};Trusted_Connection=yes;TrustServerCertificate=yes;Connection Timeout=30;Pooling=yes;Max Pool Size=10;Min Pool Size=1;`,
-        pool: mssqlPool,
-        options: mssqlOptions,
-        connectionTimeout: 30_000,
-        requestTimeout: 30_000,
+        connectionString: `Driver={ODBC Driver 17 for SQL Server};Server=${server};Database=${database};Trusted_Connection=yes;TrustServerCertificate=yes;Connection Timeout=30;Pooling=yes;Max Pool Size=10;Min Pool Size=0;`,
+        ...buildMssqlExtra(mssqlOptions),
       },
+      options: mssqlOptions,
     } as DataSourceOptions;
   }
 
+  const username =
+    env.DB_USERNAME || (dbType === 'mssql' ? undefined : 'postgres');
+  const password =
+    env.DB_PASSWORD || (dbType === 'mssql' ? undefined : 'postgres');
+
   return {
     ...base,
-    username: process.env.DB_USERNAME || 'postgres',
-    password: process.env.DB_PASSWORD || 'postgres',
-    extra:
-      dbType === 'mssql'
-        ? {
-            pool: mssqlPool,
-            connectionTimeout: 30_000,
-            requestTimeout: 30_000,
-          }
-        : undefined,
+    username,
+    password,
+    extra: dbType === 'mssql' ? buildMssqlExtra(mssqlOptions) : undefined,
     options: dbType === 'mssql' ? mssqlOptions : undefined,
   } as DataSourceOptions;
 }

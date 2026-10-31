@@ -31,5 +31,22 @@ services:
         sync: false
       - key: DB_DATABASE
         sync: false
+      # TLS SQL Server (Railway). Valores en Dashboard; no versionar secretos/CA privadas.
+      - key: DB_ENCRYPT
+        value: "true"
+      - key: DB_TRUST_SERVER_CERTIFICATE
+        value: "false"
+      - key: DB_SSL_CA
+        sync: false
+      - key: DB_SSL_CA_PATH
+        sync: false
       - key: JWT_SECRET
+        sync: false
+      - key: JWT_EXPIRES_IN
+        value: 24h
+      - key: FRONTEND_URL
+        sync: false
+      - key: FRONTEND_BASE_URL
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
         sync: false

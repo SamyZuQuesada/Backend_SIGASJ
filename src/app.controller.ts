@@ -9,23 +9,27 @@ export class AppController {
 
   @Get()
   @ApiOperation({
-    summary: 'Estado de la API',
+    summary: 'Estado de la API (liveness)',
     description:
-      'Confirma que el backend de SIGASJ está en ejecución. No requiere autenticación.',
+      'Confirma que el proceso NestJS responde. Público, sin JWT. No comprueba SQL Server.',
   })
   @ApiResponse({
     status: 200,
-    description: 'El servicio responde correctamente',
+    description: 'Proceso disponible',
   })
   getHealth(): ApiHealthStatus {
     return this.appService.getHealth();
   }
 
   @Get('health')
-  @ApiOperation({ summary: 'Chequeo de salud (alias)' })
+  @ApiOperation({
+    summary: 'Health Check (Render)',
+    description:
+      'Ruta oficial de liveness. Prefijo global → GET /api/v1/health. Sin autenticación.',
+  })
   @ApiResponse({
     status: 200,
-    description: 'El servicio responde correctamente',
+    description: 'Proceso disponible',
   })
   getHealthAlias(): ApiHealthStatus {
     return this.appService.getHealth();

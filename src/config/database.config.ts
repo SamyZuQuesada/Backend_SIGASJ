@@ -3,30 +3,17 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { registerAs } from '@nestjs/config';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
+import {
+  TYPEORM_RETRY,
+  assertProductionDatabaseEnv,
+  buildMssqlExtra,
+  parseDbPort,
+  resolveMssqlDriverOptions,
+} from './mssql-connection';
 
 const nodeRequire = createRequire(__filename);
 
-const mssqlPool = {
-  max: 10,
-  min: 2,
-  idleTimeoutMillis: 60_000,
-  acquireTimeoutMillis: 30_000,
-};
-
-const mssqlOptions = {
-  encrypt: false,
-  trustServerCertificate: true,
-  enableArithAbort: true,
-  connectTimeout: 30_000,
-  requestTimeout: 30_000,
-  enableKeepAlive: true,
-  keepAliveInitialDelay: 10_000,
-  // El datetime de SQL Server se guardó en UTC. Sin esto, el driver lo lee
-  // como hora local y la pantalla muestra seis horas de más.
-  useUTC: true,
-};
-
-const tryLoadMssqlNativeDriver = (): unknown | undefined => {
+const tryLoadMssqlNativeDriver = (): unknown => {
   try {
     return nodeRequire('mssql/msnodesqlv8');
   } catch {
@@ -65,9 +52,11 @@ const sqlJsFallback = (
 };
 
 export default registerAs('database', (): TypeOrmModuleOptions => {
+  assertProductionDatabaseEnv();
+
   const dbType =
     (process.env.DB_TYPE as 'postgres' | 'mysql' | 'mariadb' | 'mssql') ||
-    'postgres';
+    'mssql';
   const defaultPort =
     dbType === 'mssql' ? 1433 : dbType === 'mysql' ? 3306 : 5432;
   const host = process.env.DB_HOST || 'localhost';
@@ -75,21 +64,21 @@ export default registerAs('database', (): TypeOrmModuleOptions => {
   const trustedConnection = process.env.DB_TRUSTED_CONNECTION === 'true';
   const isLocalDb =
     dbType === 'mssql' && host.toLowerCase().includes('localdb');
+  const mssqlOptions = resolveMssqlDriverOptions();
 
   const base: TypeOrmModuleOptions = {
     type: dbType,
     host,
     database,
     entities: [__dirname + '/../**/*.entity{.ts,.js}'],
-    // El esquema se aplica con `npm run migration:run`, no con synchronize.
+    // Producción y resto: esquema solo con `npm run migration:run`.
     synchronize: false,
     migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
     migrationsRun: false,
-    // Fechas de auditoría desde la app en UTC real (ver el suscriptor).
     subscribers: [__dirname + '/../database/subscribers/*.subscriber{.ts,.js}'],
     logging: process.env.NODE_ENV === 'development',
-    retryAttempts: 8,
-    retryDelay: 2000,
+    retryAttempts: TYPEORM_RETRY.retryAttempts,
+    retryDelay: TYPEORM_RETRY.retryDelay,
   };
 
   if (isLocalDb) {
@@ -102,11 +91,8 @@ export default registerAs('database', (): TypeOrmModuleOptions => {
       ...base,
       driver,
       extra: {
-        connectionString: `Driver={ODBC Driver 17 for SQL Server};Server=${host};Database=${database};Trusted_Connection=yes;TrustServerCertificate=yes;Connection Timeout=30;Pooling=yes;Max Pool Size=10;Min Pool Size=1;`,
-        pool: mssqlPool,
-        options: mssqlOptions,
-        connectionTimeout: 30_000,
-        requestTimeout: 30_000,
+        connectionString: `Driver={ODBC Driver 17 for SQL Server};Server=${host};Database=${database};Trusted_Connection=yes;TrustServerCertificate=yes;Connection Timeout=30;Pooling=yes;Max Pool Size=10;Min Pool Size=0;`,
+        ...buildMssqlExtra(mssqlOptions),
       },
       options: mssqlOptions,
     };
@@ -118,35 +104,31 @@ export default registerAs('database', (): TypeOrmModuleOptions => {
       return sqlJsFallback(base.entities, base.logging);
     }
 
-    const port = parseInt(process.env.DB_PORT || String(defaultPort), 10);
+    const port = parseDbPort(process.env.DB_PORT, defaultPort);
 
     return {
       ...base,
       driver,
+      port,
       extra: {
-        connectionString: `Driver={ODBC Driver 17 for SQL Server};Server=${host},${port};Database=${database};Trusted_Connection=yes;TrustServerCertificate=yes;Connection Timeout=30;Pooling=yes;Max Pool Size=10;Min Pool Size=1;`,
-        pool: mssqlPool,
-        options: mssqlOptions,
-        connectionTimeout: 30_000,
-        requestTimeout: 30_000,
+        connectionString: `Driver={ODBC Driver 17 for SQL Server};Server=${host},${port};Database=${database};Trusted_Connection=yes;TrustServerCertificate=yes;Connection Timeout=30;Pooling=yes;Max Pool Size=10;Min Pool Size=0;`,
+        ...buildMssqlExtra(mssqlOptions),
       },
       options: mssqlOptions,
     };
   }
 
+  const username =
+    process.env.DB_USERNAME || (dbType === 'mssql' ? undefined : 'postgres');
+  const password =
+    process.env.DB_PASSWORD || (dbType === 'mssql' ? undefined : 'postgres');
+
   return {
     ...base,
-    port: parseInt(process.env.DB_PORT || String(defaultPort), 10),
-    username: process.env.DB_USERNAME || 'postgres',
-    password: process.env.DB_PASSWORD || 'postgres',
-    extra:
-      dbType === 'mssql'
-        ? {
-            pool: mssqlPool,
-            connectionTimeout: 30_000,
-            requestTimeout: 30_000,
-          }
-        : undefined,
+    port: parseDbPort(process.env.DB_PORT, defaultPort),
+    username,
+    password,
+    extra: dbType === 'mssql' ? buildMssqlExtra(mssqlOptions) : undefined,
     options: dbType === 'mssql' ? mssqlOptions : undefined,
   };
 });

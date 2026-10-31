@@ -4,6 +4,10 @@
  */
 import { config as loadEnv } from 'dotenv';
 import { DataSource } from 'typeorm';
+import {
+  resolveMssqlDriverOptions,
+  sanitizeDbErrorMessage,
+} from '../config/mssql-connection';
 import { buildMigrationDataSourceOptions } from './data-source.options';
 
 loadEnv();
@@ -19,6 +23,8 @@ async function main(): Promise<void> {
     'DB_DATABASE',
     'DB_USERNAME',
     'DB_TRUSTED_CONNECTION',
+    'DB_ENCRYPT',
+    'DB_TRUST_SERVER_CERTIFICATE',
     'SMS_ENABLED',
     'SMS_PROVIDER',
     'SMS_TEST_MODE',
@@ -39,6 +45,11 @@ async function main(): Promise<void> {
   const leaked = Object.keys(process.env).filter((key) => secretKeys.test(key));
   console.log(
     `[SIGASJ] Variables sensibles presentes (nombres): ${leaked.join(', ') || 'ninguna'}`,
+  );
+
+  const tls = resolveMssqlDriverOptions();
+  console.log(
+    `[SIGASJ] TLS mssql: encrypt=${tls.encrypt} trustServerCertificate=${tls.trustServerCertificate} ca=${Boolean(process.env.DB_SSL_CA || process.env.DB_SSL_CA_PATH)}`,
   );
 
   const options = buildMigrationDataSourceOptions();
@@ -96,6 +107,8 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  console.error('[SIGASJ] Error inspección entorno:', error);
+  console.error(
+    `[SIGASJ] Error inspección entorno: ${sanitizeDbErrorMessage(error)}`,
+  );
   process.exit(1);
 });

@@ -7,16 +7,26 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { AppModule } from './app.module';
+import {
+  CORS_ALLOWED_HEADERS,
+  CORS_METHODS,
+  createCorsOriginDelegate,
+} from './config/cors-origin';
+import { assertProductionSecrets } from './config/production-secrets';
 
 async function bootstrap() {
+  assertProductionSecrets();
+
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const configService = app.get(ConfigService);
 
-  // Habilitar CORS (soporta http://localhost:5173 y cualquier origen de desarrollo)
+  // CORS allowlist (FRONTEND_URL / FRONTEND_BASE_URL / CORS_ALLOWED_ORIGINS).
+  // Auth es Bearer (localStorage); no cookies de sesión → credentials: false.
   app.enableCors({
-    origin: true,
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    credentials: true,
+    origin: createCorsOriginDelegate(),
+    methods: [...CORS_METHODS],
+    allowedHeaders: [...CORS_ALLOWED_HEADERS],
+    credentials: false,
   });
 
   // Asegurar existencia de directorios de medios públicos
@@ -35,20 +45,17 @@ async function bootstrap() {
     }
   });
 
-  // Servir archivos estáticos en /uploads/ directamente fuera del prefijo /api/v1
+  // Estáticos: CORP cross-origin; ACAO lo define enableCors (allowlist), no wildcard.
   app.useStaticAssets(uploadDir, {
     prefix: '/uploads/',
     setHeaders: (res: { setHeader(name: string, value: string): void }) => {
-      res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     },
   });
 
-  // Exponer también bajo /api/v1/uploads/ por compatibilidad con clientes frontend
   app.useStaticAssets(uploadDir, {
     prefix: '/api/v1/uploads/',
     setHeaders: (res: { setHeader(name: string, value: string): void }) => {
-      res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     },
   });
@@ -108,19 +115,23 @@ async function bootstrap() {
   await app.listen(port, '0.0.0.0');
 
   const logger = new Logger('Bootstrap');
+  const nodeEnv = process.env.NODE_ENV || 'development';
   if (configService.get<boolean>('auth.devLoginWithoutPassword') === true) {
     logger.warn(
       'Modo desarrollo: POST /auth/login no valida contraseña (AUTH_REQUIRE_PASSWORD=true para exigirla).',
     );
   }
   logger.log(
-    `Servidor Backend SIGASJ escuchando en 0.0.0.0:${port} (http://localhost:${port}/api/v1)`,
+    `SIGASJ listo env=${nodeEnv} bind=0.0.0.0:${port} health=/api/v1/health`,
   );
-  logger.log(
-    `Documentación Swagger disponible en http://localhost:${port}/api/docs`,
-  );
+  logger.log(`Swagger: http://localhost:${port}/api/docs`);
 }
 bootstrap().catch((err: unknown) => {
-  console.error('Error al iniciar la aplicación SIGASJ:', err);
+  const logger = new Logger('Bootstrap');
+  const name = err instanceof Error ? err.name : 'Error';
+  const message = err instanceof Error ? err.message : String(err);
+  logger.error(
+    `Fallo de arranque ${name}: ${message.replace(/Password\s*=\s*\S+/gi, 'Password=***')}`,
+  );
   process.exit(1);
 });

@@ -138,9 +138,11 @@ DB_TYPE=postgres
 DB_HOST=localhost
 DB_PORT=5432
 DB_USERNAME=postgres
-DB_PASSWORD=postgres
+DB_PASSWORD=
 DB_DATABASE=sigasj_db
 
-JWT_SECRET=super_secret_jwt_key_sigasj_2026
+# Producción: solo en Render. Nunca versionar el valor real.
+JWT_SECRET=
 JWT_EXPIRES_IN=24h
+FRONTEND_URL=
 ```

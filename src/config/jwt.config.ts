@@ -1,6 +1,7 @@
 import { registerAs } from '@nestjs/config';
+import { resolveJwtSecret } from './production-secrets';
 
 export default registerAs('jwt', () => ({
-  secret: process.env.JWT_SECRET || 'super_secret_jwt_key_sigasj_2026',
+  secret: resolveJwtSecret(),
   expiresIn: process.env.JWT_EXPIRES_IN || '24h',
 }));

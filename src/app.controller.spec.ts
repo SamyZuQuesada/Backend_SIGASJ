@@ -14,16 +14,17 @@ describe('AppController — salud de SIGASJ', () => {
     appController = app.get<AppController>(AppController);
   });
 
-  it('GET / informa que la API está operativa', () => {
-    expect(appController.getHealth()).toEqual({
-      name: 'SIGASJ API',
-      status: 'ok',
-      message: 'Sistema de Gestión de la ASADA San Juan',
-      version: '1.0.0',
-    });
+  it('GET / responde liveness mínimo', () => {
+    expect(appController.getHealth()).toEqual({ status: 'ok' });
   });
 
   it('GET /health expone el mismo estado', () => {
     expect(appController.getHealthAlias()).toEqual(appController.getHealth());
+  });
+
+  it('health no incluye secretos ni metadatos internos', () => {
+    const body = JSON.stringify(appController.getHealth());
+    expect(body).not.toMatch(/password|jwt|secret|host|sql|database/i);
+    expect(body).not.toContain('SIGASJ API');
   });
 });

@@ -75,16 +75,18 @@ No ejecutar `build` dentro del Start Command.
 | `PORT` | Proveída por Render | No | No fijar a mano el puerto público |
 | `NODE_ENV` | Recomendada `production` | No | |
 | `DB_TYPE` | Sí (TypeORM) | No | Valor típico `mssql` |
-| `DB_HOST` | Sí para permanecer activo | No | **11.4** |
-| `DB_PORT` | Sí para permanecer activo | No | **11.4** |
-| `DB_USERNAME` | Sí para permanecer activo | Sí | **11.4** |
-| `DB_PASSWORD` | Sí para permanecer activo | Sí | **11.4** |
-| `DB_DATABASE` | Sí para permanecer activo | No | **11.4** |
-| `JWT_SECRET` | Tiene fallback de desarrollo en código | Sí | No versionar el valor real |
+| `DB_HOST` | Sí (TCP Railway externo) | No | Ver `docs/sqlserver-railway-typeorm.md` |
+| `DB_PORT` | Sí (TCP externo; no asumir 1433) | No | Idem |
+| `DB_USERNAME` | Sí (≠ `sa`) | Sí | Usuario app 11.4.x |
+| `DB_PASSWORD` | Sí | Sí | Solo Render |
+| `DB_DATABASE` | Sí | No | Idem |
+| `DB_ENCRYPT` / `DB_TRUST_SERVER_CERTIFICATE` | Recomendadas prod | No | TLS validado |
+| `JWT_SECRET` | Sí en producción (sin fallback inseguro) | Sí | Solo Render; ver `docs/security-backend-render.md` |
+| `FRONTEND_URL` | Sí en producción (o `FRONTEND_BASE_URL` / `CORS_ALLOWED_ORIGINS`) | No | Origen HTTPS Vercel real; no inventar |
 
-### Funcionales / opcionales (no bloquean este backlog)
+### Funcionales / opcionales
 
-`MAIL_*`, `JOTFORM_*`, `SMS_*`, `ACUEDUCTOS_CR_*`, `FRONTEND_BASE_URL`, `CORS_*` (CORS → 11.3.2).
+`MAIL_*`, `JOTFORM_*`, `SMS_*`, `ACUEDUCTOS_CR_*`. CORS/JWT de producción → `docs/security-backend-render.md`.
 
 ### Dependencia crítica documentada (11.4)
 
@@ -94,8 +96,10 @@ TypeORM (`TypeOrmModule.forRootAsync`) conecta en el bootstrap. Sin SQL Server a
 
 Rutas existentes (sin crear endpoints nuevos):
 
-- `GET /api/v1/health` → salud
+- `GET /api/v1/health` → liveness `{ "status": "ok" }` (Health Check Path de Render)
 - `GET /api/docs` → Swagger (si el entorno lo sirve)
+
+Observabilidad (logs, requestId, diagnóstico): `docs/observability-backend-render.md`.
 
 Un `401` en ruta protegida también demuestra que la API responde.
 
