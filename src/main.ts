@@ -103,8 +103,9 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, document);
 
+  // Render inyecta PORT; fallback local 3000. Escucha en 0.0.0.0 (no solo localhost).
   const port = configService.get<number>('environment.port') || 3000;
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
 
   const logger = new Logger('Bootstrap');
   if (configService.get<boolean>('auth.devLoginWithoutPassword') === true) {
@@ -113,10 +114,10 @@ async function bootstrap() {
     );
   }
   logger.log(
-    `🚀 Servidor Backend SIGASJ corriendo en http://localhost:${port}/api/v1`,
+    `Servidor Backend SIGASJ escuchando en 0.0.0.0:${port} (http://localhost:${port}/api/v1)`,
   );
   logger.log(
-    `📚 Documentación Swagger disponible en http://localhost:${port}/api/docs`,
+    `Documentación Swagger disponible en http://localhost:${port}/api/docs`,
   );
 }
 bootstrap().catch((err: unknown) => {

@@ -1,0 +1,34 @@
+# Blueprint reproducible — Web Service Node (sin Docker).
+# Secretos: sync false (solo Dashboard). No incluye database SQL (backlog 11.4).
+
+services:
+  - type: web
+    name: sigasj-api
+    runtime: node
+    plan: starter
+    region: oregon
+    rootDir: .
+    buildCommand: npm ci --ignore-scripts && npm rebuild bcrypt && npm run build
+    startCommand: npm run start:prod
+    healthCheckPath: /api/v1/health
+    autoDeploy: true
+    branch: main
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: DB_TYPE
+        value: mssql
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_DATABASE
+        sync: false
+      - key: JWT_SECRET
+        sync: false
