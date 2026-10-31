@@ -4,6 +4,11 @@ import { Controller, Get, Module } from '@nestjs/common';
 import request from 'supertest';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
+import {
+  CORS_ALLOWED_HEADERS,
+  CORS_METHODS,
+  createCorsOriginDelegate,
+} from '../../config/cors-origin';
 
 @Controller()
 class DummyController {
@@ -45,15 +50,15 @@ describe('Static Assets Serving e2e tests', () => {
     app = moduleRef.createNestApplication<NestExpressApplication>();
 
     app.enableCors({
-      origin: true,
-      methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-      credentials: true,
+      origin: createCorsOriginDelegate(),
+      methods: [...CORS_METHODS],
+      allowedHeaders: [...CORS_ALLOWED_HEADERS],
+      credentials: false,
     });
 
     app.useStaticAssets(uploadDir, {
       prefix: '/uploads/',
       setHeaders: (res: { setHeader(name: string, value: string): void }) => {
-        res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
       },
     });
@@ -61,7 +66,6 @@ describe('Static Assets Serving e2e tests', () => {
     app.useStaticAssets(uploadDir, {
       prefix: '/api/v1/uploads/',
       setHeaders: (res: { setHeader(name: string, value: string): void }) => {
-        res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
       },
     });
@@ -80,7 +84,9 @@ describe('Static Assets Serving e2e tests', () => {
 
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toMatch(/image\/jpeg/);
-    expect(res.headers['access-control-allow-origin']).toBeDefined();
+    expect(res.headers['access-control-allow-origin']).toBe(
+      'http://localhost:5173',
+    );
     expect(res.headers['cross-origin-resource-policy']).toBe('cross-origin');
   });
 
@@ -91,8 +97,19 @@ describe('Static Assets Serving e2e tests', () => {
 
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toMatch(/image\/jpeg/);
-    expect(res.headers['access-control-allow-origin']).toBeDefined();
+    expect(res.headers['access-control-allow-origin']).toBe(
+      'http://localhost:5173',
+    );
     expect(res.headers['cross-origin-resource-policy']).toBe('cross-origin');
+  });
+
+  it('GET /uploads rechaza Origin no autorizado (sin ACAO válido)', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/uploads/galeria/tanque.jpg')
+      .set('Origin', 'https://example.com');
+
+    expect(res.status).toBe(200);
+    expect(res.headers['access-control-allow-origin']).toBeUndefined();
   });
 
   it('GET /api/v1/uploads/galeria/tanque.jpg responde con 200 por alias', async () => {

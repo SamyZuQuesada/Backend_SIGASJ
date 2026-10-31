@@ -23,7 +23,9 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "migration:run": "node scripts/run-migrations.cjs"
+    "migration:run": "node scripts/run-migrations.cjs",
+    "db:probe": "node scripts/probe-db.cjs",
+    "smoke:render": "node scripts/smoke-render.cjs"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

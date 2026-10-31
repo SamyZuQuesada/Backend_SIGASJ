@@ -16,16 +16,22 @@ import { Rol } from '../usuarios/entities/rol.entity';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        secret:
-          configService.get<string>('jwt.secret') ||
-          'super_secret_jwt_key_sigasj_2026',
-        signOptions: {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          expiresIn: (configService.get<string>('jwt.expiresIn') ||
-            '24h') as any,
-        },
-      }),
+      useFactory: (configService: ConfigService) => {
+        const secret = configService.get<string>('jwt.secret');
+        if (!secret) {
+          throw new Error(
+            'jwt.secret no configurado. Defina JWT_SECRET (obligatorio en producción).',
+          );
+        }
+        return {
+          secret,
+          signOptions: {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+            expiresIn: (configService.get<string>('jwt.expiresIn') ||
+              '24h') as any,
+          },
+        };
+      },
     }),
   ],
   controllers: [AuthController],

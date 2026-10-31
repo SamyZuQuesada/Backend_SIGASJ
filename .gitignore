@@ -10,8 +10,14 @@
 *.log
 npm-debug.log*
 
-# environment variables
+# environment variables (nunca versionar secretos locales)
 .env
+.env.local
+.env.*.local
+.env.production
+.env.development.local
+.env.test.local
+# .env.example SÍ se versiona (solo nombres + placeholders)
 
 # IDE / OS
 .DS_Store

@@ -7,12 +7,16 @@ import { JwtPayload } from '../../../common/interfaces/jwt-payload.interface';
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(private configService: ConfigService) {
+    const secret = configService.get<string>('jwt.secret');
+    if (!secret) {
+      throw new Error(
+        'jwt.secret no configurado. Defina JWT_SECRET (obligatorio en producción).',
+      );
+    }
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey:
-        configService.get<string>('jwt.secret') ||
-        'super_secret_jwt_key_sigasj_2026',
+      secretOrKey: secret,
     });
   }
 

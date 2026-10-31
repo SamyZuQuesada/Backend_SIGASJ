@@ -6,8 +6,10 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
-import type { Request, Response } from 'express';
+import type { Response } from 'express';
 import { MulterError } from 'multer';
+import { safeRequestPath } from '../http/request-id';
+import type { RequestWithId } from '../middleware/request-id.middleware';
 
 const INTERNAL_MESSAGE = 'Error interno del servidor';
 
@@ -21,12 +23,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
-    const request = ctx.getRequest<Request>();
+    const request = ctx.getRequest<RequestWithId>();
+    const path = safeRequestPath(request.originalUrl || request.url);
+    const requestId = request.requestId ?? '-';
 
     const multerMapped = this.mapMulterError(exception);
     if (multerMapped) {
       this.logger.warn(
-        `${request.method} ${request.url} ${multerMapped.statusCode} MulterError`,
+        `${request.method} ${path} ${multerMapped.statusCode} MulterError requestId=${requestId}`,
       );
       response.status(multerMapped.statusCode).json(multerMapped);
       return;
@@ -35,7 +39,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const payloadMapped = this.mapPayloadTooLarge(exception);
     if (payloadMapped) {
       this.logger.warn(
-        `${request.method} ${request.url} ${payloadMapped.statusCode} PayloadTooLarge`,
+        `${request.method} ${path} ${payloadMapped.statusCode} PayloadTooLarge requestId=${requestId}`,
       );
       response.status(payloadMapped.statusCode).json(payloadMapped);
       return;
@@ -44,7 +48,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const dbConflictMapped = this.mapDatabaseConflict(exception);
     if (dbConflictMapped) {
       this.logger.warn(
-        `${request.method} ${request.url} ${dbConflictMapped.statusCode} DatabaseConflict`,
+        `${request.method} ${path} ${dbConflictMapped.statusCode} DatabaseConflict requestId=${requestId}`,
       );
       response.status(dbConflictMapped.statusCode).json(dbConflictMapped);
       return;
@@ -60,7 +64,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
         ? this.sanitizePublicMessage(this.publicHttpMessage(exception))
         : INTERNAL_MESSAGE;
 
-    const logLine = `${request.method} ${request.url} ${status} ${this.safeExceptionName(exception)}`;
+    const logLine = `${request.method} ${path} ${status} ${this.safeExceptionName(exception)} requestId=${requestId}`;
     if (status >= 500) {
       this.logger.error(logLine);
     } else {
