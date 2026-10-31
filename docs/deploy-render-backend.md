@@ -99,18 +99,25 @@ Rutas existentes (sin crear endpoints nuevos):
 
 Un `401` en ruta protegida también demuestra que la API responde.
 
-## Registro de deploy (completar al publicar)
+## Registro de deploy
 
 | Campo | Valor |
 | --- | --- |
-| Nombre del servicio | |
-| URL HTTPS | |
-| Fecha/hora deploy | |
-| Commit esperado | |
-| Commit mostrado por Render | |
-| Estado | |
-| Build | |
-| Start | |
-| Restart loop | No / Sí |
-| Ruta de prueba | `/api/v1/health` |
-| Status HTTP | |
+| Nombre del servicio | `sigasj-api` |
+| Service ID | `srv-dbikundg1s2s73dhud80` |
+| URL HTTPS | https://sigasj-api.onrender.com |
+| Repo | `SamyZuQuesada/Backend_SIGASJ` (Public Git) |
+| Rama | `Wuipy` |
+| Commit desplegado | `9127fbe9b352c3efcb4c799949a863ceb67f4ebb` |
+| Runtime | Node 22 |
+| Plan | Free |
+| Root Directory | _(vacío)_ |
+| Build Command | `npm ci --ignore-scripts --include=dev && npm rebuild bcrypt && npm run build` |
+| Start Command | `npm run start:prod` |
+| Health Check Path | `/api/v1/health` |
+| Auto-Deploy | On Commit (requiere GitHub App; con Public Git usar Manual Deploy) |
+| Build | PASS (tras `--include=dev`) |
+| Start | FAIL esperado sin SQL — `ECONNREFUSED 127.0.0.1:5432` (TypeORM default postgres) |
+| Bloqueo pendiente | **11.4** configurar `DB_TYPE=mssql` + `DB_HOST`/`DB_PORT`/`DB_USERNAME`/`DB_PASSWORD`/`DB_DATABASE` |
+
+> El Web Service y el build Nest están listos. El proceso no permanece Live hasta 11.4 porque el bootstrap exige base de datos.
