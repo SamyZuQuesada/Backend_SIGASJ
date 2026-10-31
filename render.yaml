@@ -8,7 +8,8 @@ services:
     plan: starter
     region: oregon
     rootDir: .
-    buildCommand: npm ci --ignore-scripts && npm rebuild bcrypt && npm run build
+    # --include=dev: con NODE_ENV=production, npm ci omite @nestjs/cli y falla nest build.
+    buildCommand: npm ci --ignore-scripts --include=dev && npm rebuild bcrypt && npm run build
     startCommand: npm run start:prod
     healthCheckPath: /api/v1/health
     autoDeploy: true

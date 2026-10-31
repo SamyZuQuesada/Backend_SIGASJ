@@ -12,8 +12,9 @@ Fuera de alcance de este documento: SQL Server productivo (11.4), CORS definitiv
 | Tipo | Repo Backend puro (no monorepo) |
 | Root Directory en Render | _(vacío / raíz del repo)_ |
 | Package manager | **npm** (`package-lock.json`) |
-| Install | `npm ci --ignore-scripts && npm rebuild bcrypt` |
+| Install | `npm ci --ignore-scripts --include=dev && npm rebuild bcrypt` |
 | Build | `npm run build` → `nest build` |
+| Nota install | `--include=dev` es obligatorio si `NODE_ENV=production` (si no, falta `@nestjs/cli` / `nest: not found`) |
 | Start producción | `npm run start:prod` → `node dist/main` |
 | Artifact | `dist/main.js` |
 | Node | `engines.node`: `>=22.12.0 <23`; `.nvmrc`: `22` |
@@ -59,7 +60,7 @@ Mensaje Nest observado: `Nest application successfully started`.
 | Repository | `SamyZuQuesada/Backend_SIGASJ` |
 | Branch | `main` |
 | Root Directory | _(vacío)_ |
-| Build Command | `npm ci --ignore-scripts && npm rebuild bcrypt && npm run build` |
+| Build Command | `npm ci --ignore-scripts --include=dev && npm rebuild bcrypt && npm run build` |
 | Start Command | `npm run start:prod` |
 | Node version | `22` (alineado a `.nvmrc` / `engines`) |
 
