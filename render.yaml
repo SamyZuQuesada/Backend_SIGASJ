@@ -1,5 +1,5 @@
 # Blueprint reproducible — Web Service Node (sin Docker).
-# Secretos: sync false (solo Dashboard). No incluye database SQL (backlog 11.4).
+# Secretos: sync false (solo Dashboard). Conexión a Azure SQL Database (11.4.4).
 
 services:
   - type: web
@@ -31,10 +31,12 @@ services:
         sync: false
       - key: DB_DATABASE
         sync: false
-      # TLS SQL Server (Railway). Valores en Dashboard; no versionar secretos/CA privadas.
+      # TLS Azure SQL Database. Validación estricta de certificado TLS público.
       - key: DB_ENCRYPT
         value: "true"
       - key: DB_TRUST_SERVER_CERTIFICATE
+        value: "false"
+      - key: DB_SYNCHRONIZE
         value: "false"
       - key: DB_SSL_CA
         sync: false

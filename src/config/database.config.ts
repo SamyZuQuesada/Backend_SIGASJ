@@ -60,7 +60,7 @@ export default registerAs('database', (): TypeOrmModuleOptions => {
   const defaultPort =
     dbType === 'mssql' ? 1433 : dbType === 'mysql' ? 3306 : 5432;
   const host = process.env.DB_HOST || 'localhost';
-  const database = process.env.DB_DATABASE || 'sigasj_db';
+  const database = process.env.DB_DATABASE || process.env.DB_NAME || 'sigasj_db';
   const trustedConnection = process.env.DB_TRUSTED_CONNECTION === 'true';
   const isLocalDb =
     dbType === 'mssql' && host.toLowerCase().includes('localdb');
@@ -119,7 +119,7 @@ export default registerAs('database', (): TypeOrmModuleOptions => {
   }
 
   const username =
-    process.env.DB_USERNAME || (dbType === 'mssql' ? undefined : 'postgres');
+    process.env.DB_USERNAME || process.env.DB_USER || (dbType === 'mssql' ? undefined : 'postgres');
   const password =
     process.env.DB_PASSWORD || (dbType === 'mssql' ? undefined : 'postgres');
 

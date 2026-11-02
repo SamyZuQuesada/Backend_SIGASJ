@@ -36,7 +36,7 @@ export function buildMigrationDataSourceOptions(
   const database =
     env.NODE_ENV === 'test' && env.DB_DATABASE_TEST
       ? env.DB_DATABASE_TEST
-      : env.DB_DATABASE || 'sigasj_db';
+      : env.DB_DATABASE || env.DB_NAME || 'sigasj_db';
   const trustedConnection = env.DB_TRUSTED_CONNECTION === 'true';
   const isLocalDb =
     dbType === 'mssql' && host.toLowerCase().includes('localdb');
@@ -78,7 +78,7 @@ export function buildMigrationDataSourceOptions(
   }
 
   const username =
-    env.DB_USERNAME || (dbType === 'mssql' ? undefined : 'postgres');
+    env.DB_USERNAME || env.DB_USER || (dbType === 'mssql' ? undefined : 'postgres');
   const password =
     env.DB_PASSWORD || (dbType === 'mssql' ? undefined : 'postgres');
 

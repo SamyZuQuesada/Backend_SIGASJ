@@ -15,6 +15,7 @@ describe('mssql-connection', () => {
   it('producción cifra y valida certificado por defecto', () => {
     const opts = resolveMssqlDriverOptions({
       NODE_ENV: 'production',
+      DB_HOST: 'sigasj-dev.database.windows.net',
     });
     expect(opts.encrypt).toBe(true);
     expect(opts.trustServerCertificate).toBe(false);
@@ -32,6 +33,7 @@ describe('mssql-connection', () => {
     expect(() =>
       resolveMssqlDriverOptions({
         NODE_ENV: 'production',
+        DB_HOST: 'sigasj-dev.database.windows.net',
         DB_ENCRYPT: 'false',
       }),
     ).toThrow(/DB_ENCRYPT/);
@@ -42,7 +44,7 @@ describe('mssql-connection', () => {
         DB_TYPE: 'mssql',
         DB_HOST: 'localhost',
         DB_PORT: '1433',
-        DB_DATABASE: 'SIGASJ',
+        DB_DATABASE: 'sigasj-dev',
         DB_USERNAME: 'sigasj_app',
         DB_PASSWORD: 'x',
       }),
@@ -52,13 +54,79 @@ describe('mssql-connection', () => {
       assertProductionDatabaseEnv({
         NODE_ENV: 'production',
         DB_TYPE: 'mssql',
-        DB_HOST: 'switchback.proxy.rlwy.net',
-        DB_PORT: '54321',
-        DB_DATABASE: 'SIGASJ',
+        DB_HOST: 'sigasj-dev.database.windows.net',
+        DB_PORT: '1433',
+        DB_DATABASE: 'sigasj-dev',
         DB_USERNAME: 'sa',
         DB_PASSWORD: 'x',
       }),
-    ).toThrow(/\bsa\b/);
+    ).toThrow(/credenciales administrativas/);
+  });
+
+  it('producción rechaza usuario administrativo sigasj_sqladmin', () => {
+    expect(() =>
+      assertProductionDatabaseEnv({
+        NODE_ENV: 'production',
+        DB_TYPE: 'mssql',
+        DB_HOST: 'sigasj-dev.database.windows.net',
+        DB_PORT: '1433',
+        DB_DATABASE: 'sigasj-dev',
+        DB_USERNAME: 'sigasj_sqladmin',
+        DB_PASSWORD: 'x',
+      }),
+    ).toThrow(/credenciales administrativas/);
+  });
+
+  it('producción acepta DB_NAME y DB_USER como alias de DB_DATABASE y DB_USERNAME', () => {
+    expect(() =>
+      assertProductionDatabaseEnv({
+        NODE_ENV: 'production',
+        DB_TYPE: 'mssql',
+        DB_HOST: 'sigasj-dev.database.windows.net',
+        DB_PORT: '1433',
+        DB_NAME: 'sigasj-dev',
+        DB_USER: 'sigasj_app',
+        DB_PASSWORD: 'ValidPassword123!',
+      }),
+    ).not.toThrow();
+  });
+
+  it('producción rechaza DB_SYNCHRONIZE=true', () => {
+    expect(() =>
+      assertProductionDatabaseEnv({
+        NODE_ENV: 'production',
+        DB_TYPE: 'mssql',
+        DB_HOST: 'sigasj-dev.database.windows.net',
+        DB_PORT: '1433',
+        DB_NAME: 'sigasj-dev',
+        DB_USER: 'sigasj_app',
+        DB_PASSWORD: 'ValidPassword123!',
+        DB_SYNCHRONIZE: 'true',
+      }),
+    ).toThrow(/DB_SYNCHRONIZE/);
+  });
+
+  it('producción rechaza DB_TRUST_SERVER_CERTIFICATE=true para Azure SQL Database', () => {
+    expect(() =>
+      resolveMssqlDriverOptions({
+        NODE_ENV: 'production',
+        DB_HOST: 'sigasj-dev.database.windows.net',
+        DB_TRUST_SERVER_CERTIFICATE: 'true',
+      }),
+    ).toThrow(/Azure SQL Database/);
+
+    expect(() =>
+      assertProductionDatabaseEnv({
+        NODE_ENV: 'production',
+        DB_TYPE: 'mssql',
+        DB_HOST: 'sigasj-dev.database.windows.net',
+        DB_PORT: '1433',
+        DB_NAME: 'sigasj-dev',
+        DB_USER: 'sigasj_app',
+        DB_PASSWORD: 'ValidPassword123!',
+        DB_TRUST_SERVER_CERTIFICATE: 'true',
+      }),
+    ).toThrow(/DB_TRUST_SERVER_CERTIFICATE/);
   });
 
   it('producción rechaza NODE_TLS_REJECT_UNAUTHORIZED=0', () => {
@@ -66,9 +134,9 @@ describe('mssql-connection', () => {
       assertProductionDatabaseEnv({
         NODE_ENV: 'production',
         DB_TYPE: 'mssql',
-        DB_HOST: 'switchback.proxy.rlwy.net',
-        DB_PORT: '54321',
-        DB_DATABASE: 'SIGASJ',
+        DB_HOST: 'sigasj-dev.database.windows.net',
+        DB_PORT: '1433',
+        DB_DATABASE: 'sigasj-dev',
         DB_USERNAME: 'sigasj_app',
         DB_PASSWORD: 'x',
         NODE_TLS_REJECT_UNAUTHORIZED: '0',
@@ -84,14 +152,5 @@ describe('mssql-connection', () => {
     );
     expect(msg).not.toMatch(/SuperSecret123/);
     expect(msg).toMatch(/Password=\*\*\*/);
-  });
-
-  it('trust explícito en producción solo con flag (no permanente)', () => {
-    const opts = resolveMssqlDriverOptions({
-      NODE_ENV: 'production',
-      DB_TRUST_SERVER_CERTIFICATE: 'true',
-    });
-    expect(opts.encrypt).toBe(true);
-    expect(opts.trustServerCertificate).toBe(true);
   });
 });
