@@ -29,6 +29,8 @@ import { NotificacionesModule } from './modules/notificaciones/notificaciones.mo
 import { AsociadosModule } from './modules/asociados/asociados.module';
 import { RecursosHumanosModule } from './modules/recursos-humanos/recursos-humanos.module';
 import { SolicitudesAusenciaModule } from './modules/solicitudes-ausencia/solicitudes-ausencia.module';
+import { MediaBlobBootstrap } from './common/media/media-blob.bootstrap';
+import { MediaBlobMiddleware } from './common/media/media-blob.middleware';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -71,6 +73,8 @@ import { AppService } from './app.service';
   controllers: [AppController],
   providers: [
     AppService,
+    MediaBlobBootstrap,
+    MediaBlobMiddleware,
     {
       provide: APP_FILTER,
       useClass: HttpExceptionFilter,
@@ -83,6 +87,6 @@ import { AppService } from './app.service';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(RequestIdMiddleware).forRoutes('*');
+    consumer.apply(RequestIdMiddleware, MediaBlobMiddleware).forRoutes('*');
   }
 }

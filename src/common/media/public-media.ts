@@ -14,6 +14,19 @@ import {
 } from 'fs';
 import { basename, extname, join, resolve } from 'path';
 import { randomUUID } from 'crypto';
+import {
+  forgetUploadedMedia,
+  persistUploadedMedia,
+  readStoredMedia,
+} from './media-blob.store';
+
+function rememberUploadedMedia(
+  publicPath: string,
+  mime: string,
+  bytes: Buffer,
+): void {
+  void persistUploadedMedia(publicPath, mime, bytes);
+}
 
 export type PublicMediaFolder =
   'comunicados' | 'galeria' | 'transparencia' | 'proyectos';
@@ -150,7 +163,9 @@ export function savePublicImage(
   const filename = `${Date.now()}-${randomUUID()}${extension}`;
   writeFileSync(join(directory, filename), file.buffer);
 
-  return `/uploads/${folder}/${filename}`;
+  const publicPath = `/uploads/${folder}/${filename}`;
+  rememberUploadedMedia(publicPath, file.mimetype, file.buffer);
+  return publicPath;
 }
 
 export function saveProyectoImage(
@@ -179,7 +194,9 @@ export function saveProyectoImage(
   const filename = `${proyectoId}_${prefix}_${Date.now()}_${randomUUID().slice(0, 8)}${extension}`;
   writeFileSync(join(directory, filename), file.buffer);
 
-  return `/api/v1/public/media/${folder}/${filename}`;
+  const publicPath = `/api/v1/public/media/${folder}/${filename}`;
+  rememberUploadedMedia(publicPath, file.mimetype, file.buffer);
+  return publicPath;
 }
 
 export function deletePhysicalMediaFile(
@@ -197,6 +214,8 @@ export function deletePhysicalMediaFile(
   const [folder, filename] = parts;
   const safeName = basename(filename);
   if (!safeName || safeName !== filename || safeName.includes('..')) return;
+
+  forgetUploadedMedia(normalized);
 
   const filePath = join(UPLOAD_ROOT, folder, safeName);
   if (existsSync(filePath)) {
@@ -228,13 +247,15 @@ export function savePublicDocument(
   const filename = `${Date.now()}-${randomUUID()}${extension}`;
   writeFileSync(join(directory, filename), file.buffer);
 
-  return `/api/v1/public/media/${folder}/${filename}`;
+  const publicPath = `/api/v1/public/media/${folder}/${filename}`;
+  rememberUploadedMedia(publicPath, file.mimetype, file.buffer);
+  return publicPath;
 }
 
-export function streamPublicMedia(
+export async function streamPublicMedia(
   folder: string,
   filename: string,
-): StreamableFile {
+): Promise<StreamableFile> {
   if (!isAllowedFolder(folder)) {
     throw new NotFoundException();
   }
@@ -245,8 +266,16 @@ export function streamPublicMedia(
   }
 
   const filePath = join(UPLOAD_ROOT, folder, safeName);
+  const storedPath = `/uploads/${folder}/${safeName}`;
   if (!existsSync(filePath)) {
-    throw new NotFoundException();
+    const stored = await readStoredMedia(storedPath);
+    if (!stored) {
+      throw new NotFoundException();
+    }
+    return new StreamableFile(stored.bytes, {
+      type: stored.mime,
+      disposition: `inline; filename="${safeName}"`,
+    });
   }
 
   const extension = extname(safeName).toLowerCase();
@@ -376,6 +405,7 @@ export function saveActividadDocument(
   writeFileSync(join(folder, filename), file.buffer);
 
   const rutaReferenciaArchivo = `/uploads/actividades-fontanero/${actividadId}/${filename}`;
+  rememberUploadedMedia(rutaReferenciaArchivo, file.mimetype, file.buffer);
   return { rutaReferenciaArchivo, filename };
 }
 
@@ -433,6 +463,11 @@ export function saveAusenciaDocument(
   const filename = `${Date.now()}-${randomUUID()}${extension}`;
   writeFileSync(join(folder, filename), file.buffer);
 
+  rememberUploadedMedia(
+    `/uploads/solicitudes-ausencia/${solicitudId}/${filename}`,
+    file.mimetype,
+    file.buffer,
+  );
   const rutaReferenciaArchivo = `/api/v1/fontanero/solicitudes-ausencia/${solicitudId}/documentos/${filename}`;
   return { rutaReferenciaArchivo, filename };
 }
@@ -587,6 +622,11 @@ export function saveMovimientoDocument(
   const filename = `${Date.now()}-${randomUUID()}${extension}`;
   writeFileSync(join(folder, filename), file.buffer);
 
+  rememberUploadedMedia(
+    `/uploads/movimientos-inventario/${movimientoId}/${filename}`,
+    file.mimetype,
+    file.buffer,
+  );
   const rutaReferenciaArchivo = `/api/v1/inventario/movimientos/${movimientoId}/documentos/${filename}`;
   return { rutaReferenciaArchivo, filename };
 }
@@ -874,8 +914,11 @@ export function saveSolicitudDocumentPending(file: SolicitudDocumentFile): {
 
   writeFileSync(absolutePath, file.buffer);
 
+  const rutaReferenciaArchivo = `/uploads/solicitudes/pendientes/${filename}`;
+  rememberUploadedMedia(rutaReferenciaArchivo, file.mimetype, file.buffer);
+
   return {
-    rutaReferenciaArchivo: `/uploads/solicitudes/pendientes/${filename}`,
+    rutaReferenciaArchivo,
     filename,
     absolutePath,
   };
