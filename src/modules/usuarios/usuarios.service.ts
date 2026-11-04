@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Role, ROLES_SISTEMA } from '../../common/enums/role.enum';
-import { hashPassword } from '../auth/password.util';
+import { hashPassword, verifyPassword } from '../auth/password.util';
 import { Rol } from './entities/rol.entity';
 import { Usuario } from './entities/usuario.entity';
 
@@ -14,6 +14,12 @@ export type UsuarioPublico = {
   activo: boolean;
   rol: Role;
 };
+
+/**
+ * Clave que el selector de rol del frontend ya envía en el bundle público.
+ * No es un secreto: producción solo la usa para esas tres cuentas.
+ */
+const CLAVE_SELECTOR_ROL = 'dev-login';
 
 /** Correos usados por el login de desarrollo del front (selector de rol). */
 const CUENTAS_LOGIN_DESARROLLO: ReadonlyArray<{
@@ -56,9 +62,17 @@ export class UsuariosService implements OnModuleInit {
   }
 
   private async asegurarCuentasLoginDesarrollo(): Promise<void> {
-    if (
-      this.configService.get<boolean>('auth.devLoginWithoutPassword') !== true
-    ) {
+    const devSinPassword =
+      this.configService.get<boolean>('auth.devLoginWithoutPassword') === true;
+    const alinearSelector =
+      this.configService.get<boolean>('auth.alignRolePickerPassword') === true;
+
+    if (alinearSelector) {
+      await this.alinearCuentasSelectorRol();
+      return;
+    }
+
+    if (!devSinPassword) {
       return;
     }
 
@@ -91,6 +105,63 @@ export class UsuariosService implements OnModuleInit {
         }),
       );
       this.logger.log(`Cuenta de desarrollo creada: ${correo} (${cuenta.rol})`);
+    }
+  }
+
+  private async alinearCuentasSelectorRol(): Promise<void> {
+    const passwordHash = await hashPassword(CLAVE_SELECTOR_ROL);
+
+    for (const cuenta of CUENTAS_LOGIN_DESARROLLO) {
+      const correo = cuenta.correo.trim().toLowerCase();
+      const rol = await this.findRolPorNombre(cuenta.rol);
+      if (!rol) {
+        this.logger.warn(
+          `No se alineó ${correo}: falta el rol ${cuenta.rol} en la base de datos.`,
+        );
+        continue;
+      }
+
+      const existente = await this.usuarioRepository
+        .createQueryBuilder('usuario')
+        .addSelect('usuario.passwordHash')
+        .where('LOWER(usuario.correo) = :correo', { correo })
+        .getOne();
+
+      if (!existente) {
+        await this.usuarioRepository.save(
+          this.usuarioRepository.create({
+            nombre: cuenta.nombre,
+            correo,
+            passwordHash,
+            activo: true,
+            idRol: rol.idRol,
+          }),
+        );
+        this.logger.log(`Cuenta del selector de rol creada: ${correo}`);
+        continue;
+      }
+
+      let passwordOk = false;
+      if (existente.passwordHash) {
+        try {
+          passwordOk = await verifyPassword(
+            CLAVE_SELECTOR_ROL,
+            existente.passwordHash,
+          );
+        } catch {
+          passwordOk = false;
+        }
+      }
+      if (passwordOk && existente.activo && existente.idRol === rol.idRol) {
+        continue;
+      }
+
+      await this.usuarioRepository.update(existente.idUsuario, {
+        passwordHash: passwordOk ? existente.passwordHash : passwordHash,
+        activo: true,
+        idRol: rol.idRol,
+      });
+      this.logger.log(`Cuenta del selector de rol lista: ${correo}`);
     }
   }
 
