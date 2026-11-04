@@ -5,6 +5,7 @@ const logger = new Logger('MediaBlob');
 
 let dataSource: DataSource | null = null;
 let tableReady = false;
+let schemaDenied = false;
 
 export type StoredMedia = {
   mime: string;
@@ -58,24 +59,36 @@ export function mediaStorageKey(publicPath: string): string | null {
   return `/uploads/${parts.join('/')}`;
 }
 
-export async function ensureMediaBlobTable(): Promise<void> {
-  if (!dataSource || dataSource.options.type !== 'mssql' || tableReady) {
-    return;
+export async function ensureMediaBlobTable(): Promise<boolean> {
+  if (schemaDenied || !dataSource || dataSource.options.type !== 'mssql') {
+    return false;
+  }
+  if (tableReady) {
+    return true;
   }
 
-  await dataSource.query(`
-    IF OBJECT_ID(N'dbo.ArchivoMedia', N'U') IS NULL
-    BEGIN
-      CREATE TABLE dbo.ArchivoMedia (
-        id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-        ruta VARCHAR(500) NOT NULL,
-        mime VARCHAR(120) NOT NULL,
-        contenido VARBINARY(MAX) NOT NULL,
-        CONSTRAINT UQ_ArchivoMedia_ruta UNIQUE (ruta)
-      );
-    END
-  `);
-  tableReady = true;
+  try {
+    await dataSource.query(`
+      IF OBJECT_ID(N'dbo.ArchivoMedia', N'U') IS NULL
+      BEGIN
+        CREATE TABLE dbo.ArchivoMedia (
+          id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+          ruta VARCHAR(500) NOT NULL,
+          mime VARCHAR(120) NOT NULL,
+          contenido VARBINARY(MAX) NOT NULL,
+          CONSTRAINT UQ_ArchivoMedia_ruta UNIQUE (ruta)
+        );
+      END
+    `);
+    tableReady = true;
+    return true;
+  } catch (error) {
+    schemaDenied = true;
+    logger.error(
+      `No se pudo preparar ArchivoMedia: ${error instanceof Error ? error.message : 'error'}`,
+    );
+    return false;
+  }
 }
 
 export async function persistUploadedMedia(
@@ -90,7 +103,10 @@ export async function persistUploadedMedia(
 
   try {
     if (!tableReady) {
-      await ensureMediaBlobTable();
+      const ready = await ensureMediaBlobTable();
+      if (!ready) {
+        return;
+      }
     }
     const hex = bytes.toString('hex');
     await dataSource.query(
