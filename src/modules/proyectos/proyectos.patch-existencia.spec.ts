@@ -236,7 +236,7 @@ describe('PATCH /api/v1/admin/proyectos/:id — existencia, autorización y pers
     const secretaria = await patchProyecto(
       id,
       { nombre: 'Nombre actualizado' },
-      signAs(Role.SECRETARIA, '2'),
+      signAs(Role.SECRETARIA_EJECUTIVA, '2'),
     ).expect(403);
     expect(secretaria.body).toMatchObject({
       statusCode: 403,

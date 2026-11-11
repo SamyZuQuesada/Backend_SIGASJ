@@ -71,7 +71,7 @@ describe('Auth persistido (sin login demo)', () => {
     secretaria = await crearUsuarioPrueba(usuarios, rolesMap, {
       nombre: 'Secretaria',
       correo: 'secretaria@asadasanjuan.cr',
-      role: Role.SECRETARIA,
+      role: Role.SECRETARIA_EJECUTIVA,
     });
     fontaneroA = await crearUsuarioPrueba(usuarios, rolesMap, {
       nombre: 'Carlos Pérez',
@@ -149,7 +149,7 @@ describe('Auth persistido (sin login demo)', () => {
     const response = await login('admin@asadasanjuan.cr').expect(200);
     const body = response.body as {
       accessToken: string;
-      user: { id: number; role: string; name: string };
+      user: { id: number; role: string; name: string; email?: string };
     };
     const payload = decode(body.accessToken);
     expect(Number(payload.sub)).toBe(administradora.idUsuario);
@@ -158,6 +158,19 @@ describe('Auth persistido (sin login demo)', () => {
     expect(body.user.id).toBe(administradora.idUsuario);
     expect(body.user.role).toBe(Role.ADMINISTRADORA);
     expect(JSON.stringify(payload)).not.toMatch(/passwordHash/i);
+    const serialized = JSON.stringify(body);
+    expect(serialized).not.toMatch(/passwordHash/i);
+    expect(serialized).not.toMatch(/\$2[aby]\$/);
+    expect(body.user).toEqual(
+      expect.objectContaining({
+        id: administradora.idUsuario,
+        email: 'admin@asadasanjuan.cr',
+        role: Role.ADMINISTRADORA,
+        name: 'Administradora',
+      }),
+    );
+    expect(body.user).not.toHaveProperty('passwordHash');
+    expect(body).not.toHaveProperty('password');
   });
 
   it('Fontanero A y B comparten rol FONTANERO con sub distintos', async () => {
@@ -172,18 +185,31 @@ describe('Auth persistido (sin login demo)', () => {
 
   it('Secretaria y Administradora usan el rol persistido, no el correo', async () => {
     const sec = await loginPayload('secretaria@asadasanjuan.cr');
-    expect(sec.role).toBe(Role.SECRETARIA);
+    expect(sec.role).toBe(Role.SECRETARIA_EJECUTIVA);
     expect(Number(sec.sub)).toBe(secretaria.idUsuario);
     const admin = await loginPayload('admin@asadasanjuan.cr');
     expect(admin.role).toBe(Role.ADMINISTRADORA);
   });
 
   it('rechaza inactivo y credenciales inválidas; no usa demo-user-id', async () => {
-    await login('inactivo@asadasanjuan.cr').expect(401);
-    await login('admin@asadasanjuan.cr', 'WrongPass1').expect(401);
-    await login('noexiste@asadasanjuan.cr').expect(401);
+    const inactivo = await login('inactivo@asadasanjuan.cr').expect(401);
+    const invalido = await login('admin@asadasanjuan.cr', 'WrongPass1').expect(
+      401,
+    );
+    const inexistente = await login('noexiste@asadasanjuan.cr').expect(401);
     const ok = await login('carlos@asadasanjuan.cr').expect(200);
     expect(JSON.stringify(ok.body)).not.toContain('demo-user-id');
+    expect(JSON.stringify(inactivo.body)).not.toMatch(
+      /passwordHash|\$2[aby]\$/i,
+    );
+    expect(JSON.stringify(invalido.body)).not.toMatch(
+      /passwordHash|\$2[aby]\$/i,
+    );
+    expect(JSON.stringify(inactivo.body)).not.toMatch(/passwordHash/i);
+    // Anti-enumeración: password incorrecta ≡ usuario inexistente
+    expect(invalido.body).toEqual(inexistente.body);
+    expect(JSON.stringify(invalido.body)).toMatch(/Credenciales inválidas/i);
+    expect(JSON.stringify(inactivo.body)).toMatch(/inactivo/i);
   });
 
   it('no deriva el rol desde el correo', async () => {

@@ -175,7 +175,7 @@ describe('Salidas de Inventario — QA Integral, Validación Funcional y Transac
     secretariaUser = await crearUsuarioPrueba(usuarioRepository, roles, {
       nombre: 'Secretaria QA',
       correo: 'secretaria.salidas@asada.test',
-      role: Role.SECRETARIA,
+      role: Role.SECRETARIA_EJECUTIVA,
     });
     abonadoUser = await crearUsuarioPrueba(usuarioRepository, roles, {
       nombre: 'Abonado QA',
@@ -795,7 +795,7 @@ describe('Salidas de Inventario — QA Integral, Validación Funcional y Transac
         .get(`/api/v1/inventario/salidas/averia/${averia.id}`)
         .set(
           'Authorization',
-          `Bearer ${signAs(Role.SECRETARIA, String(secretariaUser.idUsuario))}`,
+          `Bearer ${signAs(Role.SECRETARIA_EJECUTIVA, String(secretariaUser.idUsuario))}`,
         );
       expect(resSecretaria.status).toBe(HttpStatus.OK);
       expect(resSecretaria.body).toHaveLength(1);
@@ -922,7 +922,7 @@ describe('Salidas de Inventario — QA Integral, Validación Funcional y Transac
     });
 
     it('rechaza con 403 Forbidden a un rol no autorizado como SECRETARIA', async () => {
-      const token = signAs(Role.SECRETARIA, String(secretariaUser.idUsuario));
+      const token = signAs(Role.SECRETARIA_EJECUTIVA, String(secretariaUser.idUsuario));
 
       const res = await request(app.getHttpServer())
         .post('/api/v1/inventario/salidas')

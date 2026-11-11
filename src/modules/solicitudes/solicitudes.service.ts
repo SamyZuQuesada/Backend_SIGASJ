@@ -160,7 +160,8 @@ export class SolicitudesService {
       );
     }
 
-    const { rutaReferenciaArchivo, filename } = saveSolicitudDocumentPending(file);
+    const { rutaReferenciaArchivo, filename } =
+      saveSolicitudDocumentPending(file);
     const tokenReclamo = randomUUID().replace(/-/g, '');
 
     try {
@@ -645,7 +646,7 @@ export class SolicitudesService {
 
       if (
         slug === TipoSolicitudSlug.SERVICIO_EXISTENTE ||
-        (slug as string) === 'constancia-servicio' ||
+        slug === 'constancia-servicio' ||
         !slug
       ) {
         try {
@@ -680,28 +681,23 @@ export class SolicitudesService {
     };
 
     if (solicitud.detalleArregloPago) {
-      campos.plazoSeleccionado =
-        solicitud.detalleArregloPago.plazoSeleccionado;
-      campos.montoPrimaInicial =
-        solicitud.detalleArregloPago.montoPrimaInicial;
+      campos.plazoSeleccionado = solicitud.detalleArregloPago.plazoSeleccionado;
+      campos.montoPrimaInicial = solicitud.detalleArregloPago.montoPrimaInicial;
       campos.numeroCuentaServicio =
         solicitud.detalleArregloPago.numeroCuentaServicio;
     } else if (solicitud.detalleCambioTitular) {
       campos.nis = solicitud.detalleCambioTitular.nis;
-      campos.facturaANombreDe =
-        solicitud.detalleCambioTitular.facturaANombreDe;
+      campos.facturaANombreDe = solicitud.detalleCambioTitular.facturaANombreDe;
       campos.calidadTitular = solicitud.detalleCambioTitular.calidadTitular;
     } else if (solicitud.detalleInfraestructuraLinderos) {
       campos.nis = solicitud.detalleInfraestructuraLinderos.nis;
-      campos.proposito =
-        solicitud.detalleInfraestructuraLinderos.proposito;
+      campos.proposito = solicitud.detalleInfraestructuraLinderos.proposito;
     } else if (solicitud.detalleAfiliacion) {
       campos.numeroAbonado = solicitud.detalleAfiliacion.numeroAbonado;
       campos.numeroPlano = solicitud.detalleAfiliacion.numeroPlano;
       campos.folioReal = solicitud.detalleAfiliacion.folioReal;
     } else if (solicitud.detalleDisponibilidadServicios) {
-      campos.proposito =
-        solicitud.detalleDisponibilidadServicios.proposito;
+      campos.proposito = solicitud.detalleDisponibilidadServicios.proposito;
       campos.naturalezaInmueble =
         solicitud.detalleDisponibilidadServicios.naturalezaInmueble;
       campos.autorizacionInspeccion =
@@ -729,9 +725,7 @@ export class SolicitudesService {
    * Rendimiento:
    * Evita cargar documentos pesados o binarios en la vista tabular de administración.
    */
-  async findAll(
-    filtros: QuerySolicitudesDto = {},
-  ): Promise<{
+  async findAll(filtros: QuerySolicitudesDto = {}): Promise<{
     solicitudes: Solicitud[];
     data: Solicitud[];
     total: number;
@@ -921,7 +915,7 @@ export class SolicitudesService {
   ): Promise<CambioEstadoSolicitudResponseDto> {
     const dto: CambiarEstadoSolicitudDto =
       typeof dtoOrEstado === 'string'
-        ? { estadoNuevo: dtoOrEstado as EstadoSolicitud }
+        ? { estadoNuevo: dtoOrEstado }
         : dtoOrEstado;
 
     if (!dto || !isEstadoSolicitudValido(dto.estadoNuevo)) {
@@ -1396,7 +1390,8 @@ export class SolicitudesService {
             nis: dto.nis,
             facturaANombreDe: dto.facturaANombreDe,
             medioNotificacionPrincipal: dto.medioNotificacionPrincipal,
-            medioNotificacionSecundario: dto.medioNotificacionSecundario ?? null,
+            medioNotificacionSecundario:
+              dto.medioNotificacionSecundario ?? null,
             firma: dto.firma?.trim() ? dto.firma.trim() : null,
           });
           const detalleGuardado = await detalleRepo.save(nuevoDetalle);
@@ -2399,7 +2394,9 @@ export class SolicitudesService {
     return eventos.map((evento) => this.toHistorialSolicitudItemDto(evento));
   }
 
-  private observacionPublicaHistorial(evento: HistorialSolicitud): string | null {
+  private observacionPublicaHistorial(
+    evento: HistorialSolicitud,
+  ): string | null {
     if (evento.observacionPublica?.trim()) {
       return evento.observacionPublica.trim();
     }

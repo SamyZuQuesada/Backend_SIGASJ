@@ -145,7 +145,7 @@ describe('3.8.3 Consulta administrativa de alertas de reposición', () => {
     await adminGet('', signAs(Role.FONTANERO, '7')).expect(
       HttpStatus.FORBIDDEN,
     );
-    await adminGet('', signAs(Role.SECRETARIA, '2')).expect(
+    await adminGet('', signAs(Role.SECRETARIA_EJECUTIVA, '2')).expect(
       HttpStatus.FORBIDDEN,
     );
   });

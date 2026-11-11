@@ -104,7 +104,7 @@ describe('GET /api/v1/asociados (consulta y búsqueda)', () => {
       },
     );
 
-    it.each([Role.ADMINISTRADORA, Role.SECRETARIA])(
+    it.each([Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA])(
       'permite al rol %s consultar listado y detalle (200)',
       async (role) => {
         const token = signAs(role);

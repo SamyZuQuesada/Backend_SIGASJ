@@ -46,7 +46,7 @@ const mensajeDe = (res: request.Response): string => {
 };
 
 const ROLES_SIN_ACCESO = ROLES_SISTEMA.filter(
-  (role) => role !== Role.ADMINISTRADORA && role !== Role.SECRETARIA,
+  (role) => role !== Role.ADMINISTRADORA && role !== Role.SECRETARIA_EJECUTIVA,
 );
 
 describe('QA Vacaciones — checklist completo (6.3)', () => {

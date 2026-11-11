@@ -41,7 +41,7 @@ export class AveriasAdminController {
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({
     summary: 'Listar averías para el panel administrativo',
     description:
@@ -72,7 +72,7 @@ export class AveriasAdminController {
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({
     summary: 'Consultar el historial general de averías',
     description:
@@ -104,7 +104,7 @@ export class AveriasAdminController {
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({
     summary: 'Consultar el resumen de averías por estado',
     description:
@@ -135,7 +135,7 @@ export class AveriasAdminController {
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({
     summary: 'Listar usuarios asignables como Fontanero',
     description:
@@ -161,7 +161,7 @@ export class AveriasAdminController {
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({
     summary: 'Listar usuarios asignables como Ayudante del Fontanero',
     description:
@@ -187,7 +187,7 @@ export class AveriasAdminController {
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({
     summary: 'Consultar la línea de tiempo de una avería',
     description:
@@ -228,7 +228,7 @@ export class AveriasAdminController {
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({
     summary: 'Consultar el detalle administrativo de una avería',
     description:
@@ -268,7 +268,7 @@ export class AveriasAdminController {
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({
     summary: 'Cambiar el estado administrativo de una avería',
     description:
@@ -309,7 +309,7 @@ export class AveriasAdminController {
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({
     summary: 'Establecer o modificar la prioridad de una avería',
   })
@@ -343,7 +343,7 @@ export class AveriasAdminController {
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({
     summary: 'Clasificar administrativamente una avería',
     description: 'El body usa `clasificacion` y se persiste en `tipoAveria`.',
@@ -378,7 +378,7 @@ export class AveriasAdminController {
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({
     summary: 'Asignar una avería a un Fontanero',
     description:

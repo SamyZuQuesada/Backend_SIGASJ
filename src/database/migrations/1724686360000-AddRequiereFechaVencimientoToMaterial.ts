@@ -4,9 +4,7 @@ import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
  * Agrega Material.requiereFechaVencimiento.
  * Timestamp 636: 633/634/635 ya los usan inventario y formularios descargables.
  */
-export class AddRequiereFechaVencimientoToMaterial1724686360000
-  implements MigrationInterface
-{
+export class AddRequiereFechaVencimientoToMaterial1724686360000 implements MigrationInterface {
   name = 'AddRequiereFechaVencimientoToMaterial1724686360000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -39,7 +37,9 @@ export class AddRequiereFechaVencimientoToMaterial1724686360000
     if (!(await queryRunner.hasTable('Material'))) {
       return;
     }
-    if (!(await queryRunner.hasColumn('Material', 'requiereFechaVencimiento'))) {
+    if (
+      !(await queryRunner.hasColumn('Material', 'requiereFechaVencimiento'))
+    ) {
       return;
     }
 

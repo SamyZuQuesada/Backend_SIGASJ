@@ -1021,4 +1021,3 @@ export function deleteSolicitudDocumentFile(
     unlinkSync(absolutePath);
   }
 }
-

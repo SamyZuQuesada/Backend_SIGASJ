@@ -123,7 +123,13 @@ const toInt = (params: TransformFnParams): unknown => {
 const toBooleanFlag = (params: TransformFnParams): unknown => {
   const raw = params.value ?? rawValue(params);
   if (raw === true || raw === 'true' || raw === '1') return true;
-  if (raw === false || raw === 'false' || raw === '0' || raw === '' || raw == null) {
+  if (
+    raw === false ||
+    raw === 'false' ||
+    raw === '0' ||
+    raw === '' ||
+    raw == null
+  ) {
     return false;
   }
   return raw;
@@ -135,7 +141,11 @@ const toOptionalNumber = (params: TransformFnParams): unknown => {
   const raw = params.value ?? rawValue(params);
   if (raw === undefined || raw === null || raw === '') return undefined;
   if (typeof raw === 'number') return raw;
-  if (typeof raw === 'string' && raw.trim() !== '' && Number.isFinite(Number(raw))) {
+  if (
+    typeof raw === 'string' &&
+    raw.trim() !== '' &&
+    Number.isFinite(Number(raw))
+  ) {
     return Number(raw);
   }
   return raw;
@@ -188,7 +198,8 @@ export class CreateActividadDto {
 
   @ApiPropertyOptional({
     example: '2026-09-08',
-    description: 'Fecha en que finaliza la actividad (YYYY-MM-DD). Opcional en borrador.',
+    description:
+      'Fecha en que finaliza la actividad (YYYY-MM-DD). Opcional en borrador.',
   })
   @Transform(toFechaCalendario)
   @ValidateIf((dto: CreateActividadDto) => !esBorradorDto(dto))
@@ -204,7 +215,8 @@ export class CreateActividadDto {
 
   @ApiPropertyOptional({
     example: '16:00',
-    description: 'Hora de finalización de la actividad (HH:mm). Opcional en borrador.',
+    description:
+      'Hora de finalización de la actividad (HH:mm). Opcional en borrador.',
   })
   @Transform(normalizeHora)
   @ValidateIf((dto: CreateActividadDto) => !esBorradorDto(dto))
@@ -216,7 +228,8 @@ export class CreateActividadDto {
   horaFin?: string;
 
   @ApiPropertyOptional({
-    description: 'Si es verdadero, se guarda como borrador y no llega a administradora',
+    description:
+      'Si es verdadero, se guarda como borrador y no llega a administradora',
   })
   @Transform(toBooleanFlag)
   @IsOptional()
@@ -308,7 +321,8 @@ export class CreateActividadDto {
   documentos?: unknown;
 
   @ApiPropertyOptional({
-    description: 'Identificadores de evidencias a eliminar al guardar el borrador',
+    description:
+      'Identificadores de evidencias a eliminar al guardar el borrador',
     type: [Number],
   })
   @Transform(toIdArray)

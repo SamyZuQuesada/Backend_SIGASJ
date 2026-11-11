@@ -2621,7 +2621,9 @@ export class InventarioService {
             .andWhere('material.precioUnitario IS NOT NULL')
             .getRawOne<{ valor: string | null }>(),
           this.crearQueryMaterialesReporte(query)
-            .andWhere('material.requiereFechaVencimiento = :reqVenc', { reqVenc: true })
+            .andWhere('material.requiereFechaVencimiento = :reqVenc', {
+              reqVenc: true,
+            })
             .andWhere('material.fechaVencimiento IS NOT NULL')
             .andWhere('material.fechaVencimiento >= :hoy', { hoy })
             .andWhere('material.fechaVencimiento <= :fechaLimite90', {
@@ -2629,7 +2631,9 @@ export class InventarioService {
             })
             .getCount(),
           this.crearQueryMaterialesReporte(query)
-            .andWhere('material.requiereFechaVencimiento = :reqVenc2', { reqVenc2: true })
+            .andWhere('material.requiereFechaVencimiento = :reqVenc2', {
+              reqVenc2: true,
+            })
             .andWhere('material.fechaVencimiento IS NOT NULL')
             .andWhere('material.fechaVencimiento >= :hoy2', { hoy2: hoy })
             .andWhere('material.fechaVencimiento <= :fechaLimite902', {

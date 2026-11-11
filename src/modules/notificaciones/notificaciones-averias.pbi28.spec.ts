@@ -158,7 +158,7 @@ describe('PBI 2.8 — notificaciones internas y preparación SMS', () => {
     secretaria = await crearUsuarioPrueba(usuarios, rolesMap, {
       nombre: 'Secretaria 2.8',
       correo: 'secretaria28@asadasanjuan.cr',
-      role: Role.SECRETARIA,
+      role: Role.SECRETARIA_EJECUTIVA,
     });
     fontanero = await crearUsuarioPrueba(usuarios, rolesMap, {
       nombre: 'Fontanero 2.8',

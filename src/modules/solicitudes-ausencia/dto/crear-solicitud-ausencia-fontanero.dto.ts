@@ -10,7 +10,10 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { TipoSolicitudAusencia } from '../../../common/enums/tipo-solicitud-ausencia.enum';
-import { MAX_CORREOS_AVISO_LENGTH, normalizarCorreosAviso } from '../correos-aviso.util';
+import {
+  MAX_CORREOS_AVISO_LENGTH,
+  normalizarCorreosAviso,
+} from '../correos-aviso.util';
 import { IsListaCorreosAviso } from '../is-lista-correos-aviso.validator';
 
 const trimString = ({ value }: TransformFnParams): unknown =>

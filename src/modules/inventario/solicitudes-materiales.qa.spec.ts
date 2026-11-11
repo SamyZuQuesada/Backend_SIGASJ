@@ -367,7 +367,7 @@ describe('Solicitudes de Materiales por Fontanero (Backlog 4.6) — QA y Pruebas
     it('rechaza con 403 Forbidden si el rol es SECRETARIA', async () => {
       await request(app.getHttpServer())
         .post('/api/v1/fontanero/solicitudes-materiales')
-        .set('Authorization', `Bearer ${signAs(Role.SECRETARIA)}`)
+        .set('Authorization', `Bearer ${signAs(Role.SECRETARIA_EJECUTIVA)}`)
         .send({
           materiales: [{ idMaterial: 1, cantidad: 5 }],
         })
@@ -918,7 +918,7 @@ describe('Solicitudes de Materiales por Fontanero (Backlog 4.6) — QA y Pruebas
     it('rechaza con 403 Forbidden si un rol no fontanero (ej. SECRETARIA, ADMINISTRADORA) intenta consultar', async () => {
       await request(app.getHttpServer())
         .get('/api/v1/fontanero/solicitudes-materiales')
-        .set('Authorization', `Bearer ${signAs(Role.SECRETARIA, '2')}`)
+        .set('Authorization', `Bearer ${signAs(Role.SECRETARIA_EJECUTIVA, '2')}`)
         .expect(HttpStatus.FORBIDDEN);
 
       await request(app.getHttpServer())
@@ -1096,7 +1096,7 @@ describe('Solicitudes de Materiales por Fontanero (Backlog 4.6) — QA y Pruebas
       await adminGet('', signAs(Role.FONTANERO, '7')).expect(
         HttpStatus.FORBIDDEN,
       );
-      await adminGet('', signAs(Role.SECRETARIA, '2')).expect(
+      await adminGet('', signAs(Role.SECRETARIA_EJECUTIVA, '2')).expect(
         HttpStatus.FORBIDDEN,
       );
     });
@@ -1289,7 +1289,7 @@ describe('Solicitudes de Materiales por Fontanero (Backlog 4.6) — QA y Pruebas
       await adminAprobar(1, signAs(Role.FONTANERO, '7')).expect(
         HttpStatus.FORBIDDEN,
       );
-      await adminAprobar(1, signAs(Role.SECRETARIA, '2')).expect(
+      await adminAprobar(1, signAs(Role.SECRETARIA_EJECUTIVA, '2')).expect(
         HttpStatus.FORBIDDEN,
       );
     });
@@ -1483,7 +1483,7 @@ describe('Solicitudes de Materiales por Fontanero (Backlog 4.6) — QA y Pruebas
       await adminDetalle(1, signAs(Role.FONTANERO, '7')).expect(
         HttpStatus.FORBIDDEN,
       );
-      await adminDetalle(1, signAs(Role.SECRETARIA, '2')).expect(
+      await adminDetalle(1, signAs(Role.SECRETARIA_EJECUTIVA, '2')).expect(
         HttpStatus.FORBIDDEN,
       );
     });

@@ -10,9 +10,7 @@ import {
  * Evidencia adjunta a SolicitudAusencia (PDF/JPG/PNG).
  * Timestamp 637: 634 ya crea FormularioDescargable.
  */
-export class CreateDocumentoSolicitudAusenciaTable1724686370000
-  implements MigrationInterface
-{
+export class CreateDocumentoSolicitudAusenciaTable1724686370000 implements MigrationInterface {
   name = 'CreateDocumentoSolicitudAusenciaTable1724686370000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

@@ -1,5 +1,11 @@
 import { config as loadEnv } from 'dotenv';
-import { DataSource, QueryRunner, Table, TableForeignKey, TableIndex } from 'typeorm';
+import {
+  DataSource,
+  QueryRunner,
+  Table,
+  TableForeignKey,
+  TableIndex,
+} from 'typeorm';
 import { TipoDocumentoSolicitud } from '../common/enums/tipo-documento-solicitud.enum';
 import { DocumentoSolicitud } from '../modules/solicitudes/entities/documento-solicitud.entity';
 import { Solicitud } from '../modules/solicitudes/entities/solicitud.entity';
@@ -20,7 +26,9 @@ describe('Pruebas de Base de Datos e Integridad: Migración DocumentoSolicitud (
 
     it('debe existir la migración AddMetadatosToDocumentoSolicitud1724686210000', () => {
       const migration = new AddMetadatosToDocumentoSolicitud1724686210000();
-      expect(migration.name).toBe('AddMetadatosToDocumentoSolicitud1724686210000');
+      expect(migration.name).toBe(
+        'AddMetadatosToDocumentoSolicitud1724686210000',
+      );
       expect(typeof migration.up).toBe('function');
       expect(typeof migration.down).toBe('function');
     });
@@ -70,7 +78,9 @@ describe('Pruebas de Base de Datos e Integridad: Migración DocumentoSolicitud (
 
       await migration.up(mockQueryRunner);
 
-      expect(mockQueryRunner.hasTable).toHaveBeenCalledWith('DocumentoSolicitud');
+      expect(mockQueryRunner.hasTable).toHaveBeenCalledWith(
+        'DocumentoSolicitud',
+      );
       expect(createdTable).toBeDefined();
       expect(createdTable?.name).toBe('DocumentoSolicitud');
 
@@ -111,16 +121,22 @@ describe('Pruebas de Base de Datos e Integridad: Migración DocumentoSolicitud (
           },
         },
         hasTable: jest.fn().mockResolvedValue(true),
-        hasColumn: jest.fn().mockImplementation((table: string, col: string) => {
-          if (['nombreInterno', 'mimeType', 'tamano', 'ubicacion'].includes(col)) {
-            return Promise.resolve(false);
-          }
-          return Promise.resolve(true);
-        }),
-        addColumn: jest.fn().mockImplementation((table: string, column: any) => {
-          addedColumns.push(column.name);
-          return Promise.resolve();
-        }),
+        hasColumn: jest
+          .fn()
+          .mockImplementation((table: string, col: string) => {
+            if (
+              ['nombreInterno', 'mimeType', 'tamano', 'ubicacion'].includes(col)
+            ) {
+              return Promise.resolve(false);
+            }
+            return Promise.resolve(true);
+          }),
+        addColumn: jest
+          .fn()
+          .mockImplementation((table: string, column: any) => {
+            addedColumns.push(column.name);
+            return Promise.resolve();
+          }),
         query: jest.fn().mockImplementation((sql: string) => {
           queriesExecuted.push(sql);
           return Promise.resolve();
@@ -128,10 +144,12 @@ describe('Pruebas de Base de Datos e Integridad: Migración DocumentoSolicitud (
         getTable: jest.fn().mockResolvedValue({
           indices: [],
         }),
-        createIndex: jest.fn().mockImplementation((table: string, idx: TableIndex) => {
-          indexCreated = idx;
-          return Promise.resolve();
-        }),
+        createIndex: jest
+          .fn()
+          .mockImplementation((table: string, idx: TableIndex) => {
+            indexCreated = idx;
+            return Promise.resolve();
+          }),
       } as unknown as QueryRunner;
 
       await migration.up(mockQueryRunner);
@@ -209,7 +227,9 @@ describe('Pruebas de Base de Datos e Integridad: Migración DocumentoSolicitud (
       expect(guardado.nombreInterno).toBe(nombreInterno);
       expect(guardado.mimeType).toBe('application/pdf');
       expect(guardado.tamano).toBe(154200);
-      expect(guardado.ubicacion).toBe(`/uploads/solicitudes/pendientes/${nombreInterno}`);
+      expect(guardado.ubicacion).toBe(
+        `/uploads/solicitudes/pendientes/${nombreInterno}`,
+      );
       expect(guardado.fechaCarga).toBeInstanceOf(Date);
 
       // Limpieza del registro de prueba

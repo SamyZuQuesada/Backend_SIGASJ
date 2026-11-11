@@ -658,9 +658,7 @@ export class SolicitudesAusenciaService {
 
     // Fuera de la transacción: un fallo de correo no revierte la aprobación.
     try {
-      await this.notificacionSolicitudAusencia.notificarAprobacion(
-        actualizada,
-      );
+      await this.notificacionSolicitudAusencia.notificarAprobacion(actualizada);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(
@@ -715,9 +713,7 @@ export class SolicitudesAusenciaService {
       await this.notificacionSolicitudAusencia.notificarRechazo(rechazada);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      this.logger.warn(
-        `Notificación de rechazo omitida id=${id}: ${message}`,
-      );
+      this.logger.warn(`Notificación de rechazo omitida id=${id}: ${message}`);
     }
     await this.avisarFontaneroDecision(rechazada, 'rechazada');
     return rechazada;
@@ -828,9 +824,7 @@ export class SolicitudesAusenciaService {
       );
     }
     if (esFeriadoCostaRica(fechaFin)) {
-      throw new BadRequestException(
-        'La fecha de fin no puede ser un feriado',
-      );
+      throw new BadRequestException('La fecha de fin no puede ser un feriado');
     }
     if (diasAusenciaSinFeriados(fechaInicio, fechaFin) < 1) {
       throw new BadRequestException(

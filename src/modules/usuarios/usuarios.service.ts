@@ -2,8 +2,8 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Role, ROLES_SISTEMA } from '../../common/enums/role.enum';
-import { hashPassword, verifyPassword } from '../auth/password.util';
+import { Role, ROLE_LABELS, ROLES_SISTEMA } from '../../common/enums/role.enum';
+import { PasswordService } from '../auth/password.service';
 import { Rol } from './entities/rol.entity';
 import { Usuario } from './entities/usuario.entity';
 
@@ -28,17 +28,17 @@ const CUENTAS_LOGIN_DESARROLLO: ReadonlyArray<{
   rol: Role;
 }> = [
   {
-    nombre: 'Administradora',
+    nombre: ROLE_LABELS[Role.ADMINISTRADORA],
     correo: 'admin@asadasanjuan.cr',
     rol: Role.ADMINISTRADORA,
   },
   {
-    nombre: 'Secretaria',
+    nombre: ROLE_LABELS[Role.SECRETARIA_EJECUTIVA],
     correo: 'secretaria@asadasanjuan.cr',
-    rol: Role.SECRETARIA,
+    rol: Role.SECRETARIA_EJECUTIVA,
   },
   {
-    nombre: 'Fontanero',
+    nombre: ROLE_LABELS[Role.FONTANERO],
     correo: 'fontanero@asadasanjuan.cr',
     rol: Role.FONTANERO,
   },
@@ -54,7 +54,44 @@ export class UsuariosService implements OnModuleInit {
     @InjectRepository(Usuario)
     private readonly usuarioRepository: Repository<Usuario>,
     private readonly configService: ConfigService,
+    private readonly passwordService: PasswordService,
   ) {}
+
+  /**
+   * Asigna `passwordHash` desde texto plano. No persiste.
+   * `undefined` / `null` / `''` → no modifica (evita doble hash en updates).
+   */
+  async applyPlainPassword(
+    usuario: Pick<Usuario, 'passwordHash'> | Usuario,
+    plain: string | undefined | null,
+  ): Promise<boolean> {
+    if (plain === undefined || plain === null || plain === '') {
+      return false;
+    }
+    usuario.passwordHash = await this.passwordService.hashPassword(plain);
+    return true;
+  }
+
+  /**
+   * Lookup interno para AuthService.
+   * No exponer vía controller: puede incluir `passwordHash` con addSelect.
+   */
+  async findByCorreoForAuth(
+    correo: string,
+    options: { includePasswordHash?: boolean } = {},
+  ): Promise<Usuario | null> {
+    const normalized = correo.trim().toLowerCase();
+    const qb = this.usuarioRepository
+      .createQueryBuilder('usuario')
+      .leftJoinAndSelect('usuario.rol', 'rol')
+      .where('LOWER(usuario.correo) = :correo', { correo: normalized });
+
+    if (options.includePasswordHash) {
+      qb.addSelect('usuario.passwordHash');
+    }
+
+    return qb.getOne();
+  }
 
   async onModuleInit(): Promise<void> {
     await this.asegurarRolesBase();
@@ -76,7 +113,9 @@ export class UsuariosService implements OnModuleInit {
       return;
     }
 
-    const placeholderHash = await hashPassword('dev-login-placeholder');
+    const placeholderHash = await this.passwordService.hashPassword(
+      'dev-login-placeholder',
+    );
 
     for (const cuenta of CUENTAS_LOGIN_DESARROLLO) {
       const correo = cuenta.correo.trim().toLowerCase();
@@ -109,7 +148,8 @@ export class UsuariosService implements OnModuleInit {
   }
 
   private async alinearCuentasSelectorRol(): Promise<void> {
-    const passwordHash = await hashPassword(CLAVE_SELECTOR_ROL);
+    const passwordHash =
+      await this.passwordService.hashPassword(CLAVE_SELECTOR_ROL);
 
     for (const cuenta of CUENTAS_LOGIN_DESARROLLO) {
       const correo = cuenta.correo.trim().toLowerCase();
@@ -144,7 +184,7 @@ export class UsuariosService implements OnModuleInit {
       let passwordOk = false;
       if (existente.passwordHash) {
         try {
-          passwordOk = await verifyPassword(
+          passwordOk = await this.passwordService.comparePassword(
             CLAVE_SELECTOR_ROL,
             existente.passwordHash,
           );

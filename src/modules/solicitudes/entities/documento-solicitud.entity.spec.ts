@@ -12,7 +12,8 @@ describe('DocumentoSolicitud Entity (Backlog 4.1.2 - Tarea 1)', () => {
     doc.nombreInterno = '1729789123456-abc12345-uuid.pdf';
     doc.mimeType = 'application/pdf';
     doc.tamano = 204800;
-    doc.ubicacion = '/uploads/solicitudes/pendientes/1729789123456-abc12345-uuid.pdf';
+    doc.ubicacion =
+      '/uploads/solicitudes/pendientes/1729789123456-abc12345-uuid.pdf';
     doc.tokenReclamo = 'a1b2c3d4e5f67890abcdef1234567890';
     doc.fechaCarga = new Date('2026-10-24T10:00:00Z');
 
@@ -67,7 +68,8 @@ describe('DocumentoSolicitud Entity (Backlog 4.1.2 - Tarea 1)', () => {
     const docAntiguo = new DocumentoSolicitud();
     docAntiguo.tipoArchivo = 'application/pdf';
     docAntiguo.tamanio = 5000;
-    docAntiguo.rutaReferenciaArchivo = '/uploads/solicitudes/pendientes/archivo_antiguo.pdf';
+    docAntiguo.rutaReferenciaArchivo =
+      '/uploads/solicitudes/pendientes/archivo_antiguo.pdf';
 
     docAntiguo.sincronizarMetadatos();
 

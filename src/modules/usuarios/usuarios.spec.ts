@@ -16,6 +16,7 @@ import { HorarioLaboralFontanero } from './entities/horario-laboral-fontanero.en
 import { Rol } from './entities/rol.entity';
 import { Usuario } from './entities/usuario.entity';
 import { UsuariosModule } from './usuarios.module';
+import { UsuariosService } from './usuarios.service';
 import {
   PASSWORD_PRUEBA,
   crearUsuarioPrueba,
@@ -27,6 +28,7 @@ describe('Usuarios y roles persistidos', () => {
   let app: INestApplication<App>;
   let roles: Repository<Rol>;
   let usuarios: Repository<Usuario>;
+  let usuariosService: UsuariosService;
   let jwtService: JwtService;
   let adminToken: string;
   let rolesMap: Record<Role, Rol>;
@@ -63,6 +65,7 @@ describe('Usuarios y roles persistidos', () => {
     roles = dataSource.getRepository(Rol);
     usuarios = dataSource.getRepository(Usuario);
     jwtService = moduleFixture.get(JwtService);
+    usuariosService = moduleFixture.get(UsuariosService);
     rolesMap = await seedRolesBase(roles);
 
     await crearUsuarioPrueba(usuarios, rolesMap, {
@@ -121,7 +124,7 @@ describe('Usuarios y roles persistidos', () => {
     const secretaria = await crearUsuarioPrueba(usuarios, rolesMap, {
       nombre: 'Secretaria',
       correo: 'secretaria.roles@asadasanjuan.cr',
-      role: Role.SECRETARIA,
+      role: Role.SECRETARIA_EJECUTIVA,
     });
     const admin = await crearUsuarioPrueba(usuarios, rolesMap, {
       nombre: 'Otra admin',
@@ -134,7 +137,7 @@ describe('Usuarios y roles persistidos', () => {
       role: Role.FONTANERO,
       activo: false,
     });
-    expect(secretaria.rol.nombre).toBe(Role.SECRETARIA);
+    expect(secretaria.rol.nombre).toBe(Role.SECRETARIA_EJECUTIVA);
     expect(admin.rol.nombre).toBe(Role.ADMINISTRADORA);
     expect(inactivo.activo).toBe(false);
     const activo = await usuarios.findOneBy({
@@ -169,7 +172,99 @@ describe('Usuarios y roles persistidos', () => {
       .expect(200);
     const serialized = JSON.stringify(response.body);
     expect(serialized).not.toMatch(/passwordHash/i);
+    expect(serialized).not.toMatch(/\$2[aby]\$/);
     expect(response.body).toHaveProperty('data');
+    const data = (response.body as { data: Array<Record<string, unknown>> })
+      .data;
+    expect(data.length).toBeGreaterThan(0);
+    for (const row of data) {
+      expect(typeof row.id).toBe('number');
+      expect(typeof row.nombre).toBe('string');
+      expect(typeof row.correo).toBe('string');
+      expect(typeof row.activo).toBe('boolean');
+      expect(typeof row.rol).toBe('string');
+      expect(row).not.toHaveProperty('passwordHash');
+    }
     expect(jwtService).toBeDefined();
+  });
+
+  it('find() normal no carga passwordHash; addSelect sí lo obtiene', async () => {
+    const correo = 'hash.select@asadasanjuan.cr';
+    await crearUsuarioPrueba(usuarios, rolesMap, {
+      nombre: 'Select Hash',
+      correo,
+      role: Role.FONTANERO,
+    });
+    const sinHash = await usuarios.findOne({ where: { correo } });
+    expect(sinHash).toBeTruthy();
+    expect(sinHash?.passwordHash).toBeUndefined();
+
+    const conHash = await usuarios
+      .createQueryBuilder('usuario')
+      .addSelect('usuario.passwordHash')
+      .where('usuario.correo = :correo', { correo })
+      .getOne();
+    expect(conHash?.passwordHash).toBeDefined();
+    expect(conHash?.passwordHash).not.toBe(PASSWORD_PRUEBA);
+    expect(conHash?.passwordHash?.startsWith('$2')).toBe(true);
+  });
+
+  it('applyPlainPassword: hash al crear; update sin password no re-hashea', async () => {
+    const correo = 'pwd.change@asadasanjuan.cr';
+    const entity = usuarios.create({
+      nombre: 'Cambio Pwd',
+      correo,
+      passwordHash: '',
+      activo: true,
+      idRol: rolesMap[Role.ABONADO].idRol,
+    });
+    const applied = await usuariosService.applyPlainPassword(
+      entity,
+      'TestPassword123!',
+    );
+    expect(applied).toBe(true);
+    expect(entity.passwordHash).not.toBe('TestPassword123!');
+    expect(entity.passwordHash.startsWith('$2')).toBe(true);
+    await usuarios.save(entity);
+
+    const conHash = await usuarios
+      .createQueryBuilder('usuario')
+      .addSelect('usuario.passwordHash')
+      .where('usuario.correo = :correo', { correo })
+      .getOne();
+    const hashOriginal = conHash!.passwordHash;
+    expect(hashOriginal).toBeDefined();
+
+    const sinCambio = await usuariosService.applyPlainPassword(conHash!, '');
+    expect(sinCambio).toBe(false);
+    expect(conHash!.passwordHash).toBe(hashOriginal);
+
+    const sinCambioNull = await usuariosService.applyPlainPassword(
+      conHash!,
+      undefined,
+    );
+    expect(sinCambioNull).toBe(false);
+    expect(conHash!.passwordHash).toBe(hashOriginal);
+
+    const cambiado = await usuariosService.applyPlainPassword(
+      conHash!,
+      'NuevaPassword456!',
+    );
+    expect(cambiado).toBe(true);
+    expect(conHash!.passwordHash).not.toBe(hashOriginal);
+    expect(conHash!.passwordHash).not.toBe('NuevaPassword456!');
+    await usuarios.save(conHash!);
+
+    const loginVieja = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({ email: correo, password: 'TestPassword123!' });
+    expect(loginVieja.status).toBe(401);
+
+    const loginNueva = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({ email: correo, password: 'NuevaPassword456!' });
+    expect(loginNueva.status).toBe(200);
+    expect(loginNueva.body).not.toHaveProperty('passwordHash');
+    expect(JSON.stringify(loginNueva.body)).not.toMatch(/\$2[aby]\$/);
   });
 });

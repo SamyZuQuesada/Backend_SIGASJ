@@ -129,7 +129,7 @@ describe('Políticas RRHH ASADA', () => {
 
     await request(app.getHttpServer())
       .get(`${VAC}/colaboradores/${colab.id}/balance`)
-      .set('Authorization', `Bearer ${signAs(Role.SECRETARIA)}`)
+      .set('Authorization', `Bearer ${signAs(Role.SECRETARIA_EJECUTIVA)}`)
       .expect(200);
 
     await request(app.getHttpServer())
@@ -169,7 +169,7 @@ describe('Políticas RRHH ASADA', () => {
 
     const conOrigen = await request(app.getHttpServer())
       .post(INC)
-      .set('Authorization', `Bearer ${signAs(Role.SECRETARIA)}`)
+      .set('Authorization', `Bearer ${signAs(Role.SECRETARIA_EJECUTIVA)}`)
       .send({
         colaboradorId: colab.id,
         fechaInicio: '2026-04-01',

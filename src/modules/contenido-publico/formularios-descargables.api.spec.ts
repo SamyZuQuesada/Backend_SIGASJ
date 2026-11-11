@@ -170,7 +170,7 @@ describe('API admin/formularios-descargables', () => {
     },
   );
 
-  it.each([Role.ADMINISTRADORA, Role.SECRETARIA])(
+  it.each([Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA])(
     'rol %s puede listar',
     async (role) => {
       const res = await request(app.getHttpServer())
@@ -222,7 +222,7 @@ describe('API admin/formularios-descargables', () => {
   it('PATCH metadata válido', async () => {
     await request(app.getHttpServer())
       .patch('/admin/formularios-descargables/1')
-      .set('Authorization', `Bearer ${signAs(Role.SECRETARIA)}`)
+      .set('Authorization', `Bearer ${signAs(Role.SECRETARIA_EJECUTIVA)}`)
       .send({ nombre: 'Nombre B', descripcion: 'Nueva' })
       .expect(200);
 

@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
 
-export class AddAdjuntosJsonToSolicitudAusencia1724686320000
-  implements MigrationInterface
-{
+export class AddAdjuntosJsonToSolicitudAusencia1724686320000 implements MigrationInterface {
   name = 'AddAdjuntosJsonToSolicitudAusencia1724686320000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

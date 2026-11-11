@@ -124,7 +124,9 @@ export const documentosDesdeAdjuntosJson = (
             ? rec.nombreOriginal
             : 'evidencia',
         tipoArchivo:
-          typeof rec.tipoArchivo === 'string' ? rec.tipoArchivo : 'application/octet-stream',
+          typeof rec.tipoArchivo === 'string'
+            ? rec.tipoArchivo
+            : 'application/octet-stream',
         rutaReferenciaArchivo: normalizarRutaEvidenciaAusencia(
           solicitudId,
           ruta,
@@ -161,7 +163,9 @@ export const fusionarDocumentosAusencia = (
     fechaCarga: documento.fechaCarga,
   }));
   const seen = new Set(
-    fromRelation.map((doc) => filenameDeRutaEvidencia(doc.rutaReferenciaArchivo)),
+    fromRelation.map((doc) =>
+      filenameDeRutaEvidencia(doc.rutaReferenciaArchivo),
+    ),
   );
   const extra = documentosDesdeAdjuntosJson(
     solicitudId,

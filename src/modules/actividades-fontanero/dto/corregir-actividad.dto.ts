@@ -39,7 +39,11 @@ const toOptionalNumber = (params: TransformFnParams): unknown => {
   const raw = rawValue(params);
   if (raw === undefined || raw === null || raw === '') return undefined;
   if (typeof raw === 'number') return raw;
-  if (typeof raw === 'string' && raw.trim() !== '' && Number.isFinite(Number(raw))) {
+  if (
+    typeof raw === 'string' &&
+    raw.trim() !== '' &&
+    Number.isFinite(Number(raw))
+  ) {
     return Number(raw);
   }
   return raw;
@@ -140,6 +144,9 @@ export class CorregirActividadDto {
   @Transform(toIdArray)
   @IsOptional()
   @IsArray({ message: 'Las evidencias a eliminar deben ser una lista' })
-  @IsInt({ each: true, message: 'Cada evidencia a eliminar debe ser un identificador' })
+  @IsInt({
+    each: true,
+    message: 'Cada evidencia a eliminar debe ser un identificador',
+  })
   documentosEliminarIds?: number[];
 }
