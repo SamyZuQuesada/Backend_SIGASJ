@@ -53,6 +53,6 @@ export async function seedStaffLoginUsers(
   await crearUsuarioPrueba(usuarios, roles, {
     nombre: 'Secretaria',
     correo: 'secretaria@asadasanjuan.cr',
-    role: Role.SECRETARIA,
+    role: Role.SECRETARIA_EJECUTIVA,
   });
 }

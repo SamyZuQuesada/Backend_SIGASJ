@@ -83,7 +83,7 @@ export class ContenidoPublicoController {
   @Get('admin/informacion')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({
     summary: 'Consultar información institucional para edición (Admin)',
   })
@@ -94,7 +94,7 @@ export class ContenidoPublicoController {
   @Get('admin/contacto')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({ summary: 'Consultar datos de contacto para edición (Admin)' })
   getAdminContacto() {
     return this.contenidoPublicoService.getContacto();
@@ -103,7 +103,7 @@ export class ContenidoPublicoController {
   @Put('admin/contacto')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({ summary: 'Actualizar contacto y ubicación (Admin)' })
   updateAdminContacto(@Body() dto: UpdateContactoDto) {
     return this.contenidoPublicoService.updateContacto(dto);
@@ -112,7 +112,7 @@ export class ContenidoPublicoController {
   @Get('admin/galeria')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({ summary: 'Listar fotografías de la galería (Admin)' })
   getAdminGaleria() {
     return this.contenidoPublicoService.getGaleriaAdmin();
@@ -122,7 +122,7 @@ export class ContenidoPublicoController {
   @ApiBearerAuth()
   @ApiConsumes('multipart/form-data', 'application/json')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @UseInterceptors(FileInterceptor('imagen'))
   @ApiOperation({ summary: 'Agregar una fotografía a la galería (Admin)' })
   createGaleria(
@@ -136,7 +136,7 @@ export class ContenidoPublicoController {
   @ApiBearerAuth()
   @ApiConsumes('multipart/form-data', 'application/json')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @UseInterceptors(FileInterceptor('imagen'))
   @ApiOperation({ summary: 'Actualizar una fotografía de la galería (Admin)' })
   updateGaleria(
@@ -150,7 +150,7 @@ export class ContenidoPublicoController {
   @Patch('admin/galeria/:id/estado')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({ summary: 'Activar o desactivar una fotografía (Admin)' })
   setGaleriaActiva(
     @Param('id', ParseIntPipe) id: number,
@@ -162,7 +162,7 @@ export class ContenidoPublicoController {
   @Delete('admin/galeria/:id')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({ summary: 'Eliminar una fotografía de la galería (Admin)' })
   removeGaleria(@Param('id', ParseIntPipe) id: number) {
     return this.contenidoPublicoService.removeGaleria(id);
@@ -171,7 +171,7 @@ export class ContenidoPublicoController {
   @Get('admin/transparencia')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({ summary: 'Listar publicaciones de transparencia (Admin)' })
   getAdminTransparencia() {
     return this.contenidoPublicoService.getTransparenciaAdmin();
@@ -181,7 +181,7 @@ export class ContenidoPublicoController {
   @ApiBearerAuth()
   @ApiConsumes('multipart/form-data', 'application/json')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @UseInterceptors(FileInterceptor('archivo'))
   @ApiOperation({ summary: 'Crear una publicación de transparencia (Admin)' })
   createTransparencia(
@@ -195,7 +195,7 @@ export class ContenidoPublicoController {
   @ApiBearerAuth()
   @ApiConsumes('multipart/form-data', 'application/json')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @UseInterceptors(FileInterceptor('archivo'))
   @ApiOperation({
     summary: 'Actualizar una publicación de transparencia (Admin)',
@@ -211,7 +211,7 @@ export class ContenidoPublicoController {
   @Patch('admin/transparencia/:id/estado')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({
     summary: 'Activar o desactivar una publicación de transparencia (Admin)',
   })
@@ -225,7 +225,7 @@ export class ContenidoPublicoController {
   @Delete('admin/transparencia/:id')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({
     summary: 'Eliminar una publicación de transparencia (Admin)',
   })

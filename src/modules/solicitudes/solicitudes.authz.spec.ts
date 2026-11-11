@@ -103,7 +103,7 @@ describe('Tarea #338 — Solicitudes aprobadas pendientes', () => {
   it('Secretaria puede consultar solicitudes pendientes', async () => {
     await request(app.getHttpServer())
       .get('/solicitudes/aprobadas-pendientes')
-      .set('Authorization', `Bearer ${signAs(Role.SECRETARIA, '2')}`)
+      .set('Authorization', `Bearer ${signAs(Role.SECRETARIA_EJECUTIVA, '2')}`)
       .expect(200);
   });
 

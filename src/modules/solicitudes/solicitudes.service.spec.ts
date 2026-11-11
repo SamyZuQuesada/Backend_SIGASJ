@@ -199,7 +199,9 @@ describe('SolicitudesService', () => {
     findBySlugTipo = jest.fn().mockResolvedValue(mockSolicitud.tipoSolicitud);
     saveHistorial = jest
       .fn()
-      .mockImplementation((hist: unknown) => Promise.resolve({ id: 1, ...(hist as object) }));
+      .mockImplementation((hist: unknown) =>
+        Promise.resolve({ id: 1, ...(hist as object) }),
+      );
     createHistorial = jest
       .fn()
       .mockImplementation((hist: unknown) => ({ id: 1, ...(hist as object) }));
@@ -1849,7 +1851,7 @@ describe('SolicitudesService', () => {
             nombre: 'María Rodríguez',
             correo: 'secreto@example.com',
             password: 'hash',
-            rol: { nombre: 'ADMINISTRADORA' },
+            rol: { nombre: Role.ADMINISTRADORA },
           },
         },
       ]);
@@ -1859,7 +1861,7 @@ describe('SolicitudesService', () => {
       expect(hist[0].usuario).toEqual({
         idUsuario: 7,
         nombre: 'María Rodríguez',
-        rol: 'ADMINISTRADORA',
+        rol: Role.ADMINISTRADORA,
       });
       expect(hist[0]).not.toHaveProperty('correo');
       expect(JSON.stringify(hist[0])).not.toContain('secreto@');
@@ -1921,7 +1923,9 @@ describe('SolicitudesService', () => {
       expect(res.nombreInterno).toContain('cedula.pdf');
       expect(res.mimeType).toBe('application/pdf');
       expect(res.tamano).toBe(14);
-      expect(res.ubicacion).toBe(`/uploads/solicitudes/pendientes/${res.nombreInterno}`);
+      expect(res.ubicacion).toBe(
+        `/uploads/solicitudes/pendientes/${res.nombreInterno}`,
+      );
       expect(res.ubicacion).not.toContain('C:');
       expect(res.tokenReclamo).toBeDefined();
       expect(res.fechaCarga).toBeInstanceOf(Date);

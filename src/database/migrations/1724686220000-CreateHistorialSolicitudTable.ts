@@ -10,9 +10,7 @@ import {
  * Traza inmutable de eventos por solicitud (HistorialSolicitud).
  * Registra el evento inicial de creación y futuros cambios de estado.
  */
-export class CreateHistorialSolicitudTable1724686220000
-  implements MigrationInterface
-{
+export class CreateHistorialSolicitudTable1724686220000 implements MigrationInterface {
   name = 'CreateHistorialSolicitudTable1724686220000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

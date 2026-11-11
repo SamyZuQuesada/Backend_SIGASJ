@@ -43,7 +43,7 @@ export class ComunicadosController {
   @Get('admin/comunicados')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({
     summary: 'Listar todos los comunicados para administración (Admin)',
   })
@@ -55,7 +55,7 @@ export class ComunicadosController {
   @ApiBearerAuth()
   @ApiConsumes('multipart/form-data', 'application/json')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @UseInterceptors(FileInterceptor('imagen'))
   @ApiOperation({ summary: 'Crear un comunicado (Admin)' })
   create(
@@ -69,7 +69,7 @@ export class ComunicadosController {
   @ApiBearerAuth()
   @ApiConsumes('multipart/form-data', 'application/json')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @UseInterceptors(FileInterceptor('imagen'))
   @ApiOperation({ summary: 'Actualizar un comunicado (Admin)' })
   update(
@@ -83,7 +83,7 @@ export class ComunicadosController {
   @Patch('admin/comunicados/:id/estado')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({ summary: 'Activar o desactivar un comunicado (Admin)' })
   setEstado(@Param('id') id: string, @Body() dto: UpdateComunicadoEstadoDto) {
     return this.comunicadosService.setEstado(id, dto.estado);
@@ -92,7 +92,7 @@ export class ComunicadosController {
   @Delete('admin/comunicados/:id')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({ summary: 'Eliminar un comunicado (Admin)' })
   remove(@Param('id') id: string) {
     return this.comunicadosService.remove(id);

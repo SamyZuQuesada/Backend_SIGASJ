@@ -24,6 +24,10 @@ export class Usuario {
   @Column({ type: 'varchar', length: 150, unique: true })
   correo: string;
 
+  /**
+   * Hash bcrypt (nunca contraseña en texto plano).
+   * `select: false` evita cargarlo en consultas normales; Auth lo pide con addSelect.
+   */
   @ApiHideProperty()
   @Column({ type: 'varchar', length: 255, select: false })
   passwordHash: string;

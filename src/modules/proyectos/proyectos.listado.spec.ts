@@ -403,7 +403,7 @@ describe('GET /api/v1/admin/proyectos — listado administrativo', () => {
   it('Seguridad — usuario autenticado sin permiso responde 403', async () => {
     const response = await getProyectos(
       {},
-      signAs(Role.SECRETARIA, '2'),
+      signAs(Role.SECRETARIA_EJECUTIVA, '2'),
     ).expect(403);
     expect(response.body).toMatchObject({
       statusCode: 403,

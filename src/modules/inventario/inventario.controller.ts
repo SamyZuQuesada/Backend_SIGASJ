@@ -111,7 +111,7 @@ export class InventarioController {
   @Header('Pragma', 'no-cache')
   @Header('Expires', '0')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA, Role.FONTANERO)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA, Role.FONTANERO)
   @ApiOperation({
     summary: 'Consultar listado ordenado y paginado de materiales',
     description:
@@ -142,7 +142,7 @@ export class InventarioController {
   @Header('Pragma', 'no-cache')
   @Header('Expires', '0')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA, Role.FONTANERO)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA, Role.FONTANERO)
   @ApiOperation({
     summary: 'Consultar detalle completo de un material por ID',
     description:
@@ -182,7 +182,7 @@ export class InventarioController {
   @Header('Pragma', 'no-cache')
   @Header('Expires', '0')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA, Role.FONTANERO)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA, Role.FONTANERO)
   @ApiOperation({
     summary:
       'Consultar y verificar disponibilidad de existencias para una salida (Regla 4.5.2)',
@@ -377,7 +377,7 @@ export class InventarioController {
 
   @Get('categorias')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA, Role.FONTANERO)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA, Role.FONTANERO)
   @ApiOperation({
     summary: 'Consultar catálogo de categorías de materiales',
     description:
@@ -403,7 +403,7 @@ export class InventarioController {
 
   @Get('categorias/:id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA, Role.FONTANERO)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA, Role.FONTANERO)
   @ApiOperation({
     summary: 'Obtener detalle de una categoría por ID',
     description:
@@ -592,7 +592,7 @@ export class InventarioController {
 
   @Get('proveedores')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA, Role.FONTANERO)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA, Role.FONTANERO)
   @ApiOperation({
     summary: 'Listar proveedores con paginación y filtros (Personal ASADA)',
     description:
@@ -618,7 +618,7 @@ export class InventarioController {
 
   @Get('proveedores/:id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA, Role.FONTANERO)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA, Role.FONTANERO)
   @ApiOperation({
     summary: 'Consultar el detalle de un proveedor por ID (Personal ASADA)',
     description: 'Obtiene la información completa de un proveedor específico.',
@@ -805,7 +805,7 @@ export class InventarioController {
   @Get('salidas/averia/:idAveria')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA, Role.FONTANERO)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA, Role.FONTANERO)
   @ApiOperation({
     summary: 'Consultar salidas de materiales asociadas a una avería',
     description:
@@ -894,7 +894,7 @@ export class InventarioController {
 
   @Get('movimientos/:id/documentos')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA, Role.FONTANERO)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA, Role.FONTANERO)
   @ApiOperation({
     summary:
       'Listar documentos de respaldo asociados a un movimiento de inventario',
@@ -915,7 +915,7 @@ export class InventarioController {
 
   @Get('entradas/:id/documentos')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA, Role.FONTANERO)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA, Role.FONTANERO)
   @ApiOperation({
     summary:
       'Listar documentos de respaldo asociados a una entrada de inventario',
@@ -932,7 +932,7 @@ export class InventarioController {
 
   @Get('movimientos/:id/documentos/:filename')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA, Role.FONTANERO)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA, Role.FONTANERO)
   @ApiOperation({
     summary:
       'Descargar o visualizar un documento de respaldo de un movimiento de inventario',
@@ -960,7 +960,7 @@ export class InventarioController {
 
   @Get('entradas/:id/documentos/:filename')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA, Role.FONTANERO)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA, Role.FONTANERO)
   @ApiOperation({
     summary:
       'Descargar o visualizar un documento de respaldo de una entrada de inventario',

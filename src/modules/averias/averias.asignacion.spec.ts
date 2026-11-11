@@ -396,7 +396,7 @@ describe('PBI 2.4 — asignación de avería al Fontanero', () => {
   it('rechaza un ayudante igual al Fontanero, sin rol AYUDANTE o inactivo', async () => {
     const fontanero = await persistUsuario();
     const otroFontanero = await persistUsuario();
-    const secretaria = await persistUsuario({ role: Role.SECRETARIA });
+    const secretaria = await persistUsuario({ role: Role.SECRETARIA_EJECUTIVA });
     const inactivo = await persistUsuario({
       role: Role.AYUDANTE,
       activo: false,
@@ -659,7 +659,7 @@ describe('PBI 2.4 — asignación de avería al Fontanero', () => {
     const fontaneroB = await persistUsuario({ nombre: 'José Ramírez' });
     await persistUsuario({
       nombre: 'Secretaria extra',
-      role: Role.SECRETARIA,
+      role: Role.SECRETARIA_EJECUTIVA,
     });
     await persistUsuario({
       nombre: 'Otra admin',
@@ -717,7 +717,7 @@ describe('PBI 2.4 — asignación de avería al Fontanero', () => {
   it('rechaza Secretaria, Administradora y Fontanero inactivo', async () => {
     const secretaria = await persistUsuario({
       nombre: 'Secretaria no asignable',
-      role: Role.SECRETARIA,
+      role: Role.SECRETARIA_EJECUTIVA,
     });
     const administradora = await persistUsuario({
       nombre: 'Admin no asignable',

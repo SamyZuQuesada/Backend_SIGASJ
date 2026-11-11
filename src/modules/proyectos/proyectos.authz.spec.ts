@@ -209,7 +209,7 @@ describe('POST/GET/PATCH /api/v1/admin/proyectos — autenticación y autorizaci
   it('Secretaria autenticada recibe 403 y no inserta', async () => {
     const response = await postProyecto(
       VALID_PAYLOAD,
-      signAs(Role.SECRETARIA, '2'),
+      signAs(Role.SECRETARIA_EJECUTIVA, '2'),
     ).expect(403);
 
     expect(response.body).toMatchObject({
@@ -325,7 +325,7 @@ describe('POST/GET/PATCH /api/v1/admin/proyectos — autenticación y autorizaci
   it('GET /api/v1/admin/proyectos con Secretaria responde 403', async () => {
     const response = await request(app.getHttpServer())
       .get('/api/v1/admin/proyectos')
-      .set('Authorization', `Bearer ${signAs(Role.SECRETARIA, '2')}`)
+      .set('Authorization', `Bearer ${signAs(Role.SECRETARIA_EJECUTIVA, '2')}`)
       .expect(403);
 
     expect(response.body).toMatchObject({
@@ -407,7 +407,7 @@ describe('POST/GET/PATCH /api/v1/admin/proyectos — autenticación y autorizaci
   it('GET /api/v1/admin/proyectos/:id con Secretaria responde 403', async () => {
     const response = await request(app.getHttpServer())
       .get('/api/v1/admin/proyectos/1')
-      .set('Authorization', `Bearer ${signAs(Role.SECRETARIA, '2')}`)
+      .set('Authorization', `Bearer ${signAs(Role.SECRETARIA_EJECUTIVA, '2')}`)
       .expect(403);
 
     expect(response.body).toMatchObject({
@@ -642,7 +642,7 @@ describe('POST/GET/PATCH /api/v1/admin/proyectos — autenticación y autorizaci
     const response = await patchProyecto(
       id,
       { nombre: 'Nuevo nombre' },
-      signAs(Role.SECRETARIA, '2'),
+      signAs(Role.SECRETARIA_EJECUTIVA, '2'),
     ).expect(403);
 
     expect(response.body).toMatchObject({

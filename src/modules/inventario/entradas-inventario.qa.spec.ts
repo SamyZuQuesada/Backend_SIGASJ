@@ -598,7 +598,7 @@ describe('Entradas de Inventario — QA Integral, Validación Funcional y Transa
     });
 
     it('rechaza con 403 Forbidden cuando SECRETARIA intenta registrar una entrada', async () => {
-      const token = signAs(Role.SECRETARIA, String(secretariaUser.idUsuario));
+      const token = signAs(Role.SECRETARIA_EJECUTIVA, String(secretariaUser.idUsuario));
 
       const res = await request(app.getHttpServer())
         .post('/api/v1/inventario/entradas')

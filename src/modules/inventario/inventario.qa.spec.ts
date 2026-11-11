@@ -223,7 +223,7 @@ describe('Gestión de Materiales de Bodega — QA Integral y Validación Funcion
     it('permite consultar el listado a ADMINISTRADORA, SECRETARIA y FONTANERO', async () => {
       for (const role of [
         Role.ADMINISTRADORA,
-        Role.SECRETARIA,
+        Role.SECRETARIA_EJECUTIVA,
         Role.FONTANERO,
       ]) {
         const token = signAs(role);
@@ -301,7 +301,7 @@ describe('Gestión de Materiales de Bodega — QA Integral y Validación Funcion
     });
 
     it('obtiene la información completa del material por su ID', async () => {
-      const token = signAs(Role.SECRETARIA);
+      const token = signAs(Role.SECRETARIA_EJECUTIVA);
       const res = await request(app.getHttpServer())
         .get(`/api/v1/inventario/materiales/${materialId}`)
         .set('Authorization', `Bearer ${token}`);

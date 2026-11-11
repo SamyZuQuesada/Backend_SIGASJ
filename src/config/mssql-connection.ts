@@ -102,10 +102,10 @@ export function resolveMssqlDriverOptions(
   env: NodeJS.ProcessEnv = process.env,
 ): MssqlDriverOptions {
   const production = isProductionNodeEnv(env.NODE_ENV);
-  const host = env.DB_HOST?.trim() || "";
-  const isAzureSql = host.toLowerCase().includes("database.windows.net");
-  const encryptOverride = envFlag(env, "DB_ENCRYPT");
-  const trustOverride = envFlag(env, "DB_TRUST_SERVER_CERTIFICATE");
+  const host = env.DB_HOST?.trim() || '';
+  const isAzureSql = host.toLowerCase().includes('database.windows.net');
+  const encryptOverride = envFlag(env, 'DB_ENCRYPT');
+  const trustOverride = envFlag(env, 'DB_TRUST_SERVER_CERTIFICATE');
 
   const encrypt = production
     ? (encryptOverride ?? true)
@@ -115,7 +115,7 @@ export function resolveMssqlDriverOptions(
   if (production) {
     if (isAzureSql && trustOverride === true) {
       throw new Error(
-        "En Azure SQL Database (*.database.windows.net), DB_TRUST_SERVER_CERTIFICATE no puede ser true. Debe validarse el certificado TLS emitido por la CA pública.",
+        'En Azure SQL Database (*.database.windows.net), DB_TRUST_SERVER_CERTIFICATE no puede ser true. Debe validarse el certificado TLS emitido por la CA pública.',
       );
     }
     trustServerCertificate = trustOverride === true;
@@ -125,7 +125,7 @@ export function resolveMssqlDriverOptions(
 
   if (production && encrypt === false) {
     throw new Error(
-      "En producción DB_ENCRYPT no puede ser false. La conexión a Azure SQL Database debe ir cifrada con TLS.",
+      'En producción DB_ENCRYPT no puede ser false. La conexión a Azure SQL Database debe ir cifrada con TLS.',
     );
   }
 
@@ -166,26 +166,26 @@ export function assertProductionDatabaseEnv(
     return;
   }
 
-  const dbType = (env.DB_TYPE || "").trim().toLowerCase();
-  if (dbType !== "mssql") {
+  const dbType = (env.DB_TYPE || '').trim().toLowerCase();
+  if (dbType !== 'mssql') {
     throw new Error(
-      "En producción DB_TYPE debe ser mssql (Azure SQL Database / Microsoft SQL Server).",
+      'En producción DB_TYPE debe ser mssql (Azure SQL Database / Microsoft SQL Server).',
     );
   }
 
   const host = env.DB_HOST?.trim();
   if (!host) {
     throw new Error(
-      "DB_HOST es obligatorio en producción (servidor Azure SQL Database, ej. sigasj-dev.database.windows.net).",
+      'DB_HOST es obligatorio en producción (servidor Azure SQL Database, ej. sigasj-dev.database.windows.net).',
     );
   }
   if (
-    host === "localhost" ||
-    host === "127.0.0.1" ||
-    host.toLowerCase().includes("localdb")
+    host === 'localhost' ||
+    host === '127.0.0.1' ||
+    host.toLowerCase().includes('localdb')
   ) {
     throw new Error(
-      "DB_HOST de producción no puede ser localhost/LocalDB. Use el servidor Azure SQL Database configurado.",
+      'DB_HOST de producción no puede ser localhost/LocalDB. Use el servidor Azure SQL Database configurado.',
     );
   }
 
@@ -194,24 +194,24 @@ export function assertProductionDatabaseEnv(
   const database = getDbDatabaseName(env);
   if (!database) {
     throw new Error(
-      "DB_DATABASE (o DB_NAME) es obligatorio en producción (ej. sigasj-dev).",
+      'DB_DATABASE (o DB_NAME) es obligatorio en producción (ej. sigasj-dev).',
     );
   }
 
   const username = getDbUserName(env);
   if (!username) {
     throw new Error(
-      "DB_USERNAME (o DB_USER) es obligatorio en producción (ej. sigasj_app).",
+      'DB_USERNAME (o DB_USER) es obligatorio en producción (ej. sigasj_app).',
     );
   }
 
   const lowerUser = username.toLowerCase();
   if (
-    lowerUser === "sa" ||
-    lowerUser === "sigasj_sqladmin" ||
-    lowerUser === "sqladmin" ||
-    lowerUser === "admin" ||
-    lowerUser === "administrator"
+    lowerUser === 'sa' ||
+    lowerUser === 'sigasj_sqladmin' ||
+    lowerUser === 'sqladmin' ||
+    lowerUser === 'admin' ||
+    lowerUser === 'administrator'
   ) {
     throw new Error(
       `Producción no debe conectarse con credenciales administrativas (${username}). Utilice el usuario de aplicación restringido sigasj_app.`,
@@ -219,27 +219,27 @@ export function assertProductionDatabaseEnv(
   }
 
   if (!env.DB_PASSWORD?.length) {
-    throw new Error("DB_PASSWORD es obligatorio en producción.");
+    throw new Error('DB_PASSWORD es obligatorio en producción.');
   }
 
-  const syncFlag = envFlag(env, "DB_SYNCHRONIZE");
+  const syncFlag = envFlag(env, 'DB_SYNCHRONIZE');
   if (syncFlag === true) {
     throw new Error(
-      "En producción DB_SYNCHRONIZE debe ser false. El esquema de Azure SQL no debe ser alterado automáticamente.",
+      'En producción DB_SYNCHRONIZE debe ser false. El esquema de Azure SQL no debe ser alterado automáticamente.',
     );
   }
 
-  const isAzureSql = host.toLowerCase().includes("database.windows.net");
-  const trustOverride = envFlag(env, "DB_TRUST_SERVER_CERTIFICATE");
+  const isAzureSql = host.toLowerCase().includes('database.windows.net');
+  const trustOverride = envFlag(env, 'DB_TRUST_SERVER_CERTIFICATE');
   if (isAzureSql && trustOverride === true) {
     throw new Error(
-      "En Azure SQL Database (*.database.windows.net), DB_TRUST_SERVER_CERTIFICATE debe ser false. La validación TLS es obligatoria.",
+      'En Azure SQL Database (*.database.windows.net), DB_TRUST_SERVER_CERTIFICATE debe ser false. La validación TLS es obligatoria.',
     );
   }
 
-  if (env.NODE_TLS_REJECT_UNAUTHORIZED === "0") {
+  if (env.NODE_TLS_REJECT_UNAUTHORIZED === '0') {
     throw new Error(
-      "NODE_TLS_REJECT_UNAUTHORIZED=0 está prohibido. Debe utilizar certificados válidos o configurar la CA correspondiente.",
+      'NODE_TLS_REJECT_UNAUTHORIZED=0 está prohibido. Debe utilizar certificados válidos o configurar la CA correspondiente.',
     );
   }
 }
@@ -254,16 +254,16 @@ export function sanitizeDbErrorMessage(error: unknown): string {
   }
 
   return text
-    .replace(/Password\s*=\s*[^;'"\s]+/gi, "Password=***")
-    .replace(/Pwd\s*=\s*[^;'"\s]+/gi, "Pwd=***")
-    .replace(/:\/\/([^:/]+):([^@/]+)@/gi, "://$1:***@")
-    .replace(/(password|pwd|passwd)\s*[:=]\s*\S+/gi, "$1=***");
+    .replace(/Password\s*=\s*[^;'"\s]+/gi, 'Password=***')
+    .replace(/Pwd\s*=\s*[^;'"\s]+/gi, 'Pwd=***')
+    .replace(/:\/\/([^:/]+):([^@/]+)@/gi, '://$1:***@')
+    .replace(/(password|pwd|passwd)\s*[:=]\s*\S+/gi, '$1=***');
 }
 
 export function describeDbTarget(env: NodeJS.ProcessEnv = process.env): string {
-  const host = env.DB_HOST?.trim() || "(undefined)";
-  const port = env.DB_PORT?.trim() || "(default)";
-  const database = getDbDatabaseName(env) || "(undefined)";
-  const username = getDbUserName(env) ? "(definido)" : "(undefined)";
-  return `type=${env.DB_TYPE || "(undefined)"} host=${host} port=${port} database=${database} username=${username}`;
+  const host = env.DB_HOST?.trim() || '(undefined)';
+  const port = env.DB_PORT?.trim() || '(default)';
+  const database = getDbDatabaseName(env) || '(undefined)';
+  const username = getDbUserName(env) ? '(definido)' : '(undefined)';
+  return `type=${env.DB_TYPE || '(undefined)'} host=${host} port=${port} database=${database} username=${username}`;
 }

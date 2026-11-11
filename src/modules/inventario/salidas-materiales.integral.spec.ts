@@ -165,7 +165,7 @@ describe('Backlog 4.5: Registro de Salidas de Materiales — Pruebas Funcionales
     secretariaUser = await crearUsuarioPrueba(usuarioRepository, roles, {
       nombre: 'Secretaria Integral',
       correo: 'secretaria.integral@asada.test',
-      role: Role.SECRETARIA,
+      role: Role.SECRETARIA_EJECUTIVA,
     });
     abonadoUser = await crearUsuarioPrueba(usuarioRepository, roles, {
       nombre: 'Abonado Integral',
@@ -517,7 +517,7 @@ describe('Backlog 4.5: Registro de Salidas de Materiales — Pruebas Funcionales
 
     it('retorna 403 si el rol es SECRETARIA o ABONADO', async () => {
       const tokenSec = signAs(
-        Role.SECRETARIA,
+        Role.SECRETARIA_EJECUTIVA,
         String(secretariaUser.idUsuario),
       );
       await request(app.getHttpServer())

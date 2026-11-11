@@ -17,6 +17,7 @@ import { CreateSolicitudDisponibilidadServiciosDto } from './dto/create-solicitu
 import { CreateSolicitudInfraestructuraLinderosDto } from './dto/create-solicitud-infraestructura-linderos.dto';
 import { CreateSolicitudConstanciaServicioDto } from './dto/create-solicitud-constancia-servicio.dto';
 import { MotivoConstanciaServicio } from '../../common/enums/motivo-constancia-servicio.enum';
+import { Role } from '../../common/enums/role.enum';
 import { Solicitud } from './entities/solicitud.entity';
 import { SolicitudesController } from './solicitudes.controller';
 import { SolicitudesService } from './solicitudes.service';
@@ -348,7 +349,7 @@ describe('SolicitudesController', () => {
       userId: '7',
       idUsuario: 7,
       email: 'admin@asada.cr',
-      role: 'ADMINISTRADORA',
+      role: Role.ADMINISTRADORA,
       name: 'Admin',
     };
     const dto = {

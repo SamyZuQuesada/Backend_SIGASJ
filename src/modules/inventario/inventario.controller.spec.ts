@@ -764,7 +764,7 @@ describe('InventarioController — Endpoints de Materiales', () => {
     });
 
     it('rechaza con 403 Forbidden si el rol es SECRETARIA', async () => {
-      const token = signAs(Role.SECRETARIA);
+      const token = signAs(Role.SECRETARIA_EJECUTIVA);
 
       const response = await request(app.getHttpServer())
         .post('/api/v1/inventario/materiales')
@@ -875,7 +875,7 @@ describe('InventarioController — Endpoints de Materiales', () => {
     });
 
     it('permite la consulta a SECRETARIA con 200 OK para formularios de solicitudes', async () => {
-      const token = signAs(Role.SECRETARIA);
+      const token = signAs(Role.SECRETARIA_EJECUTIVA);
 
       const response = await request(app.getHttpServer())
         .get('/api/v1/inventario/materiales')
@@ -945,7 +945,7 @@ describe('InventarioController — Endpoints de Materiales', () => {
     });
 
     it('permite la consulta a SECRETARIA con 200 OK para detalles y solicitudes', async () => {
-      const token = signAs(Role.SECRETARIA);
+      const token = signAs(Role.SECRETARIA_EJECUTIVA);
 
       const response = await request(app.getHttpServer())
         .get('/api/v1/inventario/materiales/1')
@@ -1015,7 +1015,7 @@ describe('InventarioController — Endpoints de Materiales', () => {
     });
 
     it('rechaza con 403 Forbidden si el rol es SECRETARIA', async () => {
-      const token = signAs(Role.SECRETARIA);
+      const token = signAs(Role.SECRETARIA_EJECUTIVA);
 
       const response = await request(app.getHttpServer())
         .put('/api/v1/inventario/materiales/1')
@@ -1087,7 +1087,7 @@ describe('InventarioController — Endpoints de Materiales', () => {
     });
 
     it('rechaza con 403 Forbidden si el rol es SECRETARIA', async () => {
-      const token = signAs(Role.SECRETARIA);
+      const token = signAs(Role.SECRETARIA_EJECUTIVA);
 
       const response = await request(app.getHttpServer())
         .patch('/api/v1/inventario/materiales/1')
@@ -1185,7 +1185,7 @@ describe('InventarioController — Endpoints de Materiales', () => {
     });
 
     it('rechaza con 403 Forbidden si el rol es SECRETARIA', async () => {
-      const token = signAs(Role.SECRETARIA);
+      const token = signAs(Role.SECRETARIA_EJECUTIVA);
 
       const response = await request(app.getHttpServer())
         .patch('/api/v1/inventario/materiales/1/estado')
@@ -1291,7 +1291,7 @@ describe('InventarioController — Endpoints de Materiales', () => {
 
       expect(resFontanero.status).toBe(HttpStatus.FORBIDDEN);
 
-      const tokenSecretaria = signAs(Role.SECRETARIA);
+      const tokenSecretaria = signAs(Role.SECRETARIA_EJECUTIVA);
       const resSecretaria = await request(app.getHttpServer())
         .post('/api/v1/inventario/categorias')
         .set('Authorization', `Bearer ${tokenSecretaria}`)
@@ -1324,7 +1324,7 @@ describe('InventarioController — Endpoints de Materiales', () => {
     it('permite a ADMINISTRADORA, SECRETARIA y FONTANERO listar categorías (200 OK)', async () => {
       for (const role of [
         Role.ADMINISTRADORA,
-        Role.SECRETARIA,
+        Role.SECRETARIA_EJECUTIVA,
         Role.FONTANERO,
       ]) {
         const token = signAs(role);
@@ -1519,7 +1519,7 @@ describe('InventarioController — Endpoints de Materiales', () => {
 
     it('POST /api/v1/inventario/proveedores — rechaza con 403 a FONTANERO y SECRETARIA', async () => {
       const tokenFontanero = signAs(Role.FONTANERO);
-      const tokenSecretaria = signAs(Role.SECRETARIA);
+      const tokenSecretaria = signAs(Role.SECRETARIA_EJECUTIVA);
 
       const resFontanero = await request(app.getHttpServer())
         .post('/api/v1/inventario/proveedores')
@@ -1556,7 +1556,7 @@ describe('InventarioController — Endpoints de Materiales', () => {
 
     it('GET /api/v1/inventario/proveedores — permite consulta a ADMINISTRADORA, SECRETARIA y FONTANERO (200 OK)', async () => {
       const tokenAdmin = signAs(Role.ADMINISTRADORA);
-      const tokenSec = signAs(Role.SECRETARIA);
+      const tokenSec = signAs(Role.SECRETARIA_EJECUTIVA);
       const tokenFont = signAs(Role.FONTANERO);
 
       const resAdmin = await request(app.getHttpServer())
@@ -1683,7 +1683,7 @@ describe('InventarioController — Endpoints de Materiales', () => {
     });
 
     it('rechaza con 403 Forbidden si el rol es SECRETARIA', async () => {
-      const token = signAs(Role.SECRETARIA);
+      const token = signAs(Role.SECRETARIA_EJECUTIVA);
 
       const res = await request(app.getHttpServer())
         .post('/api/v1/inventario/entradas')
@@ -1787,7 +1787,7 @@ describe('InventarioController — Endpoints de Materiales', () => {
     });
 
     it('rechaza con 403 Forbidden si el rol es SECRETARIA', async () => {
-      const token = signAs(Role.SECRETARIA);
+      const token = signAs(Role.SECRETARIA_EJECUTIVA);
 
       const res = await request(app.getHttpServer())
         .post('/api/v1/inventario/salidas')

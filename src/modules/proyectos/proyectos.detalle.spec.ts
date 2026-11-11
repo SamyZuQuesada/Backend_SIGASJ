@@ -303,7 +303,7 @@ describe('GET /api/v1/admin/proyectos/:id — detalle administrativo', () => {
   });
 
   it('Prueba 6 — rol no autorizado responde 403', async () => {
-    const response = await getDetalle(1, signAs(Role.SECRETARIA)).expect(403);
+    const response = await getDetalle(1, signAs(Role.SECRETARIA_EJECUTIVA)).expect(403);
     expect(response.body).toMatchObject({
       statusCode: 403,
       message: 'Acceso denegado',

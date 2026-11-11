@@ -19,7 +19,7 @@ describe('usuarioEsFontaneroAsignable (PBI 2.4)', () => {
   });
 
   it('rechaza Secretaria, Administradora, inactivo o sin rol', () => {
-    expect(usuarioEsFontaneroAsignable(conRol(Role.SECRETARIA))).toBe(false);
+    expect(usuarioEsFontaneroAsignable(conRol(Role.SECRETARIA_EJECUTIVA))).toBe(false);
     expect(usuarioEsFontaneroAsignable(conRol(Role.ADMINISTRADORA))).toBe(
       false,
     );

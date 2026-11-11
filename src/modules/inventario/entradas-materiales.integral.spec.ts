@@ -587,7 +587,7 @@ describe('Backlog 4.4: Registro de Entradas de Materiales — Pruebas Funcionale
     it('rechaza con 403 Forbidden cuando SECRETARIA intenta registrar una entrada de bodega', async () => {
       await request(app.getHttpServer())
         .post('/api/v1/inventario/entradas')
-        .set('Authorization', `Bearer ${signAs(Role.SECRETARIA)}`)
+        .set('Authorization', `Bearer ${signAs(Role.SECRETARIA_EJECUTIVA)}`)
         .send({ idMaterial: materialActivo.id, cantidad: 10 })
         .expect(403);
     });

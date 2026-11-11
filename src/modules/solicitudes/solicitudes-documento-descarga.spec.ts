@@ -36,7 +36,9 @@ describe('Descarga Segura de Archivos Binarios de Documentos (Backend)', () => {
   const testUploadsDir = resolve(process.cwd(), 'uploads', 'solicitudes', '15');
   const dummyPdfName = 'test-doc-15-40.pdf';
   const dummyPdfPath = join(testUploadsDir, dummyPdfName);
-  const dummyPdfContent = Buffer.from('%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF');
+  const dummyPdfContent = Buffer.from(
+    '%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF',
+  );
 
   const mockSolicitud15: Partial<Solicitud> = {
     id: 15,
@@ -214,16 +216,20 @@ describe('Descarga Segura de Archivos Binarios de Documentos (Backend)', () => {
 
       // Content-Disposition debe ser inline con el nombre original codificado en UTF-8
       expect(response.headers['content-disposition']).toContain('inline');
-      expect(response.headers['content-disposition']).toContain('cedula_identidad_carlos.pdf');
+      expect(response.headers['content-disposition']).toContain(
+        'cedula_identidad_carlos.pdf',
+      );
 
       // Cuerpo binario no vacío coincidente con el archivo en disco
       expect(response.body).toBeInstanceOf(Buffer);
       expect(response.body.length).toBe(dummyPdfContent.length);
-      expect(response.body.toString('utf-8')).toBe(dummyPdfContent.toString('utf-8'));
+      expect(response.body.toString('utf-8')).toBe(
+        dummyPdfContent.toString('utf-8'),
+      );
     });
 
     it('GET /solicitudes/15/documentos/40 (sin sufijo descargar) también devuelve el archivo correctamente', async () => {
-      const token = signAsRole(Role.SECRETARIA);
+      const token = signAsRole(Role.SECRETARIA_EJECUTIVA);
 
       const response = await request(app.getHttpServer())
         .get('/solicitudes/15/documentos/40')
@@ -303,7 +309,11 @@ describe('Descarga Segura de Archivos Binarios de Documentos (Backend)', () => {
     });
 
     it('debe permitir descarga a ADMINISTRADORA, SECRETARIA y FONTANERO', async () => {
-      for (const role of [Role.ADMINISTRADORA, Role.SECRETARIA, Role.FONTANERO]) {
+      for (const role of [
+        Role.ADMINISTRADORA,
+        Role.SECRETARIA_EJECUTIVA,
+        Role.FONTANERO,
+      ]) {
         const token = signAsRole(role);
         await request(app.getHttpServer())
           .get('/solicitudes/15/documentos/40/descargar')
@@ -353,7 +363,9 @@ describe('Descarga Segura de Archivos Binarios de Documentos (Backend)', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(404);
 
-      expect(response.body.message).toBe('El archivo físico del documento no fue encontrado en el servidor.');
+      expect(response.body.message).toBe(
+        'El archivo físico del documento no fue encontrado en el servidor.',
+      );
       // Verificar que NO se filtre la ruta interna del sistema de archivos en el response
       expect(response.body.message).not.toContain('C:');
       expect(response.body.message).not.toContain('uploads');

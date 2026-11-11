@@ -54,7 +54,7 @@ describe('InventarioService.findMovimientosByAveria — 2.7.1', () => {
     userId: '2',
     idUsuario: 2,
     email: 'secretaria@asada.test',
-    role: Role.SECRETARIA,
+    role: Role.SECRETARIA_EJECUTIVA,
     name: 'Secretaria',
   };
 

@@ -296,7 +296,7 @@ describe('PBI 2.5 — atención integral del Fontanero', () => {
       401,
     );
 
-    for (const role of [Role.ADMINISTRADORA, Role.SECRETARIA, Role.ABONADO]) {
+    for (const role of [Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA, Role.ABONADO]) {
       const token = signAs(role, String(role === Role.ADMINISTRADORA ? 1 : 9));
       await getFontanero(averia.id, token).expect(403);
       await postObservacion(

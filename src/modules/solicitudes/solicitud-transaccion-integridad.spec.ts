@@ -1,4 +1,7 @@
-import { BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import {
+  BadRequestException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
@@ -130,47 +133,54 @@ describe('Tarea 1 - Integridad Transaccional del Registro de Solicitudes', () =>
       solicitudId: 42,
       evento: 'REGISTRADA',
       tipoEvento: 'CREACION',
-      descripcion: 'Registro inicial de solicitud de arreglo de pago domiciliar',
+      descripcion:
+        'Registro inicial de solicitud de arreglo de pago domiciliar',
       estadoAnterior: null,
       estadoNuevo: EstadoSolicitud.PENDIENTE,
       idUsuario: null,
       fechaHora: new Date(),
     } as unknown as HistorialSolicitud;
 
-    mockTransaction = jest.fn(async (callback: (manager: EntityManager) => Promise<unknown>) => {
-      const mockManager = {
-        getRepository: (entity: unknown) => {
-          if (entity === Solicitud) {
-            return {
-              create: jest.fn().mockReturnValue(mockSolicitudSaved),
-              save: jest.fn().mockResolvedValue(mockSolicitudSaved),
-            };
-          }
-          if (entity === SolicitudArregloPago) {
-            return {
-              create: jest.fn().mockReturnValue(mockDetalleSaved),
-              save: jest.fn().mockResolvedValue(mockDetalleSaved),
-            };
-          }
-          if (entity === DocumentoSolicitud) {
-            return {
-              create: jest.fn().mockImplementation((d) => d),
-              save: jest.fn().mockResolvedValue(mockDocumentSaved),
-              find: jest.fn().mockImplementation(() => Promise.resolve([getDocumentoPendiente()])),
-            };
-          }
-          if (entity === HistorialSolicitud) {
-            return {
-              create: jest.fn().mockReturnValue(mockHistorialSaved),
-              save: jest.fn().mockResolvedValue(mockHistorialSaved),
-            };
-          }
-          throw new Error('Repositorio no mockeado');
-        },
-      } as unknown as EntityManager;
+    mockTransaction = jest.fn(
+      async (callback: (manager: EntityManager) => Promise<unknown>) => {
+        const mockManager = {
+          getRepository: (entity: unknown) => {
+            if (entity === Solicitud) {
+              return {
+                create: jest.fn().mockReturnValue(mockSolicitudSaved),
+                save: jest.fn().mockResolvedValue(mockSolicitudSaved),
+              };
+            }
+            if (entity === SolicitudArregloPago) {
+              return {
+                create: jest.fn().mockReturnValue(mockDetalleSaved),
+                save: jest.fn().mockResolvedValue(mockDetalleSaved),
+              };
+            }
+            if (entity === DocumentoSolicitud) {
+              return {
+                create: jest.fn().mockImplementation((d) => d),
+                save: jest.fn().mockResolvedValue(mockDocumentSaved),
+                find: jest
+                  .fn()
+                  .mockImplementation(() =>
+                    Promise.resolve([getDocumentoPendiente()]),
+                  ),
+              };
+            }
+            if (entity === HistorialSolicitud) {
+              return {
+                create: jest.fn().mockReturnValue(mockHistorialSaved),
+                save: jest.fn().mockResolvedValue(mockHistorialSaved),
+              };
+            }
+            throw new Error('Repositorio no mockeado');
+          },
+        } as unknown as EntityManager;
 
-      return callback(mockManager);
-    });
+        return callback(mockManager);
+      },
+    );
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -272,7 +282,9 @@ describe('Tarea 1 - Integridad Transaccional del Registro de Solicitudes', () =>
       expect(resultado.historial).toHaveLength(1);
       expect(resultado.historial?.[0].solicitudId).toBe(42);
       expect(resultado.historial?.[0].evento).toBe('REGISTRADA');
-      expect(resultado.historial?.[0].estadoNuevo).toBe(EstadoSolicitud.PENDIENTE);
+      expect(resultado.historial?.[0].estadoNuevo).toBe(
+        EstadoSolicitud.PENDIENTE,
+      );
     });
 
     it('conserva la integridad referencial: el id de la solicitud coincide en Detalle, Documentos e Historial', async () => {
@@ -306,7 +318,11 @@ describe('Tarea 1 - Integridad Transaccional del Registro de Solicitudes', () =>
             if (entity === SolicitudArregloPago) {
               return {
                 create: jest.fn().mockReturnValue(mockDetalleSaved),
-                save: jest.fn().mockRejectedValue(new Error('Fallo al insertar detalle de formulario')),
+                save: jest
+                  .fn()
+                  .mockRejectedValue(
+                    new Error('Fallo al insertar detalle de formulario'),
+                  ),
               };
             }
             if (entity === DocumentoSolicitud) {
@@ -352,7 +368,11 @@ describe('Tarea 1 - Integridad Transaccional del Registro de Solicitudes', () =>
             }
             if (entity === DocumentoSolicitud) {
               return {
-                save: jest.fn().mockRejectedValue(new Error('Error de disco o base de datos en documento')),
+                save: jest
+                  .fn()
+                  .mockRejectedValue(
+                    new Error('Error de disco o base de datos en documento'),
+                  ),
               };
             }
             if (entity === HistorialSolicitud) {
@@ -400,7 +420,13 @@ describe('Tarea 1 - Integridad Transaccional del Registro de Solicitudes', () =>
             if (entity === HistorialSolicitud) {
               return {
                 create: jest.fn().mockReturnValue(mockHistorialSaved),
-                save: jest.fn().mockRejectedValue(new InternalServerErrorException('Fallo al registrar evento inicial de historial')),
+                save: jest
+                  .fn()
+                  .mockRejectedValue(
+                    new InternalServerErrorException(
+                      'Fallo al registrar evento inicial de historial',
+                    ),
+                  ),
               };
             }
             throw new Error('Repo desconocido');

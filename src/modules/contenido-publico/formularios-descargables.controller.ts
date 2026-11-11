@@ -35,7 +35,7 @@ import {
 @Controller()
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+@Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
 export class FormulariosDescargablesController {
   constructor(
     private readonly formulariosDescargablesService: FormulariosDescargablesService,

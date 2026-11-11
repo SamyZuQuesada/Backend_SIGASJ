@@ -211,7 +211,7 @@ describe('Gestión de Proveedores de Inventario — QA Integral y Validación Fu
         .send({ nombre: 'Intento Fontanero' });
       expect(resFont.status).toBe(HttpStatus.FORBIDDEN);
 
-      const tokenSec = signAs(Role.SECRETARIA);
+      const tokenSec = signAs(Role.SECRETARIA_EJECUTIVA);
       const resSec = await request(app.getHttpServer())
         .post('/api/v1/inventario/proveedores')
         .set('Authorization', `Bearer ${tokenSec}`)
@@ -242,7 +242,7 @@ describe('Gestión de Proveedores de Inventario — QA Integral y Validación Fu
     });
 
     it('permite a ADMINISTRADORA, SECRETARIA y FONTANERO consultar proveedores con paginación', async () => {
-      const tokenSec = signAs(Role.SECRETARIA);
+      const tokenSec = signAs(Role.SECRETARIA_EJECUTIVA);
 
       const response = await request(app.getHttpServer())
         .get('/api/v1/inventario/proveedores?page=1&limit=10')

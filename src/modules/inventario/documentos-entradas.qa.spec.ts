@@ -352,7 +352,7 @@ describe('Documentos de Respaldo en Entradas de Inventario — QA Integral y Val
     it('permite a SECRETARIA y FONTANERO consultar los documentos de respaldo (200 OK)', async () => {
       await request(app.getHttpServer())
         .get(`/api/v1/inventario/movimientos/${testMovimiento.id}/documentos`)
-        .set('Authorization', `Bearer ${signAs(Role.SECRETARIA)}`)
+        .set('Authorization', `Bearer ${signAs(Role.SECRETARIA_EJECUTIVA)}`)
         .expect(200);
 
       await request(app.getHttpServer())
@@ -439,7 +439,7 @@ describe('Documentos de Respaldo en Entradas de Inventario — QA Integral y Val
       const pdfBuffer = Buffer.from('%PDF-1.4 test');
       await request(app.getHttpServer())
         .post(`/api/v1/inventario/movimientos/${testMovimiento.id}/documentos`)
-        .set('Authorization', `Bearer ${signAs(Role.SECRETARIA)}`)
+        .set('Authorization', `Bearer ${signAs(Role.SECRETARIA_EJECUTIVA)}`)
         .attach('archivo', pdfBuffer, {
           filename: 'factura.pdf',
           contentType: 'application/pdf',

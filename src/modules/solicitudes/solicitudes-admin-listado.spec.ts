@@ -65,9 +65,7 @@ describe('Panel Administrativo - Consulta y Filtrado de Solicitudes', () => {
   };
 
   beforeEach(async () => {
-    findAndCountSolicitud = jest
-      .fn()
-      .mockResolvedValue([[mockSolicitud], 1]);
+    findAndCountSolicitud = jest.fn().mockResolvedValue([[mockSolicitud], 1]);
     findArregloPago = jest.fn().mockResolvedValue([]);
     findCambioTitular = jest.fn().mockResolvedValue([]);
     findInfraestructura = jest.fn().mockResolvedValue([]);
@@ -196,7 +194,7 @@ describe('Panel Administrativo - Consulta y Filtrado de Solicitudes', () => {
     it('debe permitir el acceso a usuarios con rol SECRETARIA', async () => {
       const response = await request(app.getHttpServer())
         .get('/solicitudes')
-        .set('Authorization', `Bearer ${signAs(Role.SECRETARIA)}`)
+        .set('Authorization', `Bearer ${signAs(Role.SECRETARIA_EJECUTIVA)}`)
         .expect(200);
 
       expect(response.body.solicitudes).toBeDefined();
@@ -272,7 +270,7 @@ describe('Panel Administrativo - Consulta y Filtrado de Solicitudes', () => {
     it('debe filtrar por estado del trámite', async () => {
       await request(app.getHttpServer())
         .get(`/solicitudes?estado=${EstadoSolicitud.PENDIENTE}`)
-        .set('Authorization', `Bearer ${signAs(Role.SECRETARIA)}`)
+        .set('Authorization', `Bearer ${signAs(Role.SECRETARIA_EJECUTIVA)}`)
         .expect(200);
 
       expect(findAndCountSolicitud).toHaveBeenCalledWith(

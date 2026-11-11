@@ -215,7 +215,7 @@ describe('Backlog 3.2: Clasificación de Materiales — QA Integral, Integració
     });
 
     it('consulta el listado de categorías con soporte de paginación y búsqueda', async () => {
-      const token = signAs(Role.SECRETARIA);
+      const token = signAs(Role.SECRETARIA_EJECUTIVA);
 
       const response = await request(app.getHttpServer())
         .get('/api/v1/inventario/categorias?nombre=tube')
@@ -602,7 +602,7 @@ describe('Backlog 3.2: Clasificación de Materiales — QA Integral, Integració
     });
 
     it('permite consulta a FONTANERO y SECRETARIA pero bloquea creación y edición de categorías con 403 Forbidden', async () => {
-      for (const rolLectura of [Role.FONTANERO, Role.SECRETARIA]) {
+      for (const rolLectura of [Role.FONTANERO, Role.SECRETARIA_EJECUTIVA]) {
         const token = signAs(rolLectura);
 
         // Lectura permitida
