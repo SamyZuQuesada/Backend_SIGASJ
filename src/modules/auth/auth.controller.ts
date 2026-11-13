@@ -1,13 +1,32 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Post,
+  UnauthorizedException,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Role } from '../../common/enums/role.enum';
-import { AuthService, AuthLoginResult } from './auth.service';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
+import { AuthService, AuthLoginResult, AuthLoginUser } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 
 /**
- * Endpoint público de autenticación.
- * Ruta final (global prefix `api/v1`): POST /api/v1/auth/login
- * Sin JwtAuthGuard / RolesGuard: no requiere sesión ni token previo.
+ * Autenticación.
+ * Prefijo global `api/v1`:
+ * - POST /api/v1/auth/login (público)
+ * - GET  /api/v1/auth/me (requiere JWT)
  */
 @ApiTags('Auth')
 @Controller('auth')
@@ -49,5 +68,35 @@ export class AuthController {
   })
   login(@Body() loginDto: LoginDto): Promise<AuthLoginResult> {
     return this.authService.login(loginDto);
+  }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Usuario de la sesión actual',
+    description:
+      'Devuelve identificador, nombre, correo y rol del usuario autenticado. ' +
+      'No acepta id por parámetros: la identidad sale del JWT. Sin password ni passwordHash.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Sesión válida',
+    schema: {
+      example: {
+        id: 5,
+        email: 'usuario.test@example.com',
+        role: Role.FONTANERO,
+        name: 'Usuario Prueba',
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Sin token, token inválido o usuario inactivo' })
+  me(@CurrentUser() user: AuthenticatedUser): Promise<AuthLoginUser> {
+    const id = user?.idUsuario ?? Number(user?.userId);
+    if (!Number.isInteger(id) || id <= 0) {
+      throw new UnauthorizedException('Token inválido');
+    }
+    return this.authService.getMe(id);
   }
 }

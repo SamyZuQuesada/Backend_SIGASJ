@@ -93,6 +93,21 @@ export class UsuariosService implements OnModuleInit {
     return qb.getOne();
   }
 
+  /**
+   * Lookup interno para JwtStrategy / AuthService.getMe.
+   * No expone passwordHash.
+   */
+  async findByIdForAuth(idUsuario: number): Promise<Usuario | null> {
+    if (!Number.isInteger(idUsuario) || idUsuario <= 0) {
+      return null;
+    }
+
+    return this.usuarioRepository.findOne({
+      where: { idUsuario },
+      relations: { rol: true },
+    });
+  }
+
   async onModuleInit(): Promise<void> {
     await this.asegurarRolesBase();
     await this.asegurarCuentasLoginDesarrollo();

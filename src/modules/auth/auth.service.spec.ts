@@ -9,7 +9,10 @@ import { PasswordService } from './password.service';
 
 describe('AuthService — validación segura de credenciales', () => {
   let service: AuthService;
-  let usuariosService: { findByCorreoForAuth: jest.Mock };
+  let usuariosService: {
+    findByCorreoForAuth: jest.Mock;
+    findByIdForAuth: jest.Mock;
+  };
   let passwordService: { comparePassword: jest.Mock };
   let jwtService: { sign: jest.Mock };
   let configService: { get: jest.Mock };
@@ -24,7 +27,10 @@ describe('AuthService — validación segura de credenciales', () => {
   };
 
   beforeEach(async () => {
-    usuariosService = { findByCorreoForAuth: jest.fn() };
+    usuariosService = {
+      findByCorreoForAuth: jest.fn(),
+      findByIdForAuth: jest.fn(),
+    };
     passwordService = { comparePassword: jest.fn() };
     jwtService = { sign: jest.fn().mockReturnValue('jwt-existente') };
     configService = { get: jest.fn().mockReturnValue(false) };
@@ -176,5 +182,31 @@ describe('AuthService — validación segura de credenciales', () => {
     await expect(
       service.login({ email: 'ok@test.local', password: 'Secret1!' }),
     ).rejects.toThrow('Credenciales inválidas');
+  });
+
+  it('getMe con usuario activo → datos mínimos sin passwordHash', async () => {
+    usuariosService.findByIdForAuth.mockResolvedValue(userBase);
+
+    const me = await service.getMe(10);
+
+    expect(usuariosService.findByIdForAuth).toHaveBeenCalledWith(10);
+    expect(me).toEqual({
+      id: 10,
+      email: 'ok@test.local',
+      role: Role.ADMINISTRADORA,
+      name: 'Usuario OK',
+    });
+    expect(me).not.toHaveProperty('passwordHash');
+  });
+
+  it('getMe con usuario inactivo → UnauthorizedException', async () => {
+    usuariosService.findByIdForAuth.mockResolvedValue({
+      ...userBase,
+      activo: false,
+    });
+
+    await expect(service.getMe(10)).rejects.toThrow(
+      'El usuario se encuentra inactivo.',
+    );
   });
 });

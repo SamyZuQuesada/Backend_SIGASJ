@@ -107,4 +107,30 @@ export class AuthService {
       user,
     };
   }
+
+  /**
+   * Sesión actual desde JWT ya validado (JwtStrategy).
+   * Relee usuario en BD para devolver datos frescos sin passwordHash.
+   */
+  async getMe(userId: number): Promise<AuthLoginUser> {
+    const usuario = await this.usuariosService.findByIdForAuth(userId);
+    if (!usuario) {
+      throw new UnauthorizedException('Token inválido');
+    }
+    if (!usuario.activo) {
+      throw new UnauthorizedException(USUARIO_INACTIVO);
+    }
+
+    const role = parseRole(usuario.rol?.nombre);
+    if (!role) {
+      throw new UnauthorizedException('Token inválido');
+    }
+
+    return {
+      id: usuario.idUsuario,
+      email: usuario.correo,
+      role,
+      name: usuario.nombre,
+    };
+  }
 }
