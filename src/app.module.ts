@@ -14,8 +14,10 @@ import acueductosCrConfig from './config/acueductos-cr.config';
 import smsConfig from './config/sms.config';
 import jotformConfig from './config/jotform.config';
 import mailConfig from './config/mail.config';
+import assistantConfig from './config/assistant.config';
 
 import { AuthModule } from './modules/auth/auth.module';
+import { AssistantModule } from './modules/assistant/assistant.module';
 import { UsuariosModule } from './modules/usuarios/usuarios.module';
 import { ContenidoPublicoModule } from './modules/contenido-publico/contenido-publico.module';
 import { ComunicadosModule } from './modules/comunicados/comunicados.module';
@@ -47,6 +49,7 @@ import { AppService } from './app.service';
         smsConfig,
         jotformConfig,
         mailConfig,
+        assistantConfig,
       ],
     }),
     TypeOrmModule.forRootAsync({
@@ -68,6 +71,7 @@ import { AppService } from './app.service';
     AsociadosModule,
     RecursosHumanosModule,
     SolicitudesAusenciaModule,
+    AssistantModule,
   ],
 
   controllers: [AppController],
