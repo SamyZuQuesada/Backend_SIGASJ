@@ -2433,22 +2433,33 @@ export class SolicitudesService {
    * ========================================================================= */
 
   async findAprobadasPendientes(): Promise<SolicitudesAprobadaPendientesResponseDto> {
-    const solicitudes = await this.solicitudServicioRepository.find({
-      where: {
-        estado: SolicitudEstado.APROBADA,
-        utilizada: false,
-      },
-      order: { idSolicitud: 'ASC' },
-    });
+    try {
+      const solicitudes = await this.solicitudServicioRepository.find({
+        where: {
+          estado: SolicitudEstado.APROBADA,
+          utilizada: false,
+        },
+        order: { idSolicitud: 'ASC' },
+      });
 
-    const items = solicitudes.map((solicitud) =>
-      this.toPendienteDto(solicitud),
-    );
+      const items = solicitudes.map((solicitud) =>
+        this.toPendienteDto(solicitud),
+      );
 
-    return {
-      solicitudes: items,
-      mensaje: items.length === 0 ? SIN_SOLICITUDES_MENSAJE : null,
-    };
+      return {
+        solicitudes: items,
+        mensaje: items.length === 0 ? SIN_SOLICITUDES_MENSAJE : null,
+      };
+    } catch (error) {
+      // Compatibilidad: entorno local sin tabla legacy no debe tumbar el dashboard.
+      this.logger.warn(
+        `findAprobadasPendientes falló (${error instanceof Error ? error.message : 'error'}); se devuelve lista vacía.`,
+      );
+      return {
+        solicitudes: [],
+        mensaje: SIN_SOLICITUDES_MENSAJE,
+      };
+    }
   }
 
   private toPendienteDto(solicitud: SolicitudServicio): SolicitudPendienteDto {
