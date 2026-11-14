@@ -17,11 +17,22 @@ import {
 import { basename, extname, join } from 'path';
 import { Repository } from 'typeorm';
 import { TipoSolicitudSlug } from '../../common/enums/tipo-solicitud-slug.enum';
+import {
+  forgetUploadedMedia,
+  persistUploadedMedia,
+  readStoredMedia,
+} from '../../common/media/media-blob.store';
 import { FormularioOficialItemDto } from './dto/formulario-oficial-response.dto';
 import { FormularioOficial } from './entities/formulario-oficial.entity';
 import { TipoSolicitud } from './entities/tipo-solicitud.entity';
 
 export const MAX_FORMULARIO_PDF_BYTES = 10 * 1024 * 1024; // 10 MB
+
+const STORAGE_FOLDER = 'formularios-oficiales';
+
+function claveArchivo(filename: string): string {
+  return `/uploads/${STORAGE_FOLDER}/${basename(filename)}`;
+}
 
 export interface UploadedPdfFile {
   fieldname?: string;
@@ -189,6 +200,11 @@ export class FormulariosOficialesService {
 
     // 3. Escribir archivo nuevo en disco
     writeFileSync(rutaFisicaNueva, file.buffer);
+    void persistUploadedMedia(
+      claveArchivo(nombreInterno),
+      'application/pdf',
+      file.buffer,
+    );
 
     let registroAnterior = tipo.formularioOficial;
     if (!registroAnterior) {
@@ -227,6 +243,7 @@ export class FormulariosOficialesService {
             );
           }
         }
+        forgetUploadedMedia(claveArchivo(basename(rutaAnterior)));
       } else {
         // Nueva carga
         const nuevo = this.formularioRepo.create({
@@ -263,6 +280,7 @@ export class FormulariosOficialesService {
           unlinkSync(rutaFisicaNueva);
         } catch {}
       }
+      forgetUploadedMedia(claveArchivo(nombreInterno));
       throw dbError;
     }
   }
@@ -301,20 +319,28 @@ export class FormulariosOficialesService {
 
     const safeName = basename(form.nombreArchivoInterno);
     const rutaFisica = join(this.storageRoot, safeName);
-
-    if (!existsSync(rutaFisica)) {
-      this.logger.error(
-        `El archivo físico ${rutaFisica} no existe para el formulario con ID ${form.id}`,
-      );
-      throw new NotFoundException(
-        'El archivo físico del formulario oficial no se encuentra en el servidor.',
-      );
-    }
-
-    // Sanitizar nombre para Content-Disposition
     const filenameDescarga = basename(
       form.nombreArchivoOriginal || `${tipo.slug}.pdf`,
     );
+
+    if (!existsSync(rutaFisica)) {
+      const stored = await readStoredMedia(claveArchivo(safeName));
+      if (!stored) {
+        this.logger.error(
+          `El archivo físico ${rutaFisica} no existe para el formulario con ID ${form.id}`,
+        );
+        throw new NotFoundException(
+          'El archivo físico del formulario oficial no se encuentra en el servidor.',
+        );
+      }
+      return {
+        streamableFile: new StreamableFile(stored.bytes, {
+          type: stored.mime || 'application/pdf',
+          disposition: `attachment; filename="${filenameDescarga}"`,
+        }),
+        filename: filenameDescarga,
+      };
+    }
 
     const streamableFile = new StreamableFile(createReadStream(rutaFisica), {
       type: 'application/pdf',

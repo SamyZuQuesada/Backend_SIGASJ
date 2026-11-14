@@ -16,6 +16,11 @@ import {
 } from 'fs';
 import { basename, extname, join } from 'path';
 import { Repository } from 'typeorm';
+import {
+  forgetUploadedMedia,
+  persistUploadedMedia,
+  readStoredMedia,
+} from '../../common/media/media-blob.store';
 import { withDbRetry } from '../../common/persistence/with-db-retry';
 import { CreateFormularioDescargableDto } from './dto/create-formulario-descargable.dto';
 import { FormularioDescargableAdminResponse } from './dto/formulario-descargable-admin.response';
@@ -36,6 +41,10 @@ export type UploadedFormularioPdfFile = {
 };
 
 const STORAGE_FOLDER = 'formularios-descargables';
+
+function claveArchivo(filename: string): string {
+  return `/uploads/${STORAGE_FOLDER}/${basename(filename)}`;
+}
 
 @Injectable()
 export class FormulariosDescargablesService {
@@ -97,19 +106,28 @@ export class FormulariosDescargablesService {
 
     const safeName = basename(form.nombreArchivoInterno);
     const rutaFisica = join(this.storageRoot, safeName);
-
-    if (!existsSync(rutaFisica)) {
-      this.logger.error(
-        `Archivo físico ausente para FormularioDescargable #${form.id}`,
-      );
-      throw new NotFoundException(
-        'El archivo del formulario no se encuentra disponible en este momento.',
-      );
-    }
-
     const filenameDescarga = basename(
       form.nombreArchivoOriginal || `formulario-${form.id}.pdf`,
     );
+
+    if (!existsSync(rutaFisica)) {
+      const stored = await readStoredMedia(claveArchivo(safeName));
+      if (!stored) {
+        this.logger.error(
+          `Archivo físico ausente para FormularioDescargable #${form.id}`,
+        );
+        throw new NotFoundException(
+          'El archivo del formulario no se encuentra disponible en este momento.',
+        );
+      }
+      return {
+        streamableFile: new StreamableFile(stored.bytes, {
+          type: stored.mime || 'application/pdf',
+          disposition: `attachment; filename="${filenameDescarga}"`,
+        }),
+        filename: filenameDescarga,
+      };
+    }
 
     const streamableFile = new StreamableFile(createReadStream(rutaFisica), {
       type: 'application/pdf',
@@ -134,6 +152,11 @@ export class FormulariosDescargablesService {
     const ubicacionRelativa = `${STORAGE_FOLDER}/${nombreInterno}`;
 
     writeFileSync(rutaFisica, file.buffer);
+    void persistUploadedMedia(
+      claveArchivo(nombreInterno),
+      'application/pdf',
+      file.buffer,
+    );
 
     try {
       const activo = dto.activo === true;
@@ -207,6 +230,11 @@ export class FormulariosDescargablesService {
     const ubicacionRelativa = `${STORAGE_FOLDER}/${nombreInternoNuevo}`;
 
     writeFileSync(rutaNueva, file.buffer);
+    void persistUploadedMedia(
+      claveArchivo(nombreInternoNuevo),
+      'application/pdf',
+      file.buffer,
+    );
 
     const snapshot = {
       nombreArchivoOriginal: form.nombreArchivoOriginal,
@@ -360,6 +388,7 @@ export class FormulariosDescargablesService {
   }
 
   private eliminarArchivoSeguro(ruta: string): void {
+    forgetUploadedMedia(claveArchivo(basename(ruta)));
     if (!existsSync(ruta)) {
       return;
     }
