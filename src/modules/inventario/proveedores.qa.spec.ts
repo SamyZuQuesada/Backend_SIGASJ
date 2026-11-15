@@ -2,9 +2,10 @@ import { HttpStatus, INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { getRepositoryToken, TypeOrmModule } from '@nestjs/typeorm';
 import request from 'supertest';
 import { App } from 'supertest/types';
+import { Repository } from 'typeorm';
 import { Role } from '../../common/enums/role.enum';
 import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
 import jwtConfig from '../../config/jwt.config';
@@ -22,6 +23,7 @@ import { AlertaReposicion } from './entities/alerta-reposicion.entity';
 import { ReposicionMaterial } from './entities/reposicion-material.entity';
 import { DetalleReposicionMaterial } from './entities/detalle-reposicion-material.entity';
 import { Averia } from '../averias/entities/averia.entity';
+import { ObservacionAveria } from '../averias/entities/observacion-averia.entity';
 import { InventarioModule } from './inventario.module';
 
 const proveedoresQaTypeOrmModule = TypeOrmModule.forRoot({
@@ -42,6 +44,7 @@ const proveedoresQaTypeOrmModule = TypeOrmModule.forRoot({
     ReposicionMaterial,
     DetalleReposicionMaterial,
     Averia,
+    ObservacionAveria,
   ],
   synchronize: true,
 });
@@ -71,6 +74,7 @@ type PaginatedProveedoresResponse = {
 describe('Gestión de Proveedores de Inventario — QA Integral y Validación Funcional', () => {
   let app: INestApplication<App>;
   let jwtService: JwtService;
+  let idCategoriaBase: number;
 
   const signAs = (role: Role | string, sub = '1') => {
     const payload: JwtPayload = {
@@ -108,6 +112,16 @@ describe('Gestión de Proveedores de Inventario — QA Integral y Validación Fu
     await app.init();
 
     jwtService = moduleRef.get<JwtService>(JwtService);
+    const categoriaRepo = moduleRef.get<Repository<CategoriaMaterial>>(
+      getRepositoryToken(CategoriaMaterial),
+    );
+    const categoria = await categoriaRepo.save(
+      categoriaRepo.create({
+        nombre: 'Categoría QA Proveedores',
+        activo: true,
+      }),
+    );
+    idCategoriaBase = categoria.id;
   });
 
   afterAll(async () => {
@@ -211,7 +225,7 @@ describe('Gestión de Proveedores de Inventario — QA Integral y Validación Fu
         .send({ nombre: 'Intento Fontanero' });
       expect(resFont.status).toBe(HttpStatus.FORBIDDEN);
 
-      const tokenSec = signAs(Role.SECRETARIA);
+      const tokenSec = signAs(Role.SECRETARIA_EJECUTIVA);
       const resSec = await request(app.getHttpServer())
         .post('/api/v1/inventario/proveedores')
         .set('Authorization', `Bearer ${tokenSec}`)
@@ -242,7 +256,7 @@ describe('Gestión de Proveedores de Inventario — QA Integral y Validación Fu
     });
 
     it('permite a ADMINISTRADORA, SECRETARIA y FONTANERO consultar proveedores con paginación', async () => {
-      const tokenSec = signAs(Role.SECRETARIA);
+      const tokenSec = signAs(Role.SECRETARIA_EJECUTIVA);
 
       const response = await request(app.getHttpServer())
         .get('/api/v1/inventario/proveedores?page=1&limit=10')
@@ -505,6 +519,7 @@ describe('Gestión de Proveedores de Inventario — QA Integral y Validación Fu
         .post('/api/v1/inventario/materiales')
         .set('Authorization', `Bearer ${token}`)
         .send({
+          idCategoria: idCategoriaBase,
           nombre: 'Tubo PVC 1 pulgada SDR 13.5 Integracion',
           unidadMedida: 'Tubo',
           stockMinimo: 15,
@@ -538,6 +553,7 @@ describe('Gestión de Proveedores de Inventario — QA Integral y Validación Fu
         .post('/api/v1/inventario/materiales')
         .set('Authorization', `Bearer ${token}`)
         .send({
+          idCategoria: idCategoriaBase,
           nombre: 'Válvula de Aire Inexistente',
           unidadMedida: 'Unidad',
           idProveedor: 99999,
@@ -590,6 +606,7 @@ describe('Gestión de Proveedores de Inventario — QA Integral y Validación Fu
         .post('/api/v1/inventario/materiales')
         .set('Authorization', `Bearer ${token}`)
         .send({
+          idCategoria: idCategoriaBase,
           nombre: 'Codo 90 PVC con Proveedor Inactivo',
           unidadMedida: 'Unidad',
           idProveedor: idProveedorPrueba,
@@ -618,6 +635,7 @@ describe('Gestión de Proveedores de Inventario — QA Integral y Validación Fu
         .post('/api/v1/inventario/materiales')
         .set('Authorization', `Bearer ${token}`)
         .send({
+          idCategoria: idCategoriaBase,
           nombre: 'Codo 90 PVC con Proveedor Reactivado',
           unidadMedida: 'Unidad',
           idProveedor: idProveedorPrueba,

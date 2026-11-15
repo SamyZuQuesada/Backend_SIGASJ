@@ -5,9 +5,7 @@ import {
   TableIndex,
 } from 'typeorm';
 
-export class AddPrecioUnitarioAndFechaVencimientoToInventario1724686200000
-  implements MigrationInterface
-{
+export class AddPrecioUnitarioAndFechaVencimientoToInventario1724686200000 implements MigrationInterface {
   name = 'AddPrecioUnitarioAndFechaVencimientoToInventario1724686200000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

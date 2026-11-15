@@ -110,7 +110,7 @@ describe('GET /api/v1/asociados/historial (Endpoint Administrativo de Consulta d
       },
     );
 
-    it.each([Role.ADMINISTRADORA, Role.SECRETARIA])(
+    it.each([Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA])(
       'debe permitir acceso al personal administrativo autorizado: %s (200)',
       async (role) => {
         const token = signAs(role);

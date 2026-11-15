@@ -1,54 +1,66 @@
-import {
-  BadRequestException,
-  InternalServerErrorException,
-  Logger,
-} from '@nestjs/common';
+import { InternalServerErrorException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { Test, TestingModule } from '@nestjs/testing';
 import { PasswordService } from './password.service';
-import { hashPassword, PasswordHashingError } from './password.util';
+import * as passwordUtil from './password.util';
 
-jest.mock('./password.util', () => {
-  const actual: typeof import('./password.util') =
-    jest.requireActual('./password.util');
-  return {
-    ...actual,
-    hashPassword: jest.fn((plain: string) => actual.hashPassword(plain)),
-  };
-});
+const PASSWORD_SINTETICA = 'TestPassword123!';
 
 describe('PasswordService', () => {
-  const service = new PasswordService();
-  const plain = 'Password123!';
-  const hashPasswordMock = hashPassword as jest.MockedFunction<
-    typeof hashPassword
-  >;
+  let service: PasswordService;
 
-  it('hash y compare reutilizan bcrypt y no igualan strings', async () => {
-    const hash = await service.hash(plain);
-    expect(hash).not.toBe(plain);
-    expect(await service.compare(plain, hash)).toBe(true);
-    expect(await service.compare('WrongPass1', hash)).toBe(false);
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        PasswordService,
+        {
+          provide: ConfigService,
+          useValue: {
+            get: (key: string) =>
+              key === 'auth.bcryptRounds' ? 10 : undefined,
+          },
+        },
+      ],
+    }).compile();
+
+    service = module.get(PasswordService);
   });
 
-  it('password vacía se rechaza sin detalle de bcrypt', async () => {
-    await expect(service.hash('')).rejects.toBeInstanceOf(BadRequestException);
-    await expect(service.hash('')).rejects.toThrow(
-      'La contraseña no es válida.',
+  it('hashPassword + comparePassword round-trip', async () => {
+    const hash = await service.hashPassword(PASSWORD_SINTETICA);
+    expect(hash).not.toBe(PASSWORD_SINTETICA);
+    expect(await service.comparePassword(PASSWORD_SINTETICA, hash)).toBe(true);
+    expect(await service.comparePassword('wrong', hash)).toBe(false);
+  });
+
+  it('hash fallido no expone detalle bcrypt al caller Nest', async () => {
+    const spy = jest
+      .spyOn(passwordUtil, 'hashPassword')
+      .mockRejectedValueOnce(new Error('bcrypt salt boom detail'));
+
+    let caught: unknown;
+    try {
+      await service.hashPassword(PASSWORD_SINTETICA);
+    } catch (error) {
+      caught = error;
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(caught).toBeInstanceOf(InternalServerErrorException);
+    expect(String(caught)).not.toMatch(/bcrypt|salt/i);
+    expect((caught as InternalServerErrorException).message).toBe(
+      'No se pudo procesar la contraseña.',
     );
   });
 
-  it('error de bcrypt no expone el mensaje interno', async () => {
-    hashPasswordMock.mockRejectedValueOnce(new PasswordHashingError());
-    const logger = (service as unknown as { logger: Logger }).logger;
-    const loggerSpy = jest
-      .spyOn(logger, 'error')
-      .mockImplementation(() => undefined);
-    await expect(service.hash(plain)).rejects.toBeInstanceOf(
-      InternalServerErrorException,
-    );
-    expect(loggerSpy).toHaveBeenCalledWith('Error generating password hash');
-    expect(JSON.stringify(loggerSpy.mock.calls)).not.toMatch(
-      /Password123|salt generation/i,
-    );
-    loggerSpy.mockRestore();
+  it('no mantiene estado mutable global entre llamadas', async () => {
+    const [h1, h2] = await Promise.all([
+      service.hashPassword(PASSWORD_SINTETICA),
+      service.hashPassword('OtraSintetica456!'),
+    ]);
+    expect(await service.comparePassword(PASSWORD_SINTETICA, h1)).toBe(true);
+    expect(await service.comparePassword('OtraSintetica456!', h2)).toBe(true);
+    expect(await service.comparePassword(PASSWORD_SINTETICA, h2)).toBe(false);
   });
 });

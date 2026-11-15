@@ -24,6 +24,7 @@ import { AlertaReposicion } from './entities/alerta-reposicion.entity';
 import { ReposicionMaterial } from './entities/reposicion-material.entity';
 import { DetalleReposicionMaterial } from './entities/detalle-reposicion-material.entity';
 import { Averia } from '../averias/entities/averia.entity';
+import { ObservacionAveria } from '../averias/entities/observacion-averia.entity';
 import { InventarioModule } from './inventario.module';
 
 const entradasQaTypeOrmModule = TypeOrmModule.forRoot({
@@ -44,6 +45,7 @@ const entradasQaTypeOrmModule = TypeOrmModule.forRoot({
     ReposicionMaterial,
     DetalleReposicionMaterial,
     Averia,
+    ObservacionAveria,
   ],
   synchronize: true,
 });
@@ -115,19 +117,47 @@ describe('Entradas de Inventario — QA Integral, Validación Funcional y Transa
 
     // Sembrar usuarios en la tabla Usuario para mantener integridad referencial
     adminUser = await usuarioRepository.save(
-      usuarioRepository.create({ idUsuario: 1 }),
+      usuarioRepository.create({
+      idUsuario: 1,
+      nombre: 'Usuario QA 1',
+      correo: 'usuario.qa.1@asadasanjuan.cr',
+      passwordHash: 'hash-qa',
+      activo: true,
+      idRol: 1,
+    }),
     );
 
     fontaneroUser = await usuarioRepository.save(
-      usuarioRepository.create({ idUsuario: 2 }),
+      usuarioRepository.create({
+      idUsuario: 2,
+      nombre: 'Usuario QA 2',
+      correo: 'usuario.qa.2@asadasanjuan.cr',
+      passwordHash: 'hash-qa',
+      activo: true,
+      idRol: 1,
+    }),
     );
 
     secretariaUser = await usuarioRepository.save(
-      usuarioRepository.create({ idUsuario: 3 }),
+      usuarioRepository.create({
+      idUsuario: 3,
+      nombre: 'Usuario QA 3',
+      correo: 'usuario.qa.3@asadasanjuan.cr',
+      passwordHash: 'hash-qa',
+      activo: true,
+      idRol: 1,
+    }),
     );
 
     abonadoUser = await usuarioRepository.save(
-      usuarioRepository.create({ idUsuario: 4 }),
+      usuarioRepository.create({
+      idUsuario: 4,
+      nombre: 'Usuario QA 4',
+      correo: 'usuario.qa.4@asadasanjuan.cr',
+      passwordHash: 'hash-qa',
+      activo: true,
+      idRol: 1,
+    }),
     );
   });
 
@@ -598,7 +628,7 @@ describe('Entradas de Inventario — QA Integral, Validación Funcional y Transa
     });
 
     it('rechaza con 403 Forbidden cuando SECRETARIA intenta registrar una entrada', async () => {
-      const token = signAs(Role.SECRETARIA, String(secretariaUser.idUsuario));
+      const token = signAs(Role.SECRETARIA_EJECUTIVA, String(secretariaUser.idUsuario));
 
       const res = await request(app.getHttpServer())
         .post('/api/v1/inventario/entradas')

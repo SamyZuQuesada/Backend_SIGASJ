@@ -41,7 +41,8 @@ export class HistorialSolicitud {
 
   @ApiProperty({
     example: 10,
-    description: 'ID de la solicitud a la que pertenece este evento de historial',
+    description:
+      'ID de la solicitud a la que pertenece este evento de historial',
   })
   @Column({ type: 'int' })
   solicitudId: number;

@@ -1,33 +1,61 @@
-import { esRol, ROLE_ETIQUETA, Role, ROLES_SISTEMA } from './role.enum';
+import {
+  isRole,
+  parseRole,
+  Role,
+  ROLE_LABELS,
+  ROLES_OPERATIVOS_ASADA,
+  ROLES_SISTEMA,
+  RoleSecretaria,
+} from './role.enum';
 
-describe('Role (fuente única)', () => {
-  it('incluye los tres roles funcionales con el código persistido', () => {
-    expect(Role.ADMINISTRADORA).toBe('ADMINISTRADORA');
-    expect(Role.SECRETARIA).toBe('SECRETARIA');
-    expect(Role.FONTANERO).toBe('FONTANERO');
-    expect(ROLE_ETIQUETA[Role.ADMINISTRADORA]).toBe('Administradora');
-    expect(ROLE_ETIQUETA[Role.SECRETARIA]).toBe('Secretaria Ejecutiva');
-    expect(ROLE_ETIQUETA[Role.FONTANERO]).toBe('Fontanero');
-  });
-
-  it('conserva ABONADO y AYUDANTE sin tratarlos como roles nuevos de esta tarea', () => {
+describe('Role — fuente única de roles', () => {
+  it('incluye exactamente los roles de sistema aprobados (+ adicionales legítimos)', () => {
     expect(ROLES_SISTEMA).toEqual([
       Role.ADMINISTRADORA,
-      Role.SECRETARIA,
+      Role.SECRETARIA_EJECUTIVA,
       Role.FONTANERO,
       Role.ABONADO,
       Role.AYUDANTE,
     ]);
+    expect(new Set(ROLES_SISTEMA).size).toBe(ROLES_SISTEMA.length);
   });
 
-  it('solo acepta el código exacto, no la etiqueta ni alias', () => {
-    expect(esRol(Role.SECRETARIA)).toBe(true);
-    expect(esRol('Secretaria')).toBe(false);
-    expect(esRol('Secretaria Ejecutiva')).toBe(false);
-    expect(esRol('SECRETARIA_EJECUTIVA')).toBe(false);
-    expect(esRol('admin')).toBe(false);
-    expect(esRol('ADMIN')).toBe(false);
-    expect(esRol(undefined)).toBe(false);
-    expect(esRol('')).toBe(false);
+  it('roles operativos ASADA: Administradora, Secretaria Ejecutiva, Fontanero', () => {
+    expect(ROLES_OPERATIVOS_ASADA).toEqual([
+      Role.ADMINISTRADORA,
+      Role.SECRETARIA_EJECUTIVA,
+      Role.FONTANERO,
+    ]);
+  });
+
+  it('valores persistidos/JWT son estables (UPPER_SNAKE)', () => {
+    expect(Role.ADMINISTRADORA).toBe('ADMINISTRADORA');
+    expect(Role.SECRETARIA_EJECUTIVA).toBe('SECRETARIA');
+    expect(Role.FONTANERO).toBe('FONTANERO');
+  });
+
+  it('labels de dominio no se usan como valor de autorización', () => {
+    expect(ROLE_LABELS[Role.ADMINISTRADORA]).toBe('Administradora');
+    expect(ROLE_LABELS[Role.SECRETARIA_EJECUTIVA]).toBe('Secretaria Ejecutiva');
+    expect(ROLE_LABELS[Role.FONTANERO]).toBe('Fontanero');
+    expect(Role.SECRETARIA_EJECUTIVA).not.toBe('Secretaria Ejecutiva');
+    expect(Role.SECRETARIA_EJECUTIVA).not.toBe('Secretaria');
+  });
+
+  it('RoleSecretaria es alias del valor canónico SECRETARIA_EJECUTIVA', () => {
+    expect(RoleSecretaria).toBe(Role.SECRETARIA_EJECUTIVA);
+    expect(RoleSecretaria).toBe('SECRETARIA');
+  });
+
+  it('parseRole es estricto: no acepta variantes inconsistentes', () => {
+    expect(parseRole('SECRETARIA')).toBe(Role.SECRETARIA_EJECUTIVA);
+    expect(parseRole('Secretaria')).toBeNull();
+    expect(parseRole('Secretaria Ejecutiva')).toBeNull();
+    expect(parseRole('SecretariaEjecutiva')).toBeNull();
+    expect(parseRole('ADMIN')).toBeNull();
+    expect(parseRole('admin')).toBeNull();
+    expect(parseRole('Administradora')).toBeNull();
+    expect(isRole(Role.FONTANERO)).toBe(true);
+    expect(isRole('FONTANERO ')).toBe(false);
   });
 });

@@ -49,10 +49,7 @@ export function mediaStorageKey(publicPath: string): string | null {
 
   const rest = url.slice('/uploads/'.length);
   const parts = rest.split('/');
-  if (
-    !rest ||
-    parts.some((part) => !part || part === '.' || part === '..')
-  ) {
+  if (!rest || parts.some((part) => !part || part === '.' || part === '..')) {
     return null;
   }
 
@@ -135,10 +132,10 @@ export async function readStoredMedia(
   }
 
   try {
-    const rows = (await dataSource.query(
+    const rows = await dataSource.query(
       `SELECT mime, contenido FROM dbo.ArchivoMedia WHERE ruta = @0`,
       [ruta],
-    )) as Array<{ mime?: string; contenido?: Buffer | Uint8Array }>;
+    );
     const row = rows?.[0];
     if (!row?.contenido) {
       return null;

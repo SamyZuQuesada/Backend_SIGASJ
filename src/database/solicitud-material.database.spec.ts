@@ -4,7 +4,10 @@ import { buildMigrationDataSourceOptions } from './data-source.options';
 
 loadEnv();
 
-describe('Pruebas de Base de Datos e Integridad en SQL Server: SolicitudMaterial y Detalle (Backlog 4.6)', () => {
+const describeSqlServer =
+  process.env.RUN_SQLSERVER_INTEGRATION === 'true' ? describe : describe.skip;
+
+describeSqlServer('Pruebas de Base de Datos e Integridad en SQL Server: SolicitudMaterial y Detalle (Backlog 4.6)', () => {
   let dataSource: DataSource | null = null;
   let isConnected = false;
 

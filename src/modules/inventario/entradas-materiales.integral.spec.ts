@@ -29,6 +29,7 @@ import { AlertaReposicion } from './entities/alerta-reposicion.entity';
 import { ReposicionMaterial } from './entities/reposicion-material.entity';
 import { DetalleReposicionMaterial } from './entities/detalle-reposicion-material.entity';
 import { Averia } from '../averias/entities/averia.entity';
+import { ObservacionAveria } from '../averias/entities/observacion-averia.entity';
 import { InventarioModule } from './inventario.module';
 import { InventarioService } from './inventario.service';
 
@@ -50,6 +51,7 @@ const integralQaTypeOrmModule = TypeOrmModule.forRoot({
     ReposicionMaterial,
     DetalleReposicionMaterial,
     Averia,
+    ObservacionAveria,
   ],
   synchronize: true,
 });
@@ -126,7 +128,14 @@ describe('Backlog 4.4: Registro de Entradas de Materiales — Pruebas Funcionale
 
     // Sembrar usuario Administradora
     adminUser = await usuarioRepository.save(
-      usuarioRepository.create({ idUsuario: 1 }),
+      usuarioRepository.create({
+      idUsuario: 1,
+      nombre: 'Usuario QA 1',
+      correo: 'usuario.qa.1@asadasanjuan.cr',
+      passwordHash: 'hash-qa',
+      activo: true,
+      idRol: 1,
+    }),
     );
 
     // Sembrar proveedores
@@ -587,7 +596,7 @@ describe('Backlog 4.4: Registro de Entradas de Materiales — Pruebas Funcionale
     it('rechaza con 403 Forbidden cuando SECRETARIA intenta registrar una entrada de bodega', async () => {
       await request(app.getHttpServer())
         .post('/api/v1/inventario/entradas')
-        .set('Authorization', `Bearer ${signAs(Role.SECRETARIA)}`)
+        .set('Authorization', `Bearer ${signAs(Role.SECRETARIA_EJECUTIVA)}`)
         .send({ idMaterial: materialActivo.id, cantidad: 10 })
         .expect(403);
     });

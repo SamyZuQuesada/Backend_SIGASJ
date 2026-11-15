@@ -14,10 +14,12 @@ import { SolicitudMaterial } from './solicitud-material.entity';
 
 describe('SolicitudMaterial Entity (Inventario ASADA)', () => {
   describe('Enum EstadoSolicitudMaterial', () => {
-    it('debe definir los estados PENDIENTE, APROBADA y RECHAZADA', () => {
+    it('debe definir los estados PENDIENTE, APROBADA, RECHAZADA, CANCELADA y DESPACHADA', () => {
       expect(EstadoSolicitudMaterial.PENDIENTE).toBe('PENDIENTE');
       expect(EstadoSolicitudMaterial.APROBADA).toBe('APROBADA');
       expect(EstadoSolicitudMaterial.RECHAZADA).toBe('RECHAZADA');
+      expect(EstadoSolicitudMaterial.CANCELADA).toBe('CANCELADA');
+      expect(EstadoSolicitudMaterial.DESPACHADA).toBe('DESPACHADA');
     });
 
     it('debe contener las etiquetas descriptivas legibles', () => {
@@ -30,14 +32,22 @@ describe('SolicitudMaterial Entity (Inventario ASADA)', () => {
       expect(
         ESTADO_SOLICITUD_MATERIAL_LABELS[EstadoSolicitudMaterial.RECHAZADA],
       ).toBe('Rechazada');
+      expect(
+        ESTADO_SOLICITUD_MATERIAL_LABELS[EstadoSolicitudMaterial.CANCELADA],
+      ).toBe('Cancelada');
+      expect(
+        ESTADO_SOLICITUD_MATERIAL_LABELS[EstadoSolicitudMaterial.DESPACHADA],
+      ).toBe('Despachada');
     });
 
     it('debe validar estados correctamente con isEstadoSolicitudMaterialValido', () => {
       expect(isEstadoSolicitudMaterialValido('PENDIENTE')).toBe(true);
       expect(isEstadoSolicitudMaterialValido('APROBADA')).toBe(true);
       expect(isEstadoSolicitudMaterialValido('RECHAZADA')).toBe(true);
-      expect(isEstadoSolicitudMaterialValido('CANCELADA')).toBe(false);
+      expect(isEstadoSolicitudMaterialValido('CANCELADA')).toBe(true);
+      expect(isEstadoSolicitudMaterialValido('DESPACHADA')).toBe(true);
       expect(isEstadoSolicitudMaterialValido('')).toBe(false);
+      expect(isEstadoSolicitudMaterialValido('OTRO')).toBe(false);
     });
   });
 

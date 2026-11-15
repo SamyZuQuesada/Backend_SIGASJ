@@ -13,6 +13,8 @@ import jwtConfig from '../../../config/jwt.config';
 import { AuthModule } from '../../auth/auth.module';
 import { Rol } from '../../usuarios/entities/rol.entity';
 import { Usuario } from '../../usuarios/entities/usuario.entity';
+import { SolicitudAusencia } from '../../solicitudes-ausencia/entities/solicitud-ausencia.entity';
+import { DocumentoSolicitudAusencia } from '../../solicitudes-ausencia/entities/documento-solicitud-ausencia.entity';
 import { Colaborador } from '../entities/colaborador.entity';
 import { Incapacidad } from '../entities/incapacidad.entity';
 import { MovimientoVacaciones } from '../entities/movimiento-vacaciones.entity';
@@ -50,6 +52,9 @@ export async function crearColaboradoresTestApp(): Promise<ColaboradoresTestApp>
           Puesto,
           Usuario,
           Rol,
+          // Colaborador declara @OneToMany solicitudesAusencia
+          SolicitudAusencia,
+          DocumentoSolicitudAusencia,
         ],
         synchronize: true,
       }),

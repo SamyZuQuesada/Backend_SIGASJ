@@ -78,7 +78,9 @@ export function buildMigrationDataSourceOptions(
   }
 
   const username =
-    env.DB_USERNAME || env.DB_USER || (dbType === 'mssql' ? undefined : 'postgres');
+    env.DB_USERNAME ||
+    env.DB_USER ||
+    (dbType === 'mssql' ? undefined : 'postgres');
   const password =
     env.DB_PASSWORD || (dbType === 'mssql' ? undefined : 'postgres');
 

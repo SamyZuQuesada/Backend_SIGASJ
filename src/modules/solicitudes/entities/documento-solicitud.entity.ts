@@ -36,7 +36,8 @@ export class DocumentoSolicitud {
 
   @ApiPropertyOptional({
     example: 12,
-    description: 'ID de la solicitud asociada (null mientras el adjunto está pendiente de reclamo)',
+    description:
+      'ID de la solicitud asociada (null mientras el adjunto está pendiente de reclamo)',
     nullable: true,
   })
   @Column({ type: 'int', nullable: true })
@@ -45,7 +46,8 @@ export class DocumentoSolicitud {
   @ApiProperty({
     example: TipoDocumentoSolicitud.IDENTIFICACION,
     enum: TipoDocumentoSolicitud,
-    description: 'Tipo o clasificación del documento oficial exigido por el trámite',
+    description:
+      'Tipo o clasificación del documento oficial exigido por el trámite',
   })
   @Column({ type: 'varchar', length: 40 })
   tipoDocumento: TipoDocumentoSolicitud;
@@ -59,7 +61,8 @@ export class DocumentoSolicitud {
 
   @ApiProperty({
     example: '1729789123456-a1b2c3d4-e5f6-7890-abcd-ef1234567890.pdf',
-    description: 'Nombre interno único asignado para evitar colisiones en almacenamiento',
+    description:
+      'Nombre interno único asignado para evitar colisiones en almacenamiento',
   })
   @Column({ type: 'varchar', length: 255, nullable: true })
   nombreInterno: string;
@@ -94,7 +97,8 @@ export class DocumentoSolicitud {
 
   @ApiProperty({
     example: '/uploads/solicitudes/pendientes/1729789123456-a1b2c3d4.pdf',
-    description: 'Ubicación física o ruta relativa del archivo en almacenamiento seguro',
+    description:
+      'Ubicación física o ruta relativa del archivo en almacenamiento seguro',
   })
   @Column({ type: 'varchar', length: 500, nullable: true })
   ubicacion: string;

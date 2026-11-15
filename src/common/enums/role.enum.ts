@@ -1,47 +1,66 @@
 /**
- * Única fuente de los roles de SIGASJ.
+ * Fuente única de roles de autorización SIGASJ.
  *
- * El valor del enum es el código persistido en `Rol.nombre` y el `role` del JWT.
- * No se autoriza con etiquetas visibles ni con variantes en minúsculas.
+ * Valores = lo persistido en `Rol.nombre` y en `JWT.role` (estables).
+ * Labels de dominio (UI) viven en `ROLE_LABELS`, no en el valor del enum.
  *
- * Secretaria Ejecutiva se persiste como `SECRETARIA`. Cambiar ese texto
- * rompería usuarios y tokens ya guardados.
+ * Roles operativos ASADA (backlog centralización):
+ * Administradora, Secretaria Ejecutiva, Fontanero.
  *
- * ABONADO y AYUDANTE ya existían en código y en la migración de roles.
- * No forman parte del trío funcional de esta tarea; se conservan.
+ * Roles adicionales legítimos del sistema (no eliminar sin confirmación):
+ * Abonado, Ayudante.
  */
 export enum Role {
   ADMINISTRADORA = 'ADMINISTRADORA',
-  SECRETARIA = 'SECRETARIA',
+  /**
+   * Secretaria Ejecutiva.
+   * Valor histórico en BD/JWT: `SECRETARIA` (no renombrar sin migration).
+   */
+  SECRETARIA_EJECUTIVA = 'SECRETARIA',
   FONTANERO = 'FONTANERO',
   ABONADO = 'ABONADO',
   /** Acompaña al Fontanero en una avería. Solo queda registrado; no atiende. */
   AYUDANTE = 'AYUDANTE',
 }
 
-/** Catálogo que siembran la tabla Rol. Derivado del enum; no es otra definición. */
-export const ROLES_SISTEMA: readonly Role[] = [
-  Role.ADMINISTRADORA,
-  Role.SECRETARIA,
-  Role.FONTANERO,
-  Role.ABONADO,
-  Role.AYUDANTE,
-];
-
 /**
- * Texto visible. No se guarda en `Rol.nombre` y RolesGuard no lo compara.
+ * @deprecated Usar `Role.SECRETARIA_EJECUTIVA`. Mismo valor persistido (`SECRETARIA`).
+ * Se mantiene como alias tipado para lecturas graduales; no usar en código nuevo.
  */
-export const ROLE_ETIQUETA: Record<Role, string> = {
+export const RoleSecretaria = Role.SECRETARIA_EJECUTIVA;
+
+/** Etiquetas de dominio (no usar para autorización). */
+export const ROLE_LABELS: Readonly<Record<Role, string>> = {
   [Role.ADMINISTRADORA]: 'Administradora',
-  [Role.SECRETARIA]: 'Secretaria Ejecutiva',
+  [Role.SECRETARIA_EJECUTIVA]: 'Secretaria Ejecutiva',
   [Role.FONTANERO]: 'Fontanero',
   [Role.ABONADO]: 'Abonado',
   [Role.AYUDANTE]: 'Ayudante',
 };
 
-const ROLES_CONOCIDOS = new Set<string>(ROLES_SISTEMA);
+/** Roles staff ASADA del backlog de centralización. */
+export const ROLES_OPERATIVOS_ASADA: readonly Role[] = [
+  Role.ADMINISTRADORA,
+  Role.SECRETARIA_EJECUTIVA,
+  Role.FONTANERO,
+];
 
-/** Comparación exacta contra el código persistido. Rechaza etiquetas y alias. */
-export function esRol(valor: string | null | undefined): valor is Role {
-  return typeof valor === 'string' && ROLES_CONOCIDOS.has(valor);
+/** Catálogo completo a sembrar en tabla `Rol` (idempotente). */
+export const ROLES_SISTEMA: readonly Role[] = [
+  Role.ADMINISTRADORA,
+  Role.SECRETARIA_EJECUTIVA,
+  Role.FONTANERO,
+  Role.ABONADO,
+  Role.AYUDANTE,
+];
+
+const ROLE_VALUES = new Set<string>(Object.values(Role));
+
+export function isRole(value: unknown): value is Role {
+  return typeof value === 'string' && ROLE_VALUES.has(value);
+}
+
+/** Parseo estricto para Auth/JWT. No normaliza ni hace includes parciales. */
+export function parseRole(value: unknown): Role | null {
+  return isRole(value) ? value : null;
 }

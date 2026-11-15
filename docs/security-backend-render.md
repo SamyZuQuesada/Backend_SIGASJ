@@ -29,9 +29,20 @@ Fuera de alcance: AuthModule nuevo, roles nuevos, refresh token (no existe), SQL
 | `FRONTEND_BASE_URL` | Correos + CORS | Alternativa | No |
 | `CORS_ALLOWED_ORIGINS` | Orígenes CSV adicionales | Alternativa | No |
 | `AUTH_REQUIRE_PASSWORD` | Fuerza bcrypt también en local | No | No |
+| `AUTH_ALIGN_ROLE_PICKER_PASSWORD` | Opt-in: alinea cuentas demo a clave conocida `dev-login` | No (debe ser `false` en prod real) | No |
 | `DB_PASSWORD` / SMTP / Infobip / Jotform | Otros secretos | Según módulo | Sí |
 
 No existe `JWT_REFRESH_SECRET` en este proyecto.
+
+### Login: bypass y cuentas demo
+
+| Riesgo | Mitigación actual |
+| --- | --- |
+| Login sin bcrypt en development | Solo si `NODE_ENV=development` y `AUTH_REQUIRE_PASSWORD≠true`; bloqueado si `RENDER=true` o `production`/`prod` |
+| Alinear `admin@` / `secretaria@` / `fontanero@` a `dev-login` en prod | **Ya no es automático.** Requiere `AUTH_ALIGN_ROLE_PICKER_PASSWORD=true` |
+| Config mal puesta (`devLoginWithoutPassword` en prod) | `AuthService` vuelve a exigir password si `auth.isProductionLike` |
+
+En Render: dejar `AUTH_ALIGN_ROLE_PICKER_PASSWORD` unset/`false` y usar contraseñas reales bcrypt para cada cuenta.
 
 En producción, `assertProductionSecrets()` falla el arranque si falta `JWT_SECRET` fuerte o un origen frontend.
 

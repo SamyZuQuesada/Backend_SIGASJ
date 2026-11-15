@@ -308,7 +308,7 @@ describe('GET /api/v1/fontanero/averias/:id — detalle asignado al Fontanero', 
 
   it.each([
     [Role.ADMINISTRADORA, '1'],
-    [Role.SECRETARIA, '2'],
+    [Role.SECRETARIA_EJECUTIVA, '2'],
     [Role.ABONADO, '4'],
   ])('%s recibe 403 en la ruta del Fontanero', async (role, sub) => {
     const saved = await persist({ codigoSeguimiento: `AV-FNT-${role}` });

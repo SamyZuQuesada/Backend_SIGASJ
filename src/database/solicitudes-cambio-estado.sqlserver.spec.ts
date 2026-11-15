@@ -135,7 +135,7 @@ describe('Cambio de estado Solicitud + HistorialSolicitud (SQL Server)', () => {
         userId: String(usuario.idUsuario),
         idUsuario: usuario.idUsuario,
         email: 'b@asada.cr',
-        role: Role.SECRETARIA,
+        role: Role.SECRETARIA_EJECUTIVA,
       },
     );
 

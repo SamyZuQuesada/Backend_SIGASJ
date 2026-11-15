@@ -65,7 +65,7 @@ describe('POST /api/v1/rrhh/colaboradores', () => {
     });
 
     it('permite SECRETARIA (201)', async () => {
-      const res = await post(body(), signAs(Role.SECRETARIA));
+      const res = await post(body(), signAs(Role.SECRETARIA_EJECUTIVA));
       expect(res.status).toBe(201);
     });
 

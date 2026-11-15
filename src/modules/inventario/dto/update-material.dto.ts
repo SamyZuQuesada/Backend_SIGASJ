@@ -263,7 +263,8 @@ export class UpdateMaterialDto {
 
   @ApiPropertyOptional({
     example: false,
-    description: 'Indica si este material requiere fecha de vencimiento (p. ej. insumos químicos)',
+    description:
+      'Indica si este material requiere fecha de vencimiento (p. ej. insumos químicos)',
   })
   @Transform((params: TransformFnParams) => {
     const raw = rawValue(params);

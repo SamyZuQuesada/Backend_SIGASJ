@@ -14,6 +14,8 @@ import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
 import jwtConfig from '../../config/jwt.config';
 import { AuthModule } from '../auth/auth.module';
 import { ImagenProyecto } from './entities/imagen-proyecto.entity';
+import { Rol } from '../usuarios/entities/rol.entity';
+import { Usuario } from '../usuarios/entities/usuario.entity';
 import { Proyecto } from './entities/proyecto.entity';
 import { ProyectosModule } from './proyectos.module';
 
@@ -75,7 +77,7 @@ describe('PATCH /api/v1/admin/proyectos/:id — existencia, autorización y pers
           type: 'sqljs',
           autoSave: false,
           dropSchema: true,
-          entities: [Proyecto, ImagenProyecto],
+          entities: [Proyecto, ImagenProyecto, Usuario, Rol],
           synchronize: true,
         }),
         AuthModule,
@@ -106,15 +108,12 @@ describe('PATCH /api/v1/admin/proyectos/:id — existencia, autorización y pers
     proyectos = moduleFixture.get(getRepositoryToken(Proyecto));
     jwtService = moduleFixture.get(JwtService);
 
-    const login = await request(app.getHttpServer())
-      .post('/api/v1/auth/login')
-      .send({
-        email: 'admin@asadasanjuan.cr',
-        password: 'Password123!',
-      });
-
-    expect(login.status).toBe(200);
-    adminToken = (login.body as { accessToken: string }).accessToken;
+    adminToken = jwtService.sign({
+      sub: '1',
+      email: 'admin@asadasanjuan.cr',
+      role: Role.ADMINISTRADORA,
+      name: 'Administradora',
+    } as JwtPayload);
   });
 
   afterAll(async () => {
@@ -236,7 +235,7 @@ describe('PATCH /api/v1/admin/proyectos/:id — existencia, autorización y pers
     const secretaria = await patchProyecto(
       id,
       { nombre: 'Nombre actualizado' },
-      signAs(Role.SECRETARIA, '2'),
+      signAs(Role.SECRETARIA_EJECUTIVA, '2'),
     ).expect(403);
     expect(secretaria.body).toMatchObject({
       statusCode: 403,

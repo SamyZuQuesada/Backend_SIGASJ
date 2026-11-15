@@ -5,9 +5,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * tenía 200 y la aprobación fallaba al copiar el motivo.
  * SQL Server: ALTER COLUMN in-place (changeColumn drop+add pierde datos).
  */
-export class WidenPermisoColaboradorMotivo1724686380000
-  implements MigrationInterface
-{
+export class WidenPermisoColaboradorMotivo1724686380000 implements MigrationInterface {
   name = 'WidenPermisoColaboradorMotivo1724686380000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

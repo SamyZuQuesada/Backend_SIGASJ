@@ -13,8 +13,9 @@ export class HistorialSolicitudUsuarioDto {
   nombre!: string;
 
   @ApiPropertyOptional({
+    enum: Role,
     example: Role.ADMINISTRADORA,
-    description: 'Nombre del rol si está cargado',
+    description: 'Nombre del rol si está cargado (valor de Role)',
     nullable: true,
   })
   rol!: string | null;

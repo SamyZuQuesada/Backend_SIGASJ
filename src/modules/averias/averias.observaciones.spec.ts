@@ -199,7 +199,7 @@ describe('POST /api/v1/fontanero/averias/:id/observaciones', () => {
       'Fontanero B',
     );
     adminToken = signAs(Role.ADMINISTRADORA, '1', 'Administradora');
-    secretariaToken = signAs(Role.SECRETARIA, '2', 'Secretaria');
+    secretariaToken = signAs(Role.SECRETARIA_EJECUTIVA, '2', 'Secretaria');
   });
 
   afterAll(async () => {
@@ -340,7 +340,7 @@ describe('POST /api/v1/fontanero/averias/:id/observaciones', () => {
 
   it.each([
     [Role.ADMINISTRADORA, () => adminToken],
-    [Role.SECRETARIA, () => secretariaToken],
+    [Role.SECRETARIA_EJECUTIVA, () => secretariaToken],
     [Role.ABONADO, () => signAs(Role.ABONADO, '4')],
   ])('%s recibe 403 en la ruta del Fontanero', async (_role, token) => {
     const averia = await persistAveria({

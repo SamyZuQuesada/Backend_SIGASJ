@@ -3,9 +3,7 @@ import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
 /**
  * Textos de cambio de estado (público / interno) sobre HistorialSolicitud de main (622).
  */
-export class AddObservacionesHistorialSolicitud1724686350000
-  implements MigrationInterface
-{
+export class AddObservacionesHistorialSolicitud1724686350000 implements MigrationInterface {
   name = 'AddObservacionesHistorialSolicitud1724686350000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

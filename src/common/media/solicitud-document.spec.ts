@@ -26,7 +26,9 @@ describe('Recepción Segura de Documentos de Solicitud (Tarea 2 - Backlog 4.10.1
   const validPngBuffer = Buffer.from([
     137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82,
   ]);
-  const validJpgBuffer = Buffer.from([255, 216, 255, 224, 0, 16, 74, 70, 73, 70]);
+  const validJpgBuffer = Buffer.from([
+    255, 216, 255, 224, 0, 16, 74, 70, 73, 70,
+  ]);
 
   describe('1. Formatos permitidos y validación exitosa', () => {
     it('acepta archivos PDF válidos', () => {
@@ -45,7 +47,11 @@ describe('Recepción Segura de Documentos de Solicitud (Tarea 2 - Backlog 4.10.1
     });
 
     it('acepta imágenes con extensión JPEG válidas', () => {
-      const jpeg = makeFile('identificacion.jpeg', 'image/jpeg', validJpgBuffer);
+      const jpeg = makeFile(
+        'identificacion.jpeg',
+        'image/jpeg',
+        validJpgBuffer,
+      );
       expect(() => validateSolicitudDocument(jpeg)).not.toThrow();
     });
   });
@@ -77,7 +83,11 @@ describe('Recepción Segura de Documentos de Solicitud (Tarea 2 - Backlog 4.10.1
     });
 
     it('rechaza cuando el tamaño declarado no coincide con el buffer', () => {
-      const corrupt = makeFile('corrupto.pdf', 'application/pdf', validPdfBuffer);
+      const corrupt = makeFile(
+        'corrupto.pdf',
+        'application/pdf',
+        validPdfBuffer,
+      );
       corrupt.size = validPdfBuffer.length + 500;
 
       expect(() => validateSolicitudDocument(corrupt)).toThrow(
@@ -97,7 +107,9 @@ describe('Recepción Segura de Documentos de Solicitud (Tarea 2 - Backlog 4.10.1
       ['biblioteca DLL (.dll)', 'library.dll', 'application/x-msdownload'],
     ])('rechaza extensión peligrosa: %s', (_nombre, filename, mime) => {
       const file = makeFile(filename, mime, Buffer.from('contenido'));
-      expect(() => validateSolicitudDocument(file)).toThrow(BadRequestException);
+      expect(() => validateSolicitudDocument(file)).toThrow(
+        BadRequestException,
+      );
     });
 
     it('rechaza ejecutables con doble extensión maliciosa (ej: archivo.exe.pdf)', () => {
@@ -112,11 +124,7 @@ describe('Recepción Segura de Documentos de Solicitud (Tarea 2 - Backlog 4.10.1
     });
 
     it('rechaza scripts con doble extensión maliciosa (ej: foto.sh.jpg)', () => {
-      const doubleExt = makeFile(
-        'foto.sh.jpg',
-        'image/jpeg',
-        validJpgBuffer,
-      );
+      const doubleExt = makeFile('foto.sh.jpg', 'image/jpeg', validJpgBuffer);
       expect(() => validateSolicitudDocument(doubleExt)).toThrow(
         'No se permiten archivos ejecutables o con extensiones potencialmente peligrosas.',
       );
@@ -199,11 +207,7 @@ describe('Recepción Segura de Documentos de Solicitud (Tarea 2 - Backlog 4.10.1
       ['ruta absoluta windows', 'C:\\inetpub\\wwwroot\\cmd.pdf'],
       ['carácter nulo', 'cedula.pdf\0.exe'],
     ])('rechaza intento de path traversal: %s', (_desc, maliciousName) => {
-      const file = makeFile(
-        maliciousName,
-        'application/pdf',
-        validPdfBuffer,
-      );
+      const file = makeFile(maliciousName, 'application/pdf', validPdfBuffer);
       expect(() => validateSolicitudDocument(file)).toThrow(
         'El nombre original del archivo contiene caracteres o secuencias no permitidas.',
       );
@@ -231,7 +235,11 @@ describe('Recepción Segura de Documentos de Solicitud (Tarea 2 - Backlog 4.10.1
       // No expone rutas internas del SO en la referencia devuelta
       expect(resultado.rutaReferenciaArchivo).not.toContain('C:');
       expect(resultado.rutaReferenciaArchivo).not.toContain('\\');
-      expect(resultado.rutaReferenciaArchivo.startsWith('/uploads/solicitudes/pendientes/')).toBe(true);
+      expect(
+        resultado.rutaReferenciaArchivo.startsWith(
+          '/uploads/solicitudes/pendientes/',
+        ),
+      ).toBe(true);
       expect(existsSync(resultado.absolutePath)).toBe(true);
     });
 
@@ -257,13 +265,18 @@ describe('Recepción Segura de Documentos de Solicitud (Tarea 2 - Backlog 4.10.1
       const pdf = makeFile('doc.pdf', 'application/pdf', validPdfBuffer);
       const pending = saveSolicitudDocumentPending(pdf);
 
-      const linked = linkSolicitudDocumentFile(99, pending.rutaReferenciaArchivo);
+      const linked = linkSolicitudDocumentFile(
+        99,
+        pending.rutaReferenciaArchivo,
+      );
 
       try {
         expect(linked.rutaReferenciaArchivo).toBe(
           `/uploads/solicitudes/99/${linked.filename}`,
         );
-        expect(linked.rutaReferenciaArchivo.startsWith('/uploads/solicitudes/99/')).toBe(true);
+        expect(
+          linked.rutaReferenciaArchivo.startsWith('/uploads/solicitudes/99/'),
+        ).toBe(true);
         // El archivo original en pendientes ya no existe (se movió)
         expect(existsSync(pending.absolutePath)).toBe(false);
       } finally {
@@ -277,7 +290,10 @@ describe('Recepción Segura de Documentos de Solicitud (Tarea 2 - Backlog 4.10.1
       ).toThrow('La ruta del documento pendiente no es válida.');
 
       expect(() =>
-        linkSolicitudDocumentFile(1, '/uploads/solicitudes/pendientes/../secreto.txt'),
+        linkSolicitudDocumentFile(
+          1,
+          '/uploads/solicitudes/pendientes/../secreto.txt',
+        ),
       ).toThrow('Nombre de archivo pendiente inválido.');
     });
   });

@@ -79,7 +79,8 @@ export class Material {
   @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
   precioUnitario?: number | null;
 
-  @Column({ type: 'datetime2', nullable: true })
+  /** `datetime` (no datetime2): compatible con sqljs en QA y con MSSQL en runtime. */
+  @Column({ type: 'datetime', nullable: true })
   fechaVencimiento?: Date | null;
 
   /** Indica que este material requiere fecha de vencimiento (p. ej. insumos químicos). */

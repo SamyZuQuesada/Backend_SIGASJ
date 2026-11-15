@@ -14,6 +14,8 @@ import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
 import jwtConfig from '../../config/jwt.config';
 import { AuthModule } from '../auth/auth.module';
 import { ImagenProyecto } from './entities/imagen-proyecto.entity';
+import { Rol } from '../usuarios/entities/rol.entity';
+import { Usuario } from '../usuarios/entities/usuario.entity';
 import { Proyecto } from './entities/proyecto.entity';
 import { ProyectosModule } from './proyectos.module';
 
@@ -95,7 +97,7 @@ describe('POST/GET/PATCH /api/v1/admin/proyectos — autenticación y autorizaci
           type: 'sqljs',
           autoSave: false,
           dropSchema: true,
-          entities: [Proyecto, ImagenProyecto],
+          entities: [Proyecto, ImagenProyecto, Usuario, Rol],
           synchronize: true,
         }),
         AuthModule,
@@ -127,15 +129,12 @@ describe('POST/GET/PATCH /api/v1/admin/proyectos — autenticación y autorizaci
     proyectos = moduleFixture.get(getRepositoryToken(Proyecto));
     imagenes = moduleFixture.get(getRepositoryToken(ImagenProyecto));
 
-    const login = await request(app.getHttpServer())
-      .post('/api/v1/auth/login')
-      .send({
-        email: 'admin@asadasanjuan.cr',
-        password: 'Password123!',
-      });
-
-    expect(login.status).toBe(200);
-    adminToken = (login.body as { accessToken: string }).accessToken;
+    adminToken = jwtService.sign({
+      sub: '1',
+      email: 'admin@asadasanjuan.cr',
+      role: Role.ADMINISTRADORA,
+      name: 'Administradora',
+    } as JwtPayload);
   });
 
   afterAll(async () => {
@@ -209,7 +208,7 @@ describe('POST/GET/PATCH /api/v1/admin/proyectos — autenticación y autorizaci
   it('Secretaria autenticada recibe 403 y no inserta', async () => {
     const response = await postProyecto(
       VALID_PAYLOAD,
-      signAs(Role.SECRETARIA, '2'),
+      signAs(Role.SECRETARIA_EJECUTIVA, '2'),
     ).expect(403);
 
     expect(response.body).toMatchObject({
@@ -325,7 +324,7 @@ describe('POST/GET/PATCH /api/v1/admin/proyectos — autenticación y autorizaci
   it('GET /api/v1/admin/proyectos con Secretaria responde 403', async () => {
     const response = await request(app.getHttpServer())
       .get('/api/v1/admin/proyectos')
-      .set('Authorization', `Bearer ${signAs(Role.SECRETARIA, '2')}`)
+      .set('Authorization', `Bearer ${signAs(Role.SECRETARIA_EJECUTIVA, '2')}`)
       .expect(403);
 
     expect(response.body).toMatchObject({
@@ -407,7 +406,7 @@ describe('POST/GET/PATCH /api/v1/admin/proyectos — autenticación y autorizaci
   it('GET /api/v1/admin/proyectos/:id con Secretaria responde 403', async () => {
     const response = await request(app.getHttpServer())
       .get('/api/v1/admin/proyectos/1')
-      .set('Authorization', `Bearer ${signAs(Role.SECRETARIA, '2')}`)
+      .set('Authorization', `Bearer ${signAs(Role.SECRETARIA_EJECUTIVA, '2')}`)
       .expect(403);
 
     expect(response.body).toMatchObject({
@@ -561,7 +560,16 @@ describe('POST/GET/PATCH /api/v1/admin/proyectos — autenticación y autorizaci
       orden: 1,
     });
     expect(Object.keys(body.imagenes[0]).sort()).toEqual(
-      ['createdAt', 'descripcion', 'id', 'orden', 'url'].sort(),
+      [
+        'createdAt',
+        'descripcion',
+        'id',
+        'imagenUrl',
+        'orden',
+        'ordenVisualizacion',
+        'textoAlternativo',
+        'url',
+      ].sort(),
     );
     expect(body.imagenes[0]).not.toHaveProperty('proyecto');
     expect(response.body).not.toHaveProperty('password');
@@ -642,7 +650,7 @@ describe('POST/GET/PATCH /api/v1/admin/proyectos — autenticación y autorizaci
     const response = await patchProyecto(
       id,
       { nombre: 'Nuevo nombre' },
-      signAs(Role.SECRETARIA, '2'),
+      signAs(Role.SECRETARIA_EJECUTIVA, '2'),
     ).expect(403);
 
     expect(response.body).toMatchObject({

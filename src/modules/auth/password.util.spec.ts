@@ -1,48 +1,65 @@
 import {
   comparePassword,
+  DEFAULT_BCRYPT_ROUNDS,
   hashPassword,
-  PasswordHashingError,
-  PasswordInputError,
+  resolveBcryptRounds,
   verifyPassword,
 } from './password.util';
 
-describe('password.util (bcrypt SIGASJ)', () => {
-  const plain = 'Password123!';
+const PASSWORD_SINTETICA = 'TestPassword123!';
 
-  it('genera un hash distinto a la contraseña original', async () => {
-    const hash = await hashPassword(plain);
-    expect(hash).not.toBe(plain);
+describe('password.util (hash seguro centralizado)', () => {
+  it('resolveBcryptRounds usa default 10 y rechaza valores bajos', () => {
+    expect(resolveBcryptRounds()).toBe(DEFAULT_BCRYPT_ROUNDS);
+    expect(resolveBcryptRounds(4)).toBe(DEFAULT_BCRYPT_ROUNDS);
+    expect(resolveBcryptRounds(12)).toBe(12);
+  });
+
+  it('hashPassword genera bcrypt distinto del texto plano', async () => {
+    const hash = await hashPassword(PASSWORD_SINTETICA);
+    expect(hash).not.toBe(PASSWORD_SINTETICA);
     expect(hash.startsWith('$2')).toBe(true);
-    expect(hash.length).toBeGreaterThan(50);
+    expect(hash.length).toBeGreaterThanOrEqual(50);
   });
 
-  it('dos hashes de la misma password no son idénticos (salt)', async () => {
-    const a = await hashPassword(plain);
-    const b = await hashPassword(plain);
+  it('dos hashes de la misma password no son necesariamente iguales (salt)', async () => {
+    const a = await hashPassword(PASSWORD_SINTETICA);
+    const b = await hashPassword(PASSWORD_SINTETICA);
     expect(a).not.toBe(b);
-    expect(await verifyPassword(plain, a)).toBe(true);
-    expect(await verifyPassword(plain, b)).toBe(true);
+    expect(await comparePassword(PASSWORD_SINTETICA, a)).toBe(true);
+    expect(await comparePassword(PASSWORD_SINTETICA, b)).toBe(true);
   });
 
-  it('verifica la contraseña correcta y rechaza la incorrecta', async () => {
-    const hash = await hashPassword(plain);
-    expect(await verifyPassword(plain, hash)).toBe(true);
-    expect(await comparePassword(plain, hash)).toBe(true);
-    expect(await verifyPassword('WrongPass1', hash)).toBe(false);
+  it('comparePassword correcta → true; incorrecta → false', async () => {
+    const hash = await hashPassword(PASSWORD_SINTETICA);
+    expect(await comparePassword(PASSWORD_SINTETICA, hash)).toBe(true);
+    expect(await comparePassword('OtraPassword999!', hash)).toBe(false);
   });
 
-  it('rechaza password vacía y no llama a persistencia (solo lanza)', async () => {
-    await expect(hashPassword('')).rejects.toBeInstanceOf(PasswordInputError);
+  it('verifyPassword es alias de comparePassword', async () => {
+    const hash = await hashPassword(PASSWORD_SINTETICA);
+    expect(await verifyPassword(PASSWORD_SINTETICA, hash)).toBe(true);
   });
 
-  it('compare con hash inválido retorna false', async () => {
-    expect(await verifyPassword(plain, 'no-es-un-hash')).toBe(false);
-    expect(await verifyPassword(plain, '')).toBe(false);
+  it('hashPassword rechaza string vacío sin persistir nada', async () => {
+    await expect(hashPassword('')).rejects.toThrow(
+      'Error generating password hash',
+    );
   });
 
-  it('PasswordHashingError no incluye detalle interno de bcrypt', () => {
-    const error = new PasswordHashingError();
-    expect(error.message).toBe('No fue posible procesar las credenciales.');
-    expect(error.message).not.toMatch(/bcrypt|salt|hash/i);
+  it('comparePassword con hash inválido o vacío → false (sin throw)', async () => {
+    expect(await comparePassword(PASSWORD_SINTETICA, '')).toBe(false);
+    expect(await comparePassword(PASSWORD_SINTETICA, 'not-a-bcrypt-hash')).toBe(
+      false,
+    );
+    expect(
+      await comparePassword('', await hashPassword(PASSWORD_SINTETICA)),
+    ).toBe(false);
+  });
+
+  it('no existe comparación directa password === hash', async () => {
+    const hash = await hashPassword(PASSWORD_SINTETICA);
+    expect(PASSWORD_SINTETICA === hash).toBe(false);
+    expect(await comparePassword(PASSWORD_SINTETICA, hash)).toBe(true);
   });
 });

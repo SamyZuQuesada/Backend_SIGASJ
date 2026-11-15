@@ -358,7 +358,7 @@ describe('PATCH /api/v1/fontanero/averias/:id/resolver', () => {
 
   it.each([
     [Role.ADMINISTRADORA, () => adminToken],
-    [Role.SECRETARIA, () => signAs(Role.SECRETARIA, '2')],
+    [Role.SECRETARIA_EJECUTIVA, () => signAs(Role.SECRETARIA_EJECUTIVA, '2')],
     [Role.ABONADO, () => signAs(Role.ABONADO, '4')],
   ])('%s recibe 403 en la ruta del Fontanero', async (_role, token) => {
     const averia = await persistAveria({

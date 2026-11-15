@@ -92,7 +92,8 @@ describe('Transacción Atómica de Cambio de Estado y Sincronización Detalle/Hi
       }),
       update: jest.fn().mockImplementation(async (_criteria, values) => {
         if (values.estado) dbSolicitud.estado = values.estado;
-        if (values.fechaResolucion !== undefined) dbSolicitud.fechaResolucion = values.fechaResolucion;
+        if (values.fechaResolucion !== undefined)
+          dbSolicitud.fechaResolucion = values.fechaResolucion;
         return { affected: 1 };
       }),
       createQueryBuilder: jest.fn().mockReturnValue({
@@ -117,7 +118,11 @@ describe('Transacción Atómica de Cambio de Estado y Sincronización Detalle/Hi
         ...dto,
       })),
       save: jest.fn().mockImplementation(async (evento: HistorialSolicitud) => {
-        const guardado = { ...evento, id: dbHistorial.length + 1, fechaHora: new Date() };
+        const guardado = {
+          ...evento,
+          id: dbHistorial.length + 1,
+          fechaHora: new Date(),
+        };
         dbHistorial.push(guardado as HistorialSolicitud);
         return guardado;
       }),
@@ -277,7 +282,11 @@ describe('Transacción Atómica de Cambio de Estado y Sincronización Detalle/Hi
                     if (e === HistorialSolicitud) {
                       return {
                         create: jest.fn(),
-                        save: jest.fn().mockRejectedValue(new Error('Fallo crítico en base de datos')),
+                        save: jest
+                          .fn()
+                          .mockRejectedValue(
+                            new Error('Fallo crítico en base de datos'),
+                          ),
                       };
                     }
                     return {};
@@ -293,10 +302,19 @@ describe('Transacción Atómica de Cambio de Estado y Sincronización Detalle/Hi
         { provide: getRepositoryToken(SolicitudServicio), useValue: {} },
         { provide: getRepositoryToken(SolicitudArregloPago), useValue: {} },
         { provide: getRepositoryToken(SolicitudCambioTitular), useValue: {} },
-        { provide: getRepositoryToken(SolicitudInfraestructuraLinderos), useValue: {} },
+        {
+          provide: getRepositoryToken(SolicitudInfraestructuraLinderos),
+          useValue: {},
+        },
         { provide: getRepositoryToken(SolicitudAfiliacion), useValue: {} },
-        { provide: getRepositoryToken(SolicitudDisponibilidadServicios), useValue: {} },
-        { provide: getRepositoryToken(SolicitudConstanciaServicio), useValue: {} },
+        {
+          provide: getRepositoryToken(SolicitudDisponibilidadServicios),
+          useValue: {},
+        },
+        {
+          provide: getRepositoryToken(SolicitudConstanciaServicio),
+          useValue: {},
+        },
       ],
     }).compile();
 

@@ -12,6 +12,7 @@ import type { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
 import jwtConfig from '../../config/jwt.config';
 import { AuthModule } from '../auth/auth.module';
 import { Averia } from '../averias/entities/averia.entity';
+import { ObservacionAveria } from '../averias/entities/observacion-averia.entity';
 import { Rol } from '../usuarios/entities/rol.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import {
@@ -48,6 +49,7 @@ const movimientosQaTypeOrmModule = TypeOrmModule.forRoot({
     ReposicionMaterial,
     DetalleReposicionMaterial,
     Averia,
+    ObservacionAveria,
   ],
   synchronize: true,
 });
@@ -280,6 +282,12 @@ describe('3.11 Historial de movimientos de inventario', () => {
     await adminGetMovimientos('').expect(HttpStatus.UNAUTHORIZED);
     await adminGetMovimientos('', signAs(Role.FONTANERO)).expect(
       HttpStatus.FORBIDDEN,
+    );
+  });
+
+  it('permite a SECRETARIA consultar el historial (solo lectura)', async () => {
+    await adminGetMovimientos('', signAs(Role.SECRETARIA_EJECUTIVA)).expect(
+      HttpStatus.OK,
     );
   });
 

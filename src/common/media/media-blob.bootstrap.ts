@@ -1,9 +1,6 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import {
-  bindMediaDataSource,
-  ensureMediaBlobTable,
-} from './media-blob.store';
+import { bindMediaDataSource, ensureMediaBlobTable } from './media-blob.store';
 
 @Injectable()
 export class MediaBlobBootstrap implements OnModuleInit {

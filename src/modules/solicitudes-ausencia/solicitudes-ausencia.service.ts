@@ -63,6 +63,7 @@ import {
 import { DocumentoSolicitudAusencia } from './entities/documento-solicitud-ausencia.entity';
 import { SolicitudAusencia } from './entities/solicitud-ausencia.entity';
 import { NotificacionSolicitudAusenciaService } from './notificacion-solicitud-ausencia.service';
+import type { ResultadoAvisoCorreo } from './resultado-aviso-correo';
 
 export type SolicitudesAusenciaListado = {
   data: SolicitudAusencia[];
@@ -403,6 +404,25 @@ export class SolicitudesAusenciaService {
     manager: EntityManager;
   }): Promise<{ solicitud: SolicitudAusencia; creada: boolean }> {
     this.validarFechas(input.fechaInicio, input.fechaFin);
+    if (input.tipo === TipoSolicitudAusencia.VACACIONES) {
+      const cantidadDias = diasVacacionesNetos(
+        input.fechaInicio,
+        input.fechaFin,
+      );
+      if (cantidadDias < 1) {
+        throw new BadRequestException(
+          'El periodo de vacaciones no produce días válidos tras descontar feriados',
+        );
+      }
+      const saldo = await this.vacacionesService.calcularSaldo(
+        input.colaboradorId,
+      );
+      if (cantidadDias > saldo.diasDisponibles) {
+        throw new BadRequestException(
+          `El colaborador no tiene saldo suficiente de vacaciones: dispone de ${saldo.diasDisponibles} día(s) y se intentan disfrutar ${cantidadDias}`,
+        );
+      }
+    }
     await this.assertPeriodoLibre(
       input.manager,
       input.colaboradorId,
@@ -657,19 +677,30 @@ export class SolicitudesAusenciaService {
     );
 
     // Fuera de la transacción: un fallo de correo no revierte la aprobación.
+    let avisoCorreo: ResultadoAvisoCorreo = {
+      enviado: false,
+      destinos: [],
+      motivoOmitido: 'No se intentó enviar el correo.',
+    };
     try {
-      await this.notificacionSolicitudAusencia.notificarAprobacion(
-        actualizada,
-      );
+      avisoCorreo =
+        await this.notificacionSolicitudAusencia.notificarAprobacion(
+          actualizada,
+        );
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(
         `Notificación de aprobación omitida id=${id}: ${message}`,
       );
+      avisoCorreo = {
+        enviado: false,
+        destinos: [],
+        motivoOmitido: message,
+      };
     }
     await this.avisarFontaneroDecision(actualizada, 'aprobada');
 
-    return this.findOne(id);
+    return Object.assign(await this.findOne(id), { avisoCorreo });
   }
 
   async rechazar(
@@ -711,16 +742,25 @@ export class SolicitudesAusenciaService {
       this.logger.log(`SolicitudAusencia RECHAZADA id=${id}`);
     });
     const rechazada = await this.findOne(id);
+    let avisoCorreo: ResultadoAvisoCorreo = {
+      enviado: false,
+      destinos: [],
+      motivoOmitido: 'No se intentó enviar el correo.',
+    };
     try {
-      await this.notificacionSolicitudAusencia.notificarRechazo(rechazada);
+      avisoCorreo =
+        await this.notificacionSolicitudAusencia.notificarRechazo(rechazada);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      this.logger.warn(
-        `Notificación de rechazo omitida id=${id}: ${message}`,
-      );
+      this.logger.warn(`Notificación de rechazo omitida id=${id}: ${message}`);
+      avisoCorreo = {
+        enviado: false,
+        destinos: [],
+        motivoOmitido: message,
+      };
     }
     await this.avisarFontaneroDecision(rechazada, 'rechazada');
-    return rechazada;
+    return Object.assign(rechazada, { avisoCorreo });
   }
 
   private async avisarFontaneroDecision(
@@ -828,9 +868,7 @@ export class SolicitudesAusenciaService {
       );
     }
     if (esFeriadoCostaRica(fechaFin)) {
-      throw new BadRequestException(
-        'La fecha de fin no puede ser un feriado',
-      );
+      throw new BadRequestException('La fecha de fin no puede ser un feriado');
     }
     if (diasAusenciaSinFeriados(fechaInicio, fechaFin) < 1) {
       throw new BadRequestException(

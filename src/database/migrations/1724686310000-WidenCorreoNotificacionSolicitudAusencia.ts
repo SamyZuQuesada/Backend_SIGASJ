@@ -3,9 +3,7 @@ import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
 /**
  * Varios correos de aviso en la misma solicitud (lista separada por coma).
  */
-export class WidenCorreoNotificacionSolicitudAusencia1724686310000
-  implements MigrationInterface
-{
+export class WidenCorreoNotificacionSolicitudAusencia1724686310000 implements MigrationInterface {
   name = 'WidenCorreoNotificacionSolicitudAusencia1724686310000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

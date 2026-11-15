@@ -288,8 +288,9 @@ describe('Tarea 2 - Generación de Referencia Pública Segura (Código de Seguim
 
       mockSolicitudRepo.findOne.mockResolvedValue(solicitudEncontrada);
 
-      const resultado =
-        await service.findByCodigoSeguimiento('  sol-2026-a82k91  ');
+      const resultado = await service.findByCodigoSeguimiento(
+        '  sol-2026-a82k91  ',
+      );
 
       expect(resultado).toBe(solicitudEncontrada);
       expect(mockSolicitudRepo.findOne).toHaveBeenCalledWith({

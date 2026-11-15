@@ -147,7 +147,7 @@ describe('API PATCH /solicitudes/:id/estado', () => {
   it('SECRETARIA también puede cambiar estado → 200', async () => {
     await request(app.getHttpServer())
       .patch('/solicitudes/1/estado')
-      .set('Authorization', `Bearer ${signAs(Role.SECRETARIA, 9)}`)
+      .set('Authorization', `Bearer ${signAs(Role.SECRETARIA_EJECUTIVA, 9)}`)
       .send({ estadoNuevo: EstadoSolicitud.APROBADA })
       .expect(200);
 

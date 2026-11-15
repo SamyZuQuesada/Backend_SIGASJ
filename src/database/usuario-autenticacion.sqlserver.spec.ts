@@ -13,6 +13,7 @@ import { HttpLoggingInterceptor } from '../common/interceptors/http-logging.inte
 import { Role } from '../common/enums/role.enum';
 import authConfig from '../config/auth.config';
 import jwtConfig from '../config/jwt.config';
+import { AuthModule } from '../modules/auth/auth.module';
 import { PasswordService } from '../modules/auth/password.service';
 import { Usuario } from '../modules/usuarios/entities/usuario.entity';
 import { UsuariosModule } from '../modules/usuarios/usuarios.module';
@@ -124,7 +125,7 @@ describe('Estructura de autenticación en SQL Server de desarrollo', () => {
     ) {
       return false;
     }
-    return passwordService.compare(plain, hash);
+    return passwordService.comparePassword(plain, hash);
   };
 
   const leerHash = async (id: number): Promise<string> => {
@@ -193,6 +194,7 @@ describe('Estructura de autenticación en SQL Server de desarrollo', () => {
           load: [jwtConfig, authConfig],
         }),
         TypeOrmModule.forRoot(options),
+        AuthModule,
         UsuariosModule,
       ],
       providers: [
@@ -362,17 +364,21 @@ describe('Estructura de autenticación en SQL Server de desarrollo', () => {
   });
 
   it('PasswordService genera hashes con salt y compare distingue la contraseña', async () => {
-    const primero = await passwordService.hash(claveInicial);
-    const segundo = await passwordService.hash(claveInicial);
+    const primero = await passwordService.hashPassword(claveInicial);
+    const segundo = await passwordService.hashPassword(claveInicial);
     expect(primero === segundo).toBe(false);
     expect(primero === claveInicial).toBe(false);
-    expect(await passwordService.compare(claveInicial, primero)).toBe(true);
-    expect(await passwordService.compare(claveAjena, primero)).toBe(false);
-    expect(await passwordService.compare(claveInicial, 'no-es-un-hash')).toBe(
+    expect(await passwordService.comparePassword(claveInicial, primero)).toBe(
+      true,
+    );
+    expect(await passwordService.comparePassword(claveAjena, primero)).toBe(
       false,
     );
-    await expect(passwordService.hash('')).rejects.toThrow(
-      'La contraseña no es válida.',
+    expect(
+      await passwordService.comparePassword(claveInicial, 'no-es-un-hash'),
+    ).toBe(false);
+    await expect(passwordService.hashPassword('')).rejects.toThrow(
+      'No se pudo procesar la contraseña.',
     );
   });
 
@@ -409,7 +415,7 @@ describe('Estructura de autenticación en SQL Server de desarrollo', () => {
       {
         nombre: 'QA Auth Secretaria Ejecutiva',
         correo: correos.secretaria,
-        rol: Role.SECRETARIA,
+        rol: Role.SECRETARIA_EJECUTIVA,
       },
       {
         nombre: 'QA Auth Fontanero',
@@ -499,7 +505,7 @@ describe('Estructura de autenticación en SQL Server de desarrollo', () => {
         Role.ADMINISTRADORA,
         Role.ADMINISTRADORA,
         Role.FONTANERO,
-        Role.SECRETARIA,
+        Role.SECRETARIA_EJECUTIVA,
       ].sort(),
     );
   });

@@ -10,7 +10,8 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { Role } from '../../../common/enums/role.enum';
-import { PASSWORD_MIN_LENGTH } from '../../auth/password.util';
+
+const PASSWORD_MIN_LENGTH = 6;
 
 const trimString = ({ value }: TransformFnParams): unknown =>
   typeof value === 'string' ? value.trim() : value;
@@ -35,7 +36,7 @@ export class UpdateUsuarioDto {
   })
   password?: string;
 
-  @ApiPropertyOptional({ enum: Role, example: Role.SECRETARIA })
+  @ApiPropertyOptional({ enum: Role, example: Role.SECRETARIA_EJECUTIVA })
   @IsOptional()
   @IsEnum(Role, { message: 'El rol no es válido' })
   rol?: Role;

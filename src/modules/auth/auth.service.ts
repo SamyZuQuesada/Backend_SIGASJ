@@ -1,16 +1,28 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { esRol, Role } from '../../common/enums/role.enum';
+import { parseRole, Role } from '../../common/enums/role.enum';
 import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
+import { UsuariosService } from '../usuarios/usuarios.service';
 import { LoginDto } from './dto/login.dto';
 import { PasswordService } from './password.service';
-import { Usuario } from '../usuarios/entities/usuario.entity';
 
+/** Misma respuesta para usuario inexistente y password incorrecta (anti-enumeración). */
 const CREDENCIALES_INVALIDAS = 'Credenciales inválidas';
+/** Contrato existente: cuenta inactiva puede comunicarse de forma explícita. */
 const USUARIO_INACTIVO = 'El usuario se encuentra inactivo.';
+
+export type AuthLoginUser = {
+  id: number;
+  email: string;
+  role: Role;
+  name: string;
+};
+
+export type AuthLoginResult = {
+  accessToken: string;
+  user: AuthLoginUser;
+};
 
 @Injectable()
 export class AuthService {
@@ -18,77 +30,128 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly passwordService: PasswordService,
-    @InjectRepository(Usuario)
-    private readonly usuarioRepository: Repository<Usuario>,
+    private readonly usuariosService: UsuariosService,
   ) {}
 
-  private devLoginWithoutPassword(): boolean {
-    return (
-      this.configService.get<boolean>('auth.devLoginWithoutPassword') === true
-    );
-  }
-
-  async login(loginDto: LoginDto) {
-    const correo = loginDto.email.trim().toLowerCase();
-    const devSinPassword = this.devLoginWithoutPassword();
-    const qb = this.usuarioRepository
-      .createQueryBuilder('usuario')
-      .leftJoinAndSelect('usuario.rol', 'rol')
-      .where('LOWER(usuario.correo) = :correo', { correo });
-
-    if (!devSinPassword) {
-      qb.addSelect('usuario.passwordHash');
+  /**
+   * Bypass de contraseña solo si auth.config lo habilitó Y el entorno no es
+   * product-like (defensa en profundidad ante mala configuración).
+   */
+  private allowsPasswordBypass(): boolean {
+    if (
+      this.configService.get<boolean>('auth.devLoginWithoutPassword') !== true
+    ) {
+      return false;
     }
 
-    const usuario = await qb.getOne();
+    if (this.configService.get<boolean>('auth.isProductionLike') === true) {
+      return false;
+    }
+
+    const nodeEnv = String(
+      this.configService.get<string>('auth.nodeEnv') ??
+        this.configService.get<string>('environment.nodeEnv') ??
+        process.env.NODE_ENV ??
+        '',
+    )
+      .trim()
+      .toLowerCase();
+
+    return nodeEnv === 'development';
+  }
+
+  /**
+   * Valida identidad: buscar Usuario → compare password → estado activo → rol.
+   * Retorna solo datos mínimos (sin password / passwordHash).
+   * No usa rol/estado del LoginDto.
+   */
+  async validateCredentials(loginDto: LoginDto): Promise<AuthLoginUser> {
+    const correo = loginDto.email.trim().toLowerCase();
+    const requirePassword = !this.allowsPasswordBypass();
+
+    const usuario = await this.usuariosService.findByCorreoForAuth(correo, {
+      includePasswordHash: requirePassword,
+    });
 
     if (!usuario) {
       throw new UnauthorizedException(CREDENCIALES_INVALIDAS);
     }
 
-    if (!devSinPassword) {
+    if (requirePassword) {
       if (!usuario.passwordHash) {
         throw new UnauthorizedException(CREDENCIALES_INVALIDAS);
       }
 
-      const passwordOk = await this.passwordService.compare(
+      const passwordOk = await this.passwordService.comparePassword(
         loginDto.password,
         usuario.passwordHash,
       );
       if (!passwordOk) {
         throw new UnauthorizedException(CREDENCIALES_INVALIDAS);
       }
-      delete (usuario as { passwordHash?: string }).passwordHash;
     }
 
     if (!usuario.activo) {
       throw new UnauthorizedException(USUARIO_INACTIVO);
     }
 
-    const role = this.asRole(usuario.rol?.nombre);
+    const role = parseRole(usuario.rol?.nombre);
     if (!role) {
       throw new UnauthorizedException(CREDENCIALES_INVALIDAS);
     }
 
-    const payload: JwtPayload = {
-      sub: usuario.idUsuario,
+    // Objeto explícito: nunca spread de Entity (evitar passwordHash).
+    return {
+      id: usuario.idUsuario,
       email: usuario.correo,
       role,
       name: usuario.nombre,
     };
+  }
+
+  /**
+   * Login HTTP: valida credenciales y emite JWT existente del módulo Auth.
+   * La emisión JWT ya formaba parte del sistema; no se inventa un token falso.
+   */
+  async login(loginDto: LoginDto): Promise<AuthLoginResult> {
+    const user = await this.validateCredentials(loginDto);
+
+    const payload: JwtPayload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      name: user.name,
+    };
 
     return {
       accessToken: this.jwtService.sign(payload),
-      user: {
-        id: usuario.idUsuario,
-        email: usuario.correo,
-        role,
-        name: usuario.nombre,
-      },
+      user,
     };
   }
 
-  private asRole(nombre: string | undefined): Role | null {
-    return esRol(nombre) ? nombre : null;
+  /**
+   * Sesión actual desde JWT ya validado (JwtStrategy).
+   * Relee usuario en BD para devolver datos frescos sin passwordHash.
+   */
+  async getMe(userId: number): Promise<AuthLoginUser> {
+    const usuario = await this.usuariosService.findByIdForAuth(userId);
+    if (!usuario) {
+      throw new UnauthorizedException('Token inválido');
+    }
+    if (!usuario.activo) {
+      throw new UnauthorizedException(USUARIO_INACTIVO);
+    }
+
+    const role = parseRole(usuario.rol?.nombre);
+    if (!role) {
+      throw new UnauthorizedException('Token inválido');
+    }
+
+    return {
+      id: usuario.idUsuario,
+      email: usuario.correo,
+      role,
+      name: usuario.nombre,
+    };
   }
 }

@@ -175,7 +175,7 @@ describe('Salidas de Inventario — QA Integral, Validación Funcional y Transac
     secretariaUser = await crearUsuarioPrueba(usuarioRepository, roles, {
       nombre: 'Secretaria QA',
       correo: 'secretaria.salidas@asada.test',
-      role: Role.SECRETARIA,
+      role: Role.SECRETARIA_EJECUTIVA,
     });
     abonadoUser = await crearUsuarioPrueba(usuarioRepository, roles, {
       nombre: 'Abonado QA',
@@ -330,7 +330,7 @@ describe('Salidas de Inventario — QA Integral, Validación Funcional y Transac
       expect(updated?.stockActual).toBe(0);
     });
 
-    it('rechaza con 400 Bad Request cuando la cantidad solicitada dejaría el stock por debajo del stock mínimo (reserva obligatoria)', async () => {
+    it('permite salida bajo stock mínimo con advertencia (no bloquea; alerta de reposición)', async () => {
       const material = await createMaterial({
         nombre: 'Codo PVC Reserva 90°',
         stockActual: 5,
@@ -348,13 +348,11 @@ describe('Salidas de Inventario — QA Integral, Validación Funcional y Transac
           cantidad: 4,
         });
 
-      expect(res.status).toBe(HttpStatus.BAD_REQUEST);
-      expect(res.body.message).toContain(
-        'La salida dejaría el material por debajo del stock mínimo',
-      );
-      expect(res.body.message).toContain(
-        'Puede retirar como máximo 3 unidades.',
-      );
+      expect(res.status).toBe(HttpStatus.CREATED);
+      expect(res.body.mensaje).toContain('Salida física registrada exitosamente');
+      expect(res.body.stockActual).toBe(1);
+      const updated = await materialRepository.findOneBy({ id: material.id });
+      expect(updated?.stockActual).toBe(1);
     });
 
     it('rechaza con 400 Bad Request cuando la cantidad solicitada supera el stock disponible (nunca negativo)', async () => {
@@ -795,7 +793,7 @@ describe('Salidas de Inventario — QA Integral, Validación Funcional y Transac
         .get(`/api/v1/inventario/salidas/averia/${averia.id}`)
         .set(
           'Authorization',
-          `Bearer ${signAs(Role.SECRETARIA, String(secretariaUser.idUsuario))}`,
+          `Bearer ${signAs(Role.SECRETARIA_EJECUTIVA, String(secretariaUser.idUsuario))}`,
         );
       expect(resSecretaria.status).toBe(HttpStatus.OK);
       expect(resSecretaria.body).toHaveLength(1);
@@ -922,7 +920,7 @@ describe('Salidas de Inventario — QA Integral, Validación Funcional y Transac
     });
 
     it('rechaza con 403 Forbidden a un rol no autorizado como SECRETARIA', async () => {
-      const token = signAs(Role.SECRETARIA, String(secretariaUser.idUsuario));
+      const token = signAs(Role.SECRETARIA_EJECUTIVA, String(secretariaUser.idUsuario));
 
       const res = await request(app.getHttpServer())
         .post('/api/v1/inventario/salidas')

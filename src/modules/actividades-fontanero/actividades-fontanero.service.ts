@@ -447,7 +447,12 @@ export class ActividadesFontaneroService {
       );
     }
 
-    await this.actualizarBorrador(id, { ...dto, esBorrador: true }, user, files);
+    await this.actualizarBorrador(
+      id,
+      { ...dto, esBorrador: true },
+      user,
+      files,
+    );
 
     const actualizada = await this.requireOwnedActividad(id, user.userId);
     const tipoActividad = actualizada.tipoActividad;
@@ -639,10 +644,7 @@ export class ActividadesFontaneroService {
 
     try {
       for (const file of files) {
-        const { rutaReferenciaArchivo } = saveActividadDocument(
-          saved.id,
-          file,
-        );
+        const { rutaReferenciaArchivo } = saveActividadDocument(saved.id, file);
         writtenDocuments.push({ rutaReferenciaArchivo });
         const document = this.documentoRepository.create({
           nombreOriginal: file.originalname,
@@ -915,9 +917,7 @@ export class ActividadesFontaneroService {
     }
   }
 
-  private excludeBorradores(
-    qb: SelectQueryBuilder<ActividadFontanero>,
-  ): void {
+  private excludeBorradores(qb: SelectQueryBuilder<ActividadFontanero>): void {
     qb.andWhere('actividad.estado <> :borrador', {
       borrador: EstadoActividadFontanero.BORRADOR,
     });
@@ -1119,10 +1119,7 @@ export class ActividadesFontaneroService {
       if (!tipo) {
         throw new NotFoundException(ACTIVIDADES_MSG.tipoNotFound);
       }
-      if (
-        !tipo.activo ||
-        !esTipoActividadOfrecidoEnRegistro(tipo.codigo)
-      ) {
+      if (!tipo.activo || !esTipoActividadOfrecidoEnRegistro(tipo.codigo)) {
         throw new BadRequestException(ACTIVIDADES_MSG.tipoInactivo);
       }
       return tipo;

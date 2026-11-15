@@ -111,7 +111,11 @@ describe('Seguridad y Control de Acceso RBAC - Solicitudes Administrativas', () 
         },
         {
           provide: getRepositoryToken(TipoSolicitud),
-          useValue: { findOne: jest.fn().mockResolvedValue(mockSolicitudBase.tipoSolicitud) },
+          useValue: {
+            findOne: jest
+              .fn()
+              .mockResolvedValue(mockSolicitudBase.tipoSolicitud),
+          },
         },
         {
           provide: getRepositoryToken(SolicitudArregloPago),
@@ -278,7 +282,7 @@ describe('Seguridad y Control de Acceso RBAC - Solicitudes Administrativas', () 
     });
 
     it('SECRETARIA puede acceder al listado y al detalle', async () => {
-      const token = signAsRole(Role.SECRETARIA);
+      const token = signAsRole(Role.SECRETARIA_EJECUTIVA);
 
       const resListado = await request(app.getHttpServer())
         .get('/solicitudes')

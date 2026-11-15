@@ -39,7 +39,7 @@ export class AsociadosController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({
     summary: 'Registrar un nuevo asociado',
     description:
@@ -76,7 +76,7 @@ export class AsociadosController {
   }
 
   @Get()
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({
     summary: 'Listar asociados',
     description:
@@ -101,7 +101,7 @@ export class AsociadosController {
   }
 
   @Get('historial')
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({
     summary: 'Historial administrativo de asociados',
     description:
@@ -128,7 +128,7 @@ export class AsociadosController {
   }
 
   @Get(':id')
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({
     summary: 'Detalle de un asociado',
     description:
@@ -147,7 +147,7 @@ export class AsociadosController {
   }
 
   @Patch(':id')
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({
     summary: 'Modificar información de un asociado',
     description:
@@ -182,7 +182,7 @@ export class AsociadosController {
   }
 
   @Patch(':id/estado')
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({
     summary: 'Activar o inactivar un asociado',
     description:

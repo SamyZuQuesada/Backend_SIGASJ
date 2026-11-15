@@ -226,7 +226,7 @@ describe('Panel Administrativo - Detalle Completo de Solicitud (Tarea 4.12.2)', 
 
       await request(app.getHttpServer())
         .get('/solicitudes/1')
-        .set('Authorization', `Bearer ${signAs(Role.SECRETARIA)}`)
+        .set('Authorization', `Bearer ${signAs(Role.SECRETARIA_EJECUTIVA)}`)
         .expect(200);
 
       await request(app.getHttpServer())
@@ -309,7 +309,7 @@ describe('Panel Administrativo - Detalle Completo de Solicitud (Tarea 4.12.2)', 
 
       const response = await request(app.getHttpServer())
         .get('/solicitudes/2/detalle')
-        .set('Authorization', `Bearer ${signAs(Role.SECRETARIA)}`)
+        .set('Authorization', `Bearer ${signAs(Role.SECRETARIA_EJECUTIVA)}`)
         .expect(200);
 
       expect(response.body.id).toBe(2);

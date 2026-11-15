@@ -123,12 +123,14 @@ export class VacacionesService {
             `El colaborador no tiene saldo suficiente de vacaciones: dispone de ${saldo.diasDisponibles} día(s) y se intentan disfrutar ${input.cantidadDias}`,
           );
         }
-        const solicitudes = await manager.getRepository(SolicitudAusencia).find({
-          where: {
-            colaboradorId: input.colaboradorId,
-            estado: EstadoSolicitudAusencia.PENDIENTE,
-          },
-        });
+        const solicitudes = await manager
+          .getRepository(SolicitudAusencia)
+          .find({
+            where: {
+              colaboradorId: input.colaboradorId,
+              estado: EstadoSolicitudAusencia.PENDIENTE,
+            },
+          });
         if (
           solicitudes.some((item) =>
             rangosCalendarioSeSolapan(
@@ -160,12 +162,14 @@ export class VacacionesService {
             'Ya existe un permiso registrado en esa fecha',
           );
         }
-        const disfrutados = await manager.getRepository(MovimientoVacaciones).find({
-          where: {
-            colaboradorId: input.colaboradorId,
-            tipo: TipoMovimientoVacaciones.DISFRUTADO,
-          },
-        });
+        const disfrutados = await manager
+          .getRepository(MovimientoVacaciones)
+          .find({
+            where: {
+              colaboradorId: input.colaboradorId,
+              tipo: TipoMovimientoVacaciones.DISFRUTADO,
+            },
+          });
         if (disfrutados.some((item) => item.fecha === input.fecha)) {
           throw new ConflictException(
             'Ya existe un disfrute de vacaciones en esa fecha',

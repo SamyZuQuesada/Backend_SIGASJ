@@ -81,7 +81,7 @@ describe('PATCH /api/v1/asociados/:id/estado (activación e inactivación)', () 
       },
     );
 
-    it.each([Role.ADMINISTRADORA, Role.SECRETARIA])(
+    it.each([Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA])(
       'permite al rol %s cambiar el estado (200)',
       async (role) => {
         const asociado = await crearAsociado();

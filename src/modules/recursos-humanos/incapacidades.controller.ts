@@ -33,7 +33,7 @@ import {
 @ApiTags('Recursos Humanos - Incapacidades')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+@Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
 @Controller('rrhh/incapacidades')
 export class IncapacidadesController {
   constructor(private readonly incapacidadesService: IncapacidadesService) {}

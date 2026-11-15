@@ -269,7 +269,7 @@ export class SolicitudesController {
   @Get('aprobadas-pendientes')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({
     summary:
       'Listar solicitudes de servicio aprobadas pendientes de procesamiento',
@@ -333,10 +333,13 @@ export class SolicitudesController {
     throw new SolicitudSeguimientoNoEncontradaException();
   }
 
-  @Get([':solicitudId/documentos/:documentoId/descargar', ':solicitudId/documentos/:documentoId'])
+  @Get([
+    ':solicitudId/documentos/:documentoId/descargar',
+    ':solicitudId/documentos/:documentoId',
+  ])
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA, Role.FONTANERO)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA, Role.FONTANERO)
   @ApiOperation({
     summary:
       'Descargar o visualizar archivo binario de un documento de solicitud (Protegido)',
@@ -394,7 +397,7 @@ export class SolicitudesController {
   @Get(':id/detalle')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA, Role.FONTANERO)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA, Role.FONTANERO)
   @ApiOperation({
     summary:
       'Obtener toda la información necesaria para revisar una solicitud específica (Detalle administrativo)',
@@ -416,7 +419,7 @@ export class SolicitudesController {
   @Get(':id')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA, Role.FONTANERO)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA, Role.FONTANERO)
   @ApiOperation({
     summary: 'Consultar detalle de solicitud por ID interno (Protegido)',
     description:
@@ -437,7 +440,7 @@ export class SolicitudesController {
   @Get(':id/historial')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({
     summary: 'Historial cronológico de una solicitud (admin)',
     description:
@@ -464,7 +467,7 @@ export class SolicitudesController {
   @Patch(':id/estado')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({
     summary: 'Cambiar estado de una solicitud con trazabilidad',
     description:
@@ -500,7 +503,7 @@ export class SolicitudesController {
   @Get()
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA, Role.FONTANERO)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA, Role.FONTANERO)
   @ApiOperation({
     summary:
       'Listar solicitudes digitales con filtros administrativos (Protegido)',

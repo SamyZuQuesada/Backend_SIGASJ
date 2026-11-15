@@ -251,10 +251,14 @@ export class CreateMaterialDto {
 
   @ApiPropertyOptional({
     example: false,
-    description: 'Indica si este material requiere fecha de vencimiento (p. ej. insumos químicos)',
+    description:
+      'Indica si este material requiere fecha de vencimiento (p. ej. insumos químicos)',
   })
   @Transform(({ value, obj, key }: TransformFnParams) => {
-    const raw = obj && typeof obj === 'object' && key in obj ? (obj as Record<string, unknown>)[key] : value;
+    const raw =
+      obj && typeof obj === 'object' && key in obj
+        ? (obj as Record<string, unknown>)[key]
+        : value;
     if (raw === undefined || raw === null) return undefined;
     if (typeof raw === 'boolean') return raw;
     if (raw === 'true' || raw === '1' || raw === 1) return true;

@@ -6,7 +6,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, IsNull, Not, Repository, WhereExpressionBuilder } from 'typeorm';
+import {
+  Brackets,
+  IsNull,
+  Not,
+  Repository,
+  WhereExpressionBuilder,
+} from 'typeorm';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import {
   CreateColaboradorDto,
@@ -351,12 +357,18 @@ export class ColaboradoresService {
     return guardado;
   }
 
-  private async cedulaDisponibleParaUsuario(usuarioId: number): Promise<string> {
+  private async cedulaDisponibleParaUsuario(
+    usuarioId: number,
+  ): Promise<string> {
     for (let intento = 0; intento < 20; intento += 1) {
-      const sucursal = String(1000 + usuarioId + intento).padStart(4, '0').slice(-4);
+      const sucursal = String(1000 + usuarioId + intento)
+        .padStart(4, '0')
+        .slice(-4);
       const secuencia = String(usuarioId).padStart(4, '0').slice(-4);
       const cedula = `9-${sucursal}-${secuencia}`;
-      const existe = await this.colaboradorRepository.exists({ where: { cedula } });
+      const existe = await this.colaboradorRepository.exists({
+        where: { cedula },
+      });
       if (!existe) {
         return cedula;
       }

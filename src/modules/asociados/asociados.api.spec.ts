@@ -84,7 +84,7 @@ describe('Endpoint POST /api/v1/asociados y /api/asociados (Registro de Asociado
     asociadoRepository = moduleFixture.get(getRepositoryToken(Asociado));
 
     adminToken = signAs(Role.ADMINISTRADORA, '10');
-    secretariaToken = signAs(Role.SECRETARIA, '20');
+    secretariaToken = signAs(Role.SECRETARIA_EJECUTIVA, '20');
     fontaneroToken = signAs(Role.FONTANERO, '30');
     abonadoToken = signAs(Role.ABONADO, '40');
   });

@@ -1,9 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 import { TipoActividadFontaneroCodigo } from '../../common/enums/tipo-actividad-fontanero-codigo.enum';
 
-export class DeactivateIncapacidadVacacionesTipoActividad1724686300000
-  implements MigrationInterface
-{
+export class DeactivateIncapacidadVacacionesTipoActividad1724686300000 implements MigrationInterface {
   name = 'DeactivateIncapacidadVacacionesTipoActividad1724686300000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

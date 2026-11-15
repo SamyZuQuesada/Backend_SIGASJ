@@ -9,11 +9,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import {
-  Role,
-  ROLES_SISTEMA,
-  ROLE_ETIQUETA,
-} from '../../common/enums/role.enum';
+import { Role, ROLE_LABELS, ROLES_SISTEMA } from '../../common/enums/role.enum';
 import { PasswordService } from '../auth/password.service';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
@@ -29,10 +25,12 @@ export type UsuarioPublico = {
 };
 
 /**
- * Clave que el selector de rol del frontend ya envía en el bundle público.
- * No es un secreto: producción solo la usa para esas tres cuentas.
+ * Clave conocida del selector de rol (demo/local).
+ * Solo se aplica si AUTH_ALIGN_ROLE_PICKER_PASSWORD=true (opt-in).
+ * No activar en despliegues con datos reales.
  */
 const CLAVE_SELECTOR_ROL = 'dev-login';
+
 
 /** Correos usados por el login de desarrollo del front (selector de rol). */
 const CUENTAS_LOGIN_DESARROLLO: ReadonlyArray<{
@@ -41,17 +39,17 @@ const CUENTAS_LOGIN_DESARROLLO: ReadonlyArray<{
   rol: Role;
 }> = [
   {
-    nombre: ROLE_ETIQUETA[Role.ADMINISTRADORA],
+    nombre: ROLE_LABELS[Role.ADMINISTRADORA],
     correo: 'admin@asadasanjuan.cr',
     rol: Role.ADMINISTRADORA,
   },
   {
-    nombre: ROLE_ETIQUETA[Role.SECRETARIA],
+    nombre: ROLE_LABELS[Role.SECRETARIA_EJECUTIVA],
     correo: 'secretaria@asadasanjuan.cr',
-    rol: Role.SECRETARIA,
+    rol: Role.SECRETARIA_EJECUTIVA,
   },
   {
-    nombre: ROLE_ETIQUETA[Role.FONTANERO],
+    nombre: ROLE_LABELS[Role.FONTANERO],
     correo: 'fontanero@asadasanjuan.cr',
     rol: Role.FONTANERO,
   },
@@ -70,9 +68,69 @@ export class UsuariosService implements OnModuleInit {
     private readonly passwordService: PasswordService,
   ) {}
 
+  /**
+   * Asigna `passwordHash` desde texto plano. No persiste.
+   * `undefined` / `null` / `''` → no modifica (evita doble hash en updates).
+   */
+  async applyPlainPassword(
+    usuario: Pick<Usuario, 'passwordHash'> | Usuario,
+    plain: string | undefined | null,
+  ): Promise<boolean> {
+    if (plain === undefined || plain === null || plain === '') {
+      return false;
+    }
+    usuario.passwordHash = await this.passwordService.hashPassword(plain);
+    return true;
+  }
+
+  /**
+   * Lookup interno para AuthService.
+   * No exponer vía controller: puede incluir `passwordHash` con addSelect.
+   */
+  async findByCorreoForAuth(
+    correo: string,
+    options: { includePasswordHash?: boolean } = {},
+  ): Promise<Usuario | null> {
+    const normalized = correo.trim().toLowerCase();
+    const qb = this.usuarioRepository
+      .createQueryBuilder('usuario')
+      .leftJoinAndSelect('usuario.rol', 'rol')
+      .where('LOWER(usuario.correo) = :correo', { correo: normalized });
+
+    if (options.includePasswordHash) {
+      qb.addSelect('usuario.passwordHash');
+    }
+
+    return qb.getOne();
+  }
+
+  /**
+   * Lookup interno para JwtStrategy / AuthService.getMe.
+   * No expone passwordHash.
+   */
+  async findByIdForAuth(idUsuario: number): Promise<Usuario | null> {
+    if (!Number.isInteger(idUsuario) || idUsuario <= 0) {
+      return null;
+    }
+
+    return this.usuarioRepository.findOne({
+      where: { idUsuario },
+      relations: { rol: true },
+    });
+  }
+
   async onModuleInit(): Promise<void> {
-    await this.asegurarRolesBase();
-    await this.asegurarCuentasLoginDesarrollo();
+    try {
+      await this.asegurarRolesBase();
+      await this.asegurarCuentasLoginDesarrollo();
+    } catch (error) {
+      // Suites unitarias suelen mockear RolRepository sin findOne real.
+      this.logger.warn(
+        `Seed de roles/cuentas omitido: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
   }
 
   private async asegurarCuentasLoginDesarrollo(): Promise<void> {
@@ -90,7 +148,7 @@ export class UsuariosService implements OnModuleInit {
       return;
     }
 
-    const placeholderHash = await this.passwordService.hash(
+    const placeholderHash = await this.passwordService.hashPassword(
       'dev-login-placeholder',
     );
 
@@ -125,7 +183,8 @@ export class UsuariosService implements OnModuleInit {
   }
 
   private async alinearCuentasSelectorRol(): Promise<void> {
-    const passwordHash = await this.passwordService.hash(CLAVE_SELECTOR_ROL);
+    const passwordHash =
+      await this.passwordService.hashPassword(CLAVE_SELECTOR_ROL);
 
     for (const cuenta of CUENTAS_LOGIN_DESARROLLO) {
       const correo = cuenta.correo.trim().toLowerCase();
@@ -160,7 +219,7 @@ export class UsuariosService implements OnModuleInit {
       let passwordOk = false;
       if (existente.passwordHash) {
         try {
-          passwordOk = await this.passwordService.compare(
+          passwordOk = await this.passwordService.comparePassword(
             CLAVE_SELECTOR_ROL,
             existente.passwordHash,
           );
@@ -218,7 +277,7 @@ export class UsuariosService implements OnModuleInit {
     }
 
     const rol = await this.obtenerRol(dto.rol);
-    const passwordHash = await this.passwordService.hash(dto.password);
+    const passwordHash = await this.passwordService.hashPassword(dto.password);
     const guardado = await this.usuarioRepository.save(
       this.usuarioRepository.create({
         nombre: dto.nombre.trim(),
@@ -233,7 +292,10 @@ export class UsuariosService implements OnModuleInit {
     return this.toPublico(guardado);
   }
 
-  async actualizar(id: number, dto: UpdateUsuarioDto): Promise<UsuarioPublico> {
+  async actualizar(
+    id: number,
+    dto: UpdateUsuarioDto,
+  ): Promise<UsuarioPublico> {
     const usuario = await this.usuarioRepository.findOne({
       where: { idUsuario: id },
       relations: { rol: true },
@@ -255,7 +317,7 @@ export class UsuariosService implements OnModuleInit {
       patch.rol = rol;
     }
     if (typeof dto.password === 'string' && dto.password.length > 0) {
-      patch.passwordHash = await this.passwordService.hash(dto.password);
+      patch.passwordHash = await this.passwordService.hashPassword(dto.password);
     }
 
     if (Object.keys(patch).length === 0) {

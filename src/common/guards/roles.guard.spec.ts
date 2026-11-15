@@ -7,7 +7,7 @@ import { Reflector } from '@nestjs/core';
 import { Role } from '../enums/role.enum';
 import { RolesGuard } from './roles.guard';
 
-describe('RolesGuard — 401 vs 403', () => {
+describe('RolesGuard — 401 vs 403 + multi-rol', () => {
   const reflector = {
     getAllAndOverride: jest.fn(),
   } as unknown as Reflector;
@@ -44,29 +44,35 @@ describe('RolesGuard — 401 vs 403', () => {
     expect(guard.canActivate(ctx({ role: Role.ADMINISTRADORA }))).toBe(true);
   });
 
-  it('ruta de Administradora y Secretaria Ejecutiva admite ambos y rechaza Fontanero', () => {
+  it('Secretaria Ejecutiva (valor JWT SECRETARIA) en ruta exclusiva Admin → 403', () => {
+    expect(() =>
+      guard.canActivate(ctx({ role: Role.SECRETARIA_EJECUTIVA })),
+    ).toThrow(ForbiddenException);
+  });
+
+  it('multi-rol: Administradora y Secretaria Ejecutiva permitidos; Fontanero 403', () => {
     (reflector.getAllAndOverride as jest.Mock).mockReturnValue([
       Role.ADMINISTRADORA,
-      Role.SECRETARIA,
+      Role.SECRETARIA_EJECUTIVA,
     ]);
-
     expect(guard.canActivate(ctx({ role: Role.ADMINISTRADORA }))).toBe(true);
-    expect(guard.canActivate(ctx({ role: Role.SECRETARIA }))).toBe(true);
+    expect(guard.canActivate(ctx({ role: Role.SECRETARIA_EJECUTIVA }))).toBe(
+      true,
+    );
     expect(() => guard.canActivate(ctx({ role: Role.FONTANERO }))).toThrow(
       ForbiddenException,
     );
   });
 
-  it('no trata la etiqueta Secretaria Ejecutiva como el rol persistido', () => {
+  it('no acepta string inconsistente como rol válido vía includes parcial', () => {
     (reflector.getAllAndOverride as jest.Mock).mockReturnValue([
-      Role.SECRETARIA,
+      Role.ADMINISTRADORA,
     ]);
-
     expect(() =>
-      guard.canActivate(ctx({ role: 'Secretaria Ejecutiva' as Role })),
+      guard.canActivate(ctx({ role: 'Administradora' as unknown as Role })),
     ).toThrow(ForbiddenException);
     expect(() =>
-      guard.canActivate(ctx({ role: 'Secretaria' as Role })),
+      guard.canActivate(ctx({ role: 'admin' as unknown as Role })),
     ).toThrow(ForbiddenException);
   });
 });

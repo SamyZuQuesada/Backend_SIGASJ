@@ -32,7 +32,7 @@ describe('PATCH /api/v1/asociados/:id y /api/asociados/:id (Modificación de Aso
     ({ app, asociadoRepository, signAs } = await crearAsociadosTestApp());
 
     adminToken = signAs(Role.ADMINISTRADORA);
-    secretariaToken = signAs(Role.SECRETARIA);
+    secretariaToken = signAs(Role.SECRETARIA_EJECUTIVA);
     fontaneroToken = signAs(Role.FONTANERO);
     abonadoToken = signAs(Role.ABONADO);
   });

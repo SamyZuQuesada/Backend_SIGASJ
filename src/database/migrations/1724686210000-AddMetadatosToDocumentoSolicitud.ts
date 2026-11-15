@@ -5,9 +5,7 @@ import {
   TableIndex,
 } from 'typeorm';
 
-export class AddMetadatosToDocumentoSolicitud1724686210000
-  implements MigrationInterface
-{
+export class AddMetadatosToDocumentoSolicitud1724686210000 implements MigrationInterface {
   name = 'AddMetadatosToDocumentoSolicitud1724686210000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

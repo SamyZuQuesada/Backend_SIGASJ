@@ -14,6 +14,7 @@ import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
 import jwtConfig from '../../config/jwt.config';
 import { AuthModule } from '../auth/auth.module';
 import { Averia } from '../averias/entities/averia.entity';
+import { ObservacionAveria } from '../averias/entities/observacion-averia.entity';
 import { Rol } from '../usuarios/entities/rol.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import {
@@ -50,6 +51,7 @@ const alertasQaTypeOrmModule = TypeOrmModule.forRoot({
     ReposicionMaterial,
     DetalleReposicionMaterial,
     Averia,
+    ObservacionAveria,
   ],
   synchronize: true,
 });
@@ -145,7 +147,7 @@ describe('3.8.3 Consulta administrativa de alertas de reposición', () => {
     await adminGet('', signAs(Role.FONTANERO, '7')).expect(
       HttpStatus.FORBIDDEN,
     );
-    await adminGet('', signAs(Role.SECRETARIA, '2')).expect(
+    await adminGet('', signAs(Role.SECRETARIA_EJECUTIVA, '2')).expect(
       HttpStatus.FORBIDDEN,
     );
   });
