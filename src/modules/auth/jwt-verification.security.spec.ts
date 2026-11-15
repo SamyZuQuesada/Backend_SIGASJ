@@ -8,6 +8,7 @@ import { App } from 'supertest/types';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { Role } from '../../common/enums/role.enum';
 import jwtConfig from '../../config/jwt.config';
+import { UsuariosService } from '../usuarios/usuarios.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
 @Controller('secure-probe')
@@ -23,6 +24,15 @@ describe('JWT verification — 401 cases', () => {
   let app: INestApplication<App>;
   let jwtService: JwtService;
   const secret = 'super_secret_jwt_key_sigasj_2026';
+  const usuariosService = {
+    findByIdForAuth: jest.fn().mockResolvedValue({
+      idUsuario: 1,
+      correo: 'probe@asadasanjuan.cr',
+      nombre: 'Probe',
+      activo: true,
+      rol: { nombre: Role.ADMINISTRADORA },
+    }),
+  };
 
   beforeAll(async () => {
     process.env.JWT_SECRET = secret;
@@ -35,7 +45,10 @@ describe('JWT verification — 401 cases', () => {
         JwtModule.register({ secret, signOptions: { expiresIn: '1h' } }),
       ],
       controllers: [SecureProbeController],
-      providers: [JwtStrategy],
+      providers: [
+        JwtStrategy,
+        { provide: UsuariosService, useValue: usuariosService },
+      ],
     }).compile();
 
     app = moduleRef.createNestApplication();
