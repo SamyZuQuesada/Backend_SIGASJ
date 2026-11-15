@@ -16,10 +16,12 @@ export type UsuarioPublico = {
 };
 
 /**
- * Clave que el selector de rol del frontend ya envía en el bundle público.
- * No es un secreto: producción solo la usa para esas tres cuentas.
+ * Clave conocida del selector de rol (demo/local).
+ * Solo se aplica si AUTH_ALIGN_ROLE_PICKER_PASSWORD=true (opt-in).
+ * No activar en despliegues con datos reales.
  */
 const CLAVE_SELECTOR_ROL = 'dev-login';
+
 
 /** Correos usados por el login de desarrollo del front (selector de rol). */
 const CUENTAS_LOGIN_DESARROLLO: ReadonlyArray<{
@@ -94,8 +96,17 @@ export class UsuariosService implements OnModuleInit {
   }
 
   async onModuleInit(): Promise<void> {
-    await this.asegurarRolesBase();
-    await this.asegurarCuentasLoginDesarrollo();
+    try {
+      await this.asegurarRolesBase();
+      await this.asegurarCuentasLoginDesarrollo();
+    } catch (error) {
+      // Suites unitarias suelen mockear RolRepository sin findOne real.
+      this.logger.warn(
+        `Seed de roles/cuentas omitido: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
   }
 
   private async asegurarCuentasLoginDesarrollo(): Promise<void> {

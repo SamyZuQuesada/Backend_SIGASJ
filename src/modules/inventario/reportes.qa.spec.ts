@@ -12,6 +12,7 @@ import type { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
 import jwtConfig from '../../config/jwt.config';
 import { AuthModule } from '../auth/auth.module';
 import { Averia } from '../averias/entities/averia.entity';
+import { ObservacionAveria } from '../averias/entities/observacion-averia.entity';
 import { Rol } from '../usuarios/entities/rol.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import {
@@ -48,6 +49,7 @@ const reportesQaTypeOrmModule = TypeOrmModule.forRoot({
     ReposicionMaterial,
     DetalleReposicionMaterial,
     Averia,
+    ObservacionAveria,
   ],
   synchronize: true,
 });
@@ -233,6 +235,13 @@ describe('3.12 Reportes de inventario', () => {
       HttpStatus.FORBIDDEN,
     );
   });
+
+  it('permite a SECRETARIA consultar el reporte consolidado (solo lectura)', async () => {
+    await adminGetReporte('', signAs(Role.SECRETARIA_EJECUTIVA)).expect(
+      HttpStatus.OK,
+    );
+  });
+
 
   it('rechaza rangos de fechas inválidos', async () => {
     await adminGetReporte(

@@ -37,13 +37,14 @@ export class MovimientosController {
     'admin/movimientos',
   ])
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.ADMINISTRADORA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({
     summary:
-      'Consultar historial de movimientos de inventario (Administradora)',
+      'Consultar historial de movimientos de inventario (Administradora / Secretaria)',
     description:
       'Listado paginado de entradas y salidas registradas en MovimientoInventario. Solo lectura.',
   })
+
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'tipo', required: false, enum: TipoMovimientoInventario })
@@ -65,11 +66,12 @@ export class MovimientosController {
     'admin/movimientos/:id',
   ])
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.ADMINISTRADORA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({
     summary:
-      'Consultar detalle de un movimiento de inventario (Administradora)',
+      'Consultar detalle de un movimiento de inventario (Administradora / Secretaria)',
   })
+
   @ApiParam({ name: 'id', description: 'ID del movimiento', type: Number })
   @ApiResponse({ status: HttpStatus.OK, description: 'Detalle del movimiento' })
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'No encontrado' })

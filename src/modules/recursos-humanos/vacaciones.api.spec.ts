@@ -32,13 +32,17 @@ describe('POST /api/v1/rrhh/vacaciones/movimientos', () => {
   let crearColaborador: (extra?: Partial<Colaborador>) => Promise<Colaborador>;
   let colaborador: Colaborador;
 
-  const body = (extra: Record<string, unknown> = {}) => ({
-    colaboradorId: colaborador.id,
-    tipo: ACUMULADO,
-    cantidadDias: 12,
-    fecha: '2026-01-01',
-    ...extra,
-  });
+  const body = (extra: Record<string, unknown> = {}) => {
+    const tipo = String(extra.tipo ?? ACUMULADO).toUpperCase();
+    return {
+      colaboradorId: colaborador.id,
+      tipo: ACUMULADO,
+      cantidadDias: 12,
+      // DISFRUTADO no puede caer en feriado CR (2026-01-01 = Año Nuevo)
+      fecha: tipo === DISFRUTADO ? '2026-03-10' : '2026-01-01',
+      ...extra,
+    };
+  };
 
   const post = (data: Record<string, unknown>, token = adminToken) =>
     request(app.getHttpServer())

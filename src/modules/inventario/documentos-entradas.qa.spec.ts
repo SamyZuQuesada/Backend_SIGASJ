@@ -24,6 +24,7 @@ import { AlertaReposicion } from './entities/alerta-reposicion.entity';
 import { ReposicionMaterial } from './entities/reposicion-material.entity';
 import { DetalleReposicionMaterial } from './entities/detalle-reposicion-material.entity';
 import { Averia } from '../averias/entities/averia.entity';
+import { ObservacionAveria } from '../averias/entities/observacion-averia.entity';
 import { InventarioModule } from './inventario.module';
 
 const documentosQaTypeOrmModule = TypeOrmModule.forRoot({
@@ -44,6 +45,7 @@ const documentosQaTypeOrmModule = TypeOrmModule.forRoot({
     ReposicionMaterial,
     DetalleReposicionMaterial,
     Averia,
+    ObservacionAveria,
   ],
   synchronize: true,
 });
@@ -109,9 +111,14 @@ describe('Documentos de Respaldo en Entradas de Inventario — QA Integral y Val
       getRepositoryToken(DocumentoMovimientoInventario),
     );
 
-    // Sembrar usuario Administradora
+    // Sembrar usuario Administradora (sqljs exige columnas NOT NULL)
     const adminUser = usuarioRepo.create({
       idUsuario: 1,
+      nombre: 'Administradora QA',
+      correo: 'admin.docs.qa@asadasanjuan.cr',
+      passwordHash: 'hash-qa',
+      activo: true,
+      idRol: 1,
     });
     await usuarioRepo.save(adminUser);
 

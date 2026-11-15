@@ -1,16 +1,21 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER } from '@nestjs/core';
+import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken, TypeOrmModule } from '@nestjs/typeorm';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { Repository } from 'typeorm';
 import { EstadoProyecto } from '../../common/enums/estado-proyecto.enum';
+import { Role } from '../../common/enums/role.enum';
 import { HttpExceptionFilter } from '../../common/filters/http-exception.filter';
+import type { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
 import jwtConfig from '../../config/jwt.config';
 import { AuthModule } from '../auth/auth.module';
 import { ImagenProyecto } from './entities/imagen-proyecto.entity';
+import { Rol } from '../usuarios/entities/rol.entity';
+import { Usuario } from '../usuarios/entities/usuario.entity';
 import { Proyecto } from './entities/proyecto.entity';
 import { ProyectosModule } from './proyectos.module';
 
@@ -77,7 +82,7 @@ describe('PATCH /api/v1/admin/proyectos/:id — actualización parcial', () => {
           type: 'sqljs',
           autoSave: false,
           dropSchema: true,
-          entities: [Proyecto, ImagenProyecto],
+          entities: [Proyecto, ImagenProyecto, Usuario, Rol],
           synchronize: true,
         }),
         AuthModule,
@@ -106,16 +111,14 @@ describe('PATCH /api/v1/admin/proyectos/:id — actualización parcial', () => {
     await app.init();
 
     proyectos = moduleFixture.get(getRepositoryToken(Proyecto));
+    const jwtService = moduleFixture.get(JwtService);
 
-    const login = await request(app.getHttpServer())
-      .post('/api/v1/auth/login')
-      .send({
-        email: 'admin@asadasanjuan.cr',
-        password: 'Password123!',
-      });
-
-    expect(login.status).toBe(200);
-    accessToken = (login.body as AuthLoginBody).accessToken;
+    accessToken = jwtService.sign({
+      sub: '1',
+      email: 'admin@asadasanjuan.cr',
+      role: Role.ADMINISTRADORA,
+      name: 'Administradora',
+    } as JwtPayload);
   });
 
   afterAll(async () => {

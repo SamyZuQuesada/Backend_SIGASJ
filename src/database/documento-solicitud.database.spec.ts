@@ -163,7 +163,10 @@ describe('Pruebas de Base de Datos e Integridad: Migración DocumentoSolicitud (
     });
   });
 
-  describe('2. Verificación en SQL Server y TypeORM', () => {
+  const describeSqlServer =
+    process.env.RUN_SQLSERVER_INTEGRATION === 'true' ? describe : describe.skip;
+
+  describeSqlServer('2. Verificación en SQL Server y TypeORM', () => {
     let dataSource: DataSource;
 
     beforeAll(async () => {

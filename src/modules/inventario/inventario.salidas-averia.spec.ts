@@ -22,6 +22,7 @@ import { MovimientoInventario } from './entities/movimiento-inventario.entity';
 import { Proveedor } from './entities/proveedor.entity';
 import { ReposicionMaterial } from './entities/reposicion-material.entity';
 import { InventarioService } from './inventario.service';
+import { inventarioSolicitudNotificacionProviders } from './testing/inventario-unit-test-providers';
 
 describe('InventarioService.findMovimientosByAveria — 2.7.1', () => {
   let service: InventarioService;
@@ -100,6 +101,7 @@ describe('InventarioService.findMovimientosByAveria — 2.7.1', () => {
           provide: getRepositoryToken(DetalleReposicionMaterial),
           useValue: {},
         },
+        ...inventarioSolicitudNotificacionProviders,
       ],
     }).compile();
 

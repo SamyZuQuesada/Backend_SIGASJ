@@ -742,6 +742,8 @@ describe('InventarioController — Endpoints de Materiales', () => {
       unidadMedida: 'Tubo',
       ubicacion: 'Bodega Principal - Pasillo 2',
       stockMinimo: 10,
+      idCategoria: 1,
+      idProveedor: 1,
     };
 
     it('rechaza con 401 Unauthorized si no se envía token JWT', async () => {

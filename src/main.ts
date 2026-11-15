@@ -121,6 +121,11 @@ async function bootstrap() {
       'Modo desarrollo: POST /auth/login no valida contraseña (AUTH_REQUIRE_PASSWORD=true para exigirla).',
     );
   }
+  if (configService.get<boolean>('auth.alignRolePickerPassword') === true) {
+    logger.warn(
+      'AUTH_ALIGN_ROLE_PICKER_PASSWORD=true: se alinean cuentas demo a clave conocida. Desactivar en producción real.',
+    );
+  }
   logger.log(
     `SIGASJ listo env=${nodeEnv} bind=0.0.0.0:${port} health=/api/v1/health`,
   );
