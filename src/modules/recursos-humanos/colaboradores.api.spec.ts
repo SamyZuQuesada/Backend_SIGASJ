@@ -117,6 +117,43 @@ describe('POST /api/v1/rrhh/colaboradores', () => {
       expect(res.status).toBe(201);
       expect(colaboradorDe(res).usuarioId).toBe(usuario.idUsuario);
     });
+
+    it('registra expediente laboral y calcula antigüedad', async () => {
+      const res = await post(
+        body({
+          fechaIngreso: '2024-01-15',
+          jornadaLaboral: 'COMPLETA',
+          diasLaboralesHabituales: 5,
+          modalidadPago: 'MENSUAL',
+        }),
+      );
+
+      expect(res.status).toBe(201);
+      expect(colaboradorDe(res)).toMatchObject({
+        fechaIngreso: '2024-01-15',
+        jornadaLaboral: 'COMPLETA',
+        diasLaboralesHabituales: 5,
+        modalidadPago: 'MENSUAL',
+      });
+      expect(colaboradorDe(res).antiguedad).toEqual(
+        expect.objectContaining({
+          anios: expect.any(Number),
+          meses: expect.any(Number),
+          dias: expect.any(Number),
+          etiqueta: expect.any(String),
+        }),
+      );
+    });
+
+    it('permite omitir expediente laboral (compatibilidad legacy)', async () => {
+      const res = await post(body({ cedula: '1-9999-0001' }));
+      expect(res.status).toBe(201);
+      expect(colaboradorDe(res).fechaIngreso).toBeNull();
+      expect(colaboradorDe(res).jornadaLaboral).toBeNull();
+      expect(colaboradorDe(res).diasLaboralesHabituales).toBeNull();
+      expect(colaboradorDe(res).modalidadPago).toBeNull();
+      expect(colaboradorDe(res).antiguedad).toBeNull();
+    });
   });
 
   describe('Datos inválidos', () => {
@@ -133,6 +170,21 @@ describe('POST /api/v1/rrhh/colaboradores', () => {
     it('rechaza puesto inexistente (400)', async () => {
       const res = await post(body({ puestoId: 99999 }));
       expect(res.status).toBe(400);
+    });
+
+    it('rechaza fecha de ingreso futura (400)', async () => {
+      const res = await post(body({ fechaIngreso: '2099-01-01' }));
+      expect(res.status).toBe(400);
+    });
+
+    it('rechaza jornada o modalidad inválidas (400)', async () => {
+      expect(
+        (await post(body({ jornadaLaboral: 'NOCTURNA' }))).status,
+      ).toBe(400);
+      expect((await post(body({ modalidadPago: 'DIARIA' }))).status).toBe(400);
+      expect(
+        (await post(body({ diasLaboralesHabituales: 8 }))).status,
+      ).toBe(400);
     });
   });
 });

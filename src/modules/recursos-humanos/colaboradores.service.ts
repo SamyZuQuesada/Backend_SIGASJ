@@ -154,6 +154,10 @@ export class ColaboradoresService {
       cargo: puesto.nombre,
       activo: true,
       usuarioId,
+      fechaIngreso: dto.fechaIngreso ?? null,
+      jornadaLaboral: dto.jornadaLaboral ?? null,
+      diasLaboralesHabituales: dto.diasLaboralesHabituales ?? null,
+      modalidadPago: dto.modalidadPago ?? null,
     });
 
     try {
@@ -161,7 +165,7 @@ export class ColaboradoresService {
       this.logger.log(
         `Colaborador registrado: id=${guardado.id}, cedula=${guardado.cedula}`,
       );
-      return guardado;
+      return this.findOne(guardado.id);
     } catch (error) {
       if (esViolacionUnicidad(error)) {
         throw new ConflictException(
@@ -290,6 +294,19 @@ export class ColaboradoresService {
       colaborador.cargo = puesto.nombre;
     } else if (dto.cargo !== undefined) {
       colaborador.cargo = dto.cargo;
+    }
+
+    if (dto.fechaIngreso !== undefined) {
+      colaborador.fechaIngreso = dto.fechaIngreso;
+    }
+    if (dto.jornadaLaboral !== undefined) {
+      colaborador.jornadaLaboral = dto.jornadaLaboral;
+    }
+    if (dto.diasLaboralesHabituales !== undefined) {
+      colaborador.diasLaboralesHabituales = dto.diasLaboralesHabituales;
+    }
+    if (dto.modalidadPago !== undefined) {
+      colaborador.modalidadPago = dto.modalidadPago;
     }
 
     try {

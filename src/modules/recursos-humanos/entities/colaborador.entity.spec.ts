@@ -128,10 +128,21 @@ describe('Colaborador Entity (SIGASJ)', () => {
           'cargo',
           'activo',
           'usuarioId',
+          'fechaIngreso',
+          'jornadaLaboral',
+          'diasLaboralesHabituales',
+          'modalidadPago',
           'createdAt',
           'updatedAt',
         ]),
       );
+    });
+
+    it('debe configurar el expediente laboral como opcional (legacy)', () => {
+      expect(columna('fechaIngreso')?.options.nullable).toBe(true);
+      expect(columna('jornadaLaboral')?.options.nullable).toBe(true);
+      expect(columna('diasLaboralesHabituales')?.options.nullable).toBe(true);
+      expect(columna('modalidadPago')?.options.nullable).toBe(true);
     });
 
     it('debe configurar cédula única', () => {

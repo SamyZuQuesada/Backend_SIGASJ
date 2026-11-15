@@ -88,6 +88,47 @@ describe('PATCH /api/v1/rrhh/colaboradores/:id y /:id/estado', () => {
   });
 
   describe('Actualizar información', () => {
+    it('actualiza expediente laboral y expone antigüedad', async () => {
+      const res = await patch(`${URL}/${colaborador.id}`, {
+        fechaIngreso: '2023-06-01',
+        jornadaLaboral: 'MEDIA',
+        diasLaboralesHabituales: 3,
+        modalidadPago: 'QUINCENAL',
+      });
+
+      expect(res.status).toBe(200);
+      expect(colaboradorDe(res)).toMatchObject({
+        fechaIngreso: '2023-06-01',
+        jornadaLaboral: 'MEDIA',
+        diasLaboralesHabituales: 3,
+        modalidadPago: 'QUINCENAL',
+      });
+      expect(colaboradorDe(res).antiguedad).not.toBeNull();
+      expect(colaboradorDe(res).antiguedad?.etiqueta).toEqual(
+        expect.any(String),
+      );
+    });
+
+    it('permite limpiar el expediente laboral con null', async () => {
+      await repo.update(colaborador.id, {
+        fechaIngreso: '2022-01-01',
+        jornadaLaboral: 'COMPLETA' as never,
+        diasLaboralesHabituales: 5,
+        modalidadPago: 'MENSUAL' as never,
+      });
+
+      const res = await patch(`${URL}/${colaborador.id}`, {
+        fechaIngreso: null,
+        jornadaLaboral: null,
+        diasLaboralesHabituales: null,
+        modalidadPago: null,
+      });
+
+      expect(res.status).toBe(200);
+      expect(colaboradorDe(res).fechaIngreso).toBeNull();
+      expect(colaboradorDe(res).antiguedad).toBeNull();
+    });
+
     it('actualiza solo los campos enviados', async () => {
       const res = await patch(`${URL}/${colaborador.id}`, {
         cargo: '  Encargado de bodega ',
