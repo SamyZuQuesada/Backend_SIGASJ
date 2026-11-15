@@ -55,15 +55,18 @@ describe('validar-stock.util — Regla de negocio de existencias disponibles (4.
       );
     });
 
-    it('rechaza cuando la salida dejaría el material por debajo del stock mínimo (reserva obligatoria)', () => {
+    it('permite salir por debajo del stock mínimo y marca alerta (no bloquea; genera aviso)', () => {
+      // Regla vigente: bloquear solo stock insuficiente/negativo; mínimo dispara alerta.
       const res = validarStockDisponible(baseMaterial, 8); // 10 - 8 = 2 < 3
 
-      expect(res.esValido).toBe(false);
+      expect(res.esValido).toBe(true);
+      expect(res.stockFinal).toBe(2);
+      expect(res.alcanzaStockMinimo).toBe(true);
       expect(res.mensaje).toContain(
-        'La salida dejaría el material por debajo del stock mínimo.',
+        'alcanzará o estará por debajo del stock mínimo (3)',
       );
-      expect(res.mensaje).toContain('Puede retirar como máximo 7 unidades.');
     });
+
 
     it('rechaza cuando la cantidad solicitada supera el stock disponible y no altera existencias', () => {
       const res = validarStockDisponible(baseMaterial, 15);

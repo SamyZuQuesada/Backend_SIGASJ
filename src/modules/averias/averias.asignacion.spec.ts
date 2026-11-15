@@ -575,6 +575,7 @@ describe('PBI 2.4 — asignación de avería al Fontanero', () => {
       .post('/api/v1/public/averias')
       .send({
         nombreReportante: 'María Rodríguez',
+        identificacionReportante: '1-2345-6789',
         telefonoReportante: '8888-8888',
         ubicacion: 'Frente a la escuela',
         sectorComunidad: 'San Juan',

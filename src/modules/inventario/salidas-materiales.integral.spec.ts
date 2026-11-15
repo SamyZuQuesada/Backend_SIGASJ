@@ -304,7 +304,7 @@ describe('Backlog 4.5: Registro de Salidas de Materiales — Pruebas Funcionales
       expect(enDb?.stockActual).toBe(0);
     });
 
-    it('rechaza con 400 Bad Request cuando la salida dejaría el stock por debajo del stock mínimo (reserva obligatoria)', async () => {
+    it('autoriza con 201 la salida que deja el stock por debajo del mínimo y lo reporta como bajoStockMinimo (Backlog 4.8)', async () => {
       const material = await createMaterial({
         nombre: 'Codo PVC Reserva 45°',
         stockActual: 10,
@@ -321,13 +321,15 @@ describe('Backlog 4.5: Registro de Salidas de Materiales — Pruebas Funcionales
           cantidad: 8,
         });
 
-      expect(res.status).toBe(400);
-      expect(res.body.message).toContain(
-        'La salida dejaría el material por debajo del stock mínimo.',
-      );
-      expect(res.body.message).toContain(
-        'Puede retirar como máximo 7 unidades.',
-      );
+      expect(res.status).toBe(201);
+      expect(res.body.stockAnterior).toBe(10);
+      expect(res.body.stockActual).toBe(2);
+      expect(res.body.bajoStockMinimo).toBe(true);
+
+      const enDb = await materialRepository.findOne({
+        where: { id: material.id },
+      });
+      expect(enDb?.stockActual).toBe(2);
     });
   });
 

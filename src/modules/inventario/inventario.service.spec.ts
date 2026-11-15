@@ -16,9 +16,10 @@ import { MovimientoInventario } from './entities/movimiento-inventario.entity';
 import { Proveedor } from './entities/proveedor.entity';
 import { TipoMovimientoInventario } from '../../common/enums/tipo-movimiento-inventario.enum';
 import { Role } from '../../common/enums/role.enum';
+import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
+import { Averia } from '../averias/entities/averia.entity';
 import { RegistrarEntradaDto } from './dto/registrar-entrada.dto';
 import { RegistrarSalidaDto } from './dto/registrar-salida.dto';
-import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { InventarioService } from './inventario.service';
 import { AlertaReposicion } from './entities/alerta-reposicion.entity';
 import { EstadoAlertaReposicion } from '../../common/enums/estado-alerta-reposicion.enum';
@@ -26,6 +27,7 @@ import { EstadoReposicionMaterial } from '../../common/enums/estado-reposicion-m
 import { OrigenReposicionMaterial } from '../../common/enums/origen-reposicion-material.enum';
 import { ReposicionMaterial } from './entities/reposicion-material.entity';
 import { DetalleReposicionMaterial } from './entities/detalle-reposicion-material.entity';
+import { inventarioSolicitudNotificacionProviders } from './testing/inventario-unit-test-providers';
 
 describe('InventarioService — Catálogo de Materiales y Categorías', () => {
   let service: InventarioService;
@@ -352,6 +354,8 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
           provide: getRepositoryToken(DetalleReposicionMaterial),
           useValue: mockDetalleReposicionRepo,
         },
+        ...inventarioSolicitudNotificacionProviders,
+        { provide: getRepositoryToken(Averia), useValue: mockRepo },
       ],
     }).compile();
 
@@ -407,6 +411,9 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
         categoria: categoriaActiva,
         idProveedor: 4,
         proveedor: proveedorActivo,
+        precioUnitario: null,
+        requiereFechaVencimiento: undefined, // categoriaActiva no lo define
+        fechaVencimiento: null,
       });
       expect(result.id).toBe(1);
       expect(result.stockActual).toBe(0);
@@ -1038,6 +1045,13 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
       repoFindOneSpy.mockResolvedValueOnce({
         ...existingMaterial,
         idCategoria: 4,
+        // Categoría ya cargada en el material: no se vuelve a consultar el repositorio
+        categoria: {
+          id: 4,
+          nombre: 'Categoría Inactiva',
+          activo: false,
+          requiereFechaVencimiento: false,
+        },
       });
 
       const dto: UpdateMaterialDto = {
@@ -1257,6 +1271,7 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
         nombre: 'Tuberías',
         descripcion: '  Líneas principales de distribución  ',
         activo: true,
+        requiereFechaVencimiento: false,
       });
       expect(catRepoSaveSpy).toHaveBeenCalled();
       expect(result.id).toBe(1);
@@ -2443,7 +2458,7 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
       expect(res.esAgotamientoTotal).toBe(false);
     });
 
-    it('debe lanzar BadRequestException si la salida dejaría el material por debajo del stock mínimo', async () => {
+    it('autoriza la salida que deja el stock por debajo del mínimo y la marca como alerta (Backlog 4.8)', async () => {
       const materialMock: Partial<Material> = {
         id: 3,
         nombre: 'Válvula de retención',
@@ -2453,9 +2468,13 @@ describe('InventarioService — Catálogo de Materiales y Categorías', () => {
       };
       repoFindOneSpy.mockResolvedValueOnce(materialMock);
 
-      await expect(service.validarDisponibilidadStock(3, 5)).rejects.toThrow(
-        'La salida dejaría el material por debajo del stock mínimo. Puede retirar como máximo 4 unidades.',
-      );
+      const res = await service.validarDisponibilidadStock(3, 5); // 8 - 5 = 3 < mínimo 4
+
+      expect(res.esValido).toBe(true);
+      expect(res.stockFinal).toBe(3);
+      expect(res.alcanzaStockMinimo).toBe(true);
+      expect(res.esBajoMinimo).toBe(true);
+      expect(res.esAgotamientoTotal).toBe(false);
     });
 
     it('debe lanzar BadRequestException si la cantidad supera el stock disponible', async () => {

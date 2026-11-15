@@ -168,7 +168,10 @@ describe('Pruebas de Base de Datos: Migración ReposicionMaterial', () => {
     });
   });
 
-  describe('2. Verificación física en SQL Server', () => {
+const describeSqlServer =
+  process.env.RUN_SQLSERVER_INTEGRATION === 'true' ? describe : describe.skip;
+
+  describeSqlServer('2. Verificación física en SQL Server', () => {
     jest.setTimeout(30_000);
     let dataSource: DataSource | null = null;
     let isConnected = false;

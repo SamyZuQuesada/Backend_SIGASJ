@@ -175,7 +175,10 @@ describe('Pruebas de Base de Datos e Integridad: Migración Proveedor', () => {
     });
   });
 
-  describe('2. Verificación de Estructura Física en Base de Datos SQL Server', () => {
+const describeSqlServer =
+  process.env.RUN_SQLSERVER_INTEGRATION === 'true' ? describe : describe.skip;
+
+  describeSqlServer('2. Verificación de Estructura Física en Base de Datos SQL Server', () => {
     let dataSource: DataSource | null = null;
     let isConnected = false;
 

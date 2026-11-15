@@ -420,15 +420,21 @@ describe('ProyectosService', () => {
       {
         id: 1,
         url: 'https://ejemplo.com/a.jpg',
+        imagenUrl: 'https://ejemplo.com/a.jpg',
         descripcion: 'Primera',
+        textoAlternativo: 'Primera',
         orden: 1,
+        ordenVisualizacion: 1,
         createdAt,
       },
       {
         id: 2,
         url: 'https://ejemplo.com/b.jpg',
+        imagenUrl: 'https://ejemplo.com/b.jpg',
         descripcion: 'Segunda',
+        textoAlternativo: 'Segunda',
         orden: 2,
+        ordenVisualizacion: 2,
         createdAt,
       },
     ]);

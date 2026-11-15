@@ -33,10 +33,31 @@ export class AuthService {
     private readonly usuariosService: UsuariosService,
   ) {}
 
-  private devLoginWithoutPassword(): boolean {
-    return (
-      this.configService.get<boolean>('auth.devLoginWithoutPassword') === true
-    );
+  /**
+   * Bypass de contraseña solo si auth.config lo habilitó Y el entorno no es
+   * product-like (defensa en profundidad ante mala configuración).
+   */
+  private allowsPasswordBypass(): boolean {
+    if (
+      this.configService.get<boolean>('auth.devLoginWithoutPassword') !== true
+    ) {
+      return false;
+    }
+
+    if (this.configService.get<boolean>('auth.isProductionLike') === true) {
+      return false;
+    }
+
+    const nodeEnv = String(
+      this.configService.get<string>('auth.nodeEnv') ??
+        this.configService.get<string>('environment.nodeEnv') ??
+        process.env.NODE_ENV ??
+        '',
+    )
+      .trim()
+      .toLowerCase();
+
+    return nodeEnv === 'development';
   }
 
   /**
@@ -46,7 +67,7 @@ export class AuthService {
    */
   async validateCredentials(loginDto: LoginDto): Promise<AuthLoginUser> {
     const correo = loginDto.email.trim().toLowerCase();
-    const requirePassword = !this.devLoginWithoutPassword();
+    const requirePassword = !this.allowsPasswordBypass();
 
     const usuario = await this.usuariosService.findByCorreoForAuth(correo, {
       includePasswordHash: requirePassword,

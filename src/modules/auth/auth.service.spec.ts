@@ -184,6 +184,49 @@ describe('AuthService — validación segura de credenciales', () => {
     ).rejects.toThrow('Credenciales inválidas');
   });
 
+  it('bypass de password en development: no llama comparePassword', async () => {
+    configService.get.mockImplementation((key: string) => {
+      if (key === 'auth.devLoginWithoutPassword') return true;
+      if (key === 'auth.isProductionLike') return false;
+      if (key === 'auth.nodeEnv') return 'development';
+      return false;
+    });
+    usuariosService.findByCorreoForAuth.mockResolvedValue(userBase);
+
+    const result = await service.login({
+      email: 'ok@test.local',
+      password: 'cualquier-cosa',
+    });
+
+    expect(usuariosService.findByCorreoForAuth).toHaveBeenCalledWith(
+      'ok@test.local',
+      { includePasswordHash: false },
+    );
+    expect(passwordService.comparePassword).not.toHaveBeenCalled();
+    expect(result.accessToken).toBe('jwt-existente');
+  });
+
+  it('ignora bypass si el entorno es product-like (defensa en profundidad)', async () => {
+    configService.get.mockImplementation((key: string) => {
+      if (key === 'auth.devLoginWithoutPassword') return true;
+      if (key === 'auth.isProductionLike') return true;
+      if (key === 'auth.nodeEnv') return 'production';
+      return false;
+    });
+    usuariosService.findByCorreoForAuth.mockResolvedValue(userBase);
+    passwordService.comparePassword.mockResolvedValue(false);
+
+    await expect(
+      service.login({ email: 'ok@test.local', password: 'Wrong1!' }),
+    ).rejects.toThrow('Credenciales inválidas');
+
+    expect(usuariosService.findByCorreoForAuth).toHaveBeenCalledWith(
+      'ok@test.local',
+      { includePasswordHash: true },
+    );
+    expect(passwordService.comparePassword).toHaveBeenCalledTimes(1);
+  });
+
   it('getMe con usuario activo → datos mínimos sin passwordHash', async () => {
     usuariosService.findByIdForAuth.mockResolvedValue(userBase);
 
@@ -210,3 +253,4 @@ describe('AuthService — validación segura de credenciales', () => {
     );
   });
 });
+
