@@ -17,11 +17,12 @@ import {
 } from './correo-aprobacion-ausencia.template';
 import { parseCorreosAviso } from './correos-aviso.util';
 import { SolicitudAusencia } from './entities/solicitud-ausencia.entity';
+import type { ResultadoAvisoCorreo } from './resultado-aviso-correo';
 
 /**
- * Notifica cuando se aprueba una solicitud de ausencia.
+ * Notifica cuando se aprueba o rechaza una solicitud de ausencia.
  * Prioriza el correo que el Fontanero indicó en la solicitud.
- * No bloquea ni revierte la aprobación si el correo falla o no está configurado.
+ * No bloquea ni revierte la decisión si el correo falla o no está configurado.
  */
 @Injectable()
 export class NotificacionSolicitudAusenciaService {
@@ -37,18 +38,22 @@ export class NotificacionSolicitudAusenciaService {
     private readonly colaboradorRepository: Repository<Colaborador>,
   ) {}
 
-  async notificarAprobacion(solicitud: SolicitudAusencia): Promise<void> {
-    await this.notificarDecision(solicitud, 'aprobada');
+  async notificarAprobacion(
+    solicitud: SolicitudAusencia,
+  ): Promise<ResultadoAvisoCorreo> {
+    return this.notificarDecision(solicitud, 'aprobada');
   }
 
-  async notificarRechazo(solicitud: SolicitudAusencia): Promise<void> {
-    await this.notificarDecision(solicitud, 'rechazada');
+  async notificarRechazo(
+    solicitud: SolicitudAusencia,
+  ): Promise<ResultadoAvisoCorreo> {
+    return this.notificarDecision(solicitud, 'rechazada');
   }
 
   private async notificarDecision(
     solicitud: SolicitudAusencia,
     decision: 'aprobada' | 'rechazada',
-  ): Promise<void> {
+  ): Promise<ResultadoAvisoCorreo> {
     const colaborador =
       solicitud.colaborador ??
       (await this.colaboradorRepository.findOne({
@@ -60,15 +65,19 @@ export class NotificacionSolicitudAusenciaService {
         colaborador?.correoElectronico?.trim() ||
         '',
     );
-    const destino = destinos.join(', ');
 
-    if (!destino) {
+    if (destinos.length === 0) {
       this.logger.warn(
         `${decision} id=${solicitud.id}: sin correo de notificación; no se envía aviso.`,
       );
-      return;
+      return {
+        enviado: false,
+        destinos: [],
+        motivoOmitido: 'Sin correo de notificación en la solicitud.',
+      };
     }
 
+    const destino = destinos.join(', ');
     const tipoLabel =
       solicitud.tipo === TipoSolicitudAusencia.VACACIONES
         ? 'vacaciones'
@@ -102,7 +111,12 @@ export class NotificacionSolicitudAusenciaService {
       this.logger.log(
         `MAIL_ENABLED=false — notificación omitida (${decision} id=${solicitud.id} → ${destino}).`,
       );
-      return;
+      return {
+        enviado: false,
+        destinos,
+        motivoOmitido:
+          'MAIL_ENABLED=false. Active el correo en el Backend para avisar al aprobar.',
+      };
     }
 
     try {
@@ -111,7 +125,12 @@ export class NotificacionSolicitudAusenciaService {
         this.logger.warn(
           `Correo no configurado (MAIL_HOST / MAIL_USER). Notificación omitida → ${destino}.`,
         );
-        return;
+        return {
+          enviado: false,
+          destinos,
+          motivoOmitido:
+            'SMTP no configurado (MAIL_HOST / MAIL_USER / MAIL_PASSWORD).',
+        };
       }
       const from = this.resolverRemitente();
       const info: SentMessageInfo = await transporter.sendMail({
@@ -131,11 +150,21 @@ export class NotificacionSolicitudAusenciaService {
           `Correo de ${decision} enviado: solicitud=${solicitud.id} → ${destino}`,
         );
       }
+      return {
+        enviado: true,
+        destinos,
+        vistaPreviaUrl: preview || null,
+      };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(
         `No se pudo enviar correo de ${decision} id=${solicitud.id}: ${message}`,
       );
+      return {
+        enviado: false,
+        destinos,
+        motivoOmitido: `Error al enviar: ${message}`,
+      };
     }
   }
 

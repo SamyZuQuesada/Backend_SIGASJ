@@ -2,9 +2,10 @@ import { HttpStatus, INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { getRepositoryToken, TypeOrmModule } from '@nestjs/typeorm';
 import request from 'supertest';
 import { App } from 'supertest/types';
+import { Repository } from 'typeorm';
 import { Role } from '../../common/enums/role.enum';
 import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
 import jwtConfig from '../../config/jwt.config';
@@ -73,6 +74,8 @@ describe('Gestión de Materiales de Bodega — QA Integral y Validación Funcion
   jest.setTimeout(30_000);
   let app: INestApplication<App>;
   let jwtService: JwtService;
+  let idCategoriaBase: number;
+  let idProveedorBase: number;
 
   const signAs = (role: Role | string, sub = '1') => {
     const payload: JwtPayload = {
@@ -83,6 +86,13 @@ describe('Gestión de Materiales de Bodega — QA Integral y Validación Funcion
     };
     return jwtService.sign(payload);
   };
+
+  /** Payload mínimo válido tras exigir categoría + proveedor. */
+  const materialBase = (overrides: Record<string, unknown> = {}) => ({
+    idCategoria: idCategoriaBase,
+    idProveedor: idProveedorBase,
+    ...overrides,
+  });
 
   beforeAll(async () => {
     const moduleRef: TestingModule = await Test.createTestingModule({
@@ -110,6 +120,26 @@ describe('Gestión de Materiales de Bodega — QA Integral y Validación Funcion
     await app.init();
 
     jwtService = moduleRef.get<JwtService>(JwtService);
+    const categoriaRepo = moduleRef.get<Repository<CategoriaMaterial>>(
+      getRepositoryToken(CategoriaMaterial),
+    );
+    const proveedorRepo = moduleRef.get<Repository<Proveedor>>(
+      getRepositoryToken(Proveedor),
+    );
+    const categoria = await categoriaRepo.save(
+      categoriaRepo.create({
+        nombre: 'Categoría QA Materiales',
+        activo: true,
+      }),
+    );
+    const proveedor = await proveedorRepo.save(
+      proveedorRepo.create({
+        nombre: 'Proveedor QA Materiales',
+        activo: true,
+      }),
+    );
+    idCategoriaBase = categoria.id;
+    idProveedorBase = proveedor.id;
   });
 
   afterAll(async () => {
@@ -126,13 +156,13 @@ describe('Gestión de Materiales de Bodega — QA Integral y Validación Funcion
       const response = await request(app.getHttpServer())
         .post('/api/v1/inventario/materiales')
         .set('Authorization', `Bearer ${token}`)
-        .send({
+        .send(materialBase({
           nombre: 'Tubo PVC 1/2 pulgada Presión',
           descripcion: 'Tubo para agua potable alta presión',
           unidadMedida: 'Tubo',
           ubicacion: 'Bodega Principal - Estante 1',
           stockMinimo: 10,
-        });
+        }));
 
       expect(response.status).toBe(HttpStatus.CREATED);
       const body = response.body as MaterialResponseBody;
@@ -166,20 +196,20 @@ describe('Gestión de Materiales de Bodega — QA Integral y Validación Funcion
       const resStockNegativo = await request(app.getHttpServer())
         .post('/api/v1/inventario/materiales')
         .set('Authorization', `Bearer ${token}`)
-        .send({
+        .send(materialBase({
           nombre: 'Abrazadera',
           unidadMedida: 'Unidad',
           stockMinimo: -5,
-        });
+        }));
       expect(resStockNegativo.status).toBe(HttpStatus.BAD_REQUEST);
 
       const resNombreLargo = await request(app.getHttpServer())
         .post('/api/v1/inventario/materiales')
         .set('Authorization', `Bearer ${token}`)
-        .send({
+        .send(materialBase({
           nombre: 'A'.repeat(151),
           unidadMedida: 'Unidad',
-        });
+        }));
       expect(resNombreLargo.status).toBe(HttpStatus.BAD_REQUEST);
     });
 
@@ -190,10 +220,10 @@ describe('Gestión de Materiales de Bodega — QA Integral y Validación Funcion
       const response = await request(app.getHttpServer())
         .post('/api/v1/inventario/materiales')
         .set('Authorization', `Bearer ${token}`)
-        .send({
+        .send(materialBase({
           nombre: '  tubo pvc 1/2 pulgada presión  ',
           unidadMedida: 'Tubo',
-        });
+        }));
 
       expect(response.status).toBe(HttpStatus.CONFLICT);
     });
@@ -210,11 +240,11 @@ describe('Gestión de Materiales de Bodega — QA Integral y Validación Funcion
       const res = await request(app.getHttpServer())
         .post('/api/v1/inventario/materiales')
         .set('Authorization', `Bearer ${token}`)
-        .send({
+        .send(materialBase({
           nombre: 'Válvula de bola 1/2 pulgada',
           unidadMedida: 'Unidad',
           stockMinimo: 5,
-        });
+        }));
       const body = res.body as MaterialResponseBody;
       createdId2 = body.id;
       expect(createdId2).toBeDefined();
@@ -291,11 +321,11 @@ describe('Gestión de Materiales de Bodega — QA Integral y Validación Funcion
       const res = await request(app.getHttpServer())
         .post('/api/v1/inventario/materiales')
         .set('Authorization', `Bearer ${token}`)
-        .send({
+        .send(materialBase({
           nombre: 'Codo PVC 90 x 1/2 pulgada',
           unidadMedida: 'Unidad',
           ubicacion: 'Caja 3',
-        });
+        }));
       const body = res.body as MaterialResponseBody;
       materialId = body.id;
     });
@@ -345,11 +375,11 @@ describe('Gestión de Materiales de Bodega — QA Integral y Validación Funcion
       const res = await request(app.getHttpServer())
         .post('/api/v1/inventario/materiales')
         .set('Authorization', `Bearer ${token}`)
-        .send({
+        .send(materialBase({
           nombre: 'Adaptador Macho PVC 1/2 pulgada',
           unidadMedida: 'Unidad',
           stockMinimo: 8,
-        });
+        }));
       const body = res.body as MaterialResponseBody;
       editMaterialId = body.id;
     });
@@ -359,13 +389,13 @@ describe('Gestión de Materiales de Bodega — QA Integral y Validación Funcion
       const res = await request(app.getHttpServer())
         .put(`/api/v1/inventario/materiales/${editMaterialId}`)
         .set('Authorization', `Bearer ${token}`)
-        .send({
+        .send(materialBase({
           nombre: 'Adaptador Macho PVC 1/2 pulgada Reforzado',
           descripcion: 'Actualizado para soportar 200 PSI',
           unidadMedida: 'Pieza',
           ubicacion: 'Estante D',
           stockMinimo: 15,
-        });
+        }));
 
       expect(res.status).toBe(HttpStatus.OK);
       const body = res.body as MaterialResponseBody;
@@ -427,10 +457,10 @@ describe('Gestión de Materiales de Bodega — QA Integral y Validación Funcion
       const res = await request(app.getHttpServer())
         .post('/api/v1/inventario/materiales')
         .set('Authorization', `Bearer ${token}`)
-        .send({
+        .send(materialBase({
           nombre: 'Unión Universal PVC 1/2 pulgada',
           unidadMedida: 'Unidad',
-        });
+        }));
       const body = res.body as MaterialResponseBody;
       statusMaterialId = body.id;
     });
@@ -509,7 +539,7 @@ describe('Gestión de Materiales de Bodega — QA Integral y Validación Funcion
     it('rechaza con 401 Unauthorized sin token en todos los endpoints privados', async () => {
       const postRes = await request(app.getHttpServer())
         .post('/api/v1/inventario/materiales')
-        .send({ nombre: 'X', unidadMedida: 'U' });
+        .send(materialBase({ nombre: 'X', unidadMedida: 'U' }));
       expect(postRes.status).toBe(HttpStatus.UNAUTHORIZED);
 
       const getListRes = await request(app.getHttpServer()).get(
@@ -524,7 +554,7 @@ describe('Gestión de Materiales de Bodega — QA Integral y Validación Funcion
 
       const putRes = await request(app.getHttpServer())
         .put('/api/v1/inventario/materiales/1')
-        .send({ nombre: 'X', unidadMedida: 'U' });
+        .send(materialBase({ nombre: 'X', unidadMedida: 'U' }));
       expect(putRes.status).toBe(HttpStatus.UNAUTHORIZED);
 
       const patchRes = await request(app.getHttpServer())
@@ -552,7 +582,7 @@ describe('Gestión de Materiales de Bodega — QA Integral y Validación Funcion
       const postRes = await request(app.getHttpServer())
         .post('/api/v1/inventario/materiales')
         .set('Authorization', `Bearer ${token}`)
-        .send({ nombre: 'Intento Fontanero', unidadMedida: 'U' });
+        .send(materialBase({ nombre: 'Intento Fontanero', unidadMedida: 'U' }));
       expect(postRes.status).toBe(HttpStatus.FORBIDDEN);
 
       const patchRes = await request(app.getHttpServer())
@@ -579,7 +609,7 @@ describe('Gestión de Materiales de Bodega — QA Integral y Validación Funcion
       const postRes = await request(app.getHttpServer())
         .post('/api/v1/inventario/materiales')
         .set('Authorization', `Bearer ${token}`)
-        .send({ nombre: 'Intento Abonado', unidadMedida: 'U' });
+        .send(materialBase({ nombre: 'Intento Abonado', unidadMedida: 'U' }));
       expect(postRes.status).toBe(HttpStatus.FORBIDDEN);
     });
   });

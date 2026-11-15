@@ -22,6 +22,7 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
+    "test:sqlserver": "node -e \"process.env.RUN_SQLSERVER_INTEGRATION='true';require('child_process').execSync('npx jest --testPathIgnorePatterns=/node_modules/ --testPathPatterns=sqlserver.spec --runInBand',{stdio:'inherit',env:process.env,shell:true})\"",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "migration:run": "node scripts/run-migrations.cjs",
     "db:probe": "node scripts/probe-db.cjs",
@@ -91,6 +92,10 @@
     "rootDir": "src",
     "globalSetup": "<rootDir>/../test/jest-global-setup.cjs",
     "testRegex": ".*\\.spec\\.ts$",
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      ".*\\.sqlserver\\.spec\\.ts$"
+    ],
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },

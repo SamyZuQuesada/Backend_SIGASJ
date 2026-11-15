@@ -22,6 +22,7 @@ import { AlertaReposicion } from './entities/alerta-reposicion.entity';
 import { ReposicionMaterial } from './entities/reposicion-material.entity';
 import { DetalleReposicionMaterial } from './entities/detalle-reposicion-material.entity';
 import { Averia } from '../averias/entities/averia.entity';
+import { ObservacionAveria } from '../averias/entities/observacion-averia.entity';
 import { InventarioModule } from './inventario.module';
 
 const clasificacionQaTypeOrmModule = TypeOrmModule.forRoot({
@@ -42,6 +43,7 @@ const clasificacionQaTypeOrmModule = TypeOrmModule.forRoot({
     ReposicionMaterial,
     DetalleReposicionMaterial,
     Averia,
+    ObservacionAveria,
   ],
   synchronize: true,
 });

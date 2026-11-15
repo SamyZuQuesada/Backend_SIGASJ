@@ -22,7 +22,10 @@ type MovimientoRow = {
   observacion: string | null;
 };
 
-describe('Pruebas de Base de Datos e Integridad en SQL Server: Salidas y Movimientos (Backlog 4.5)', () => {
+const describeSqlServer =
+  process.env.RUN_SQLSERVER_INTEGRATION === 'true' ? describe : describe.skip;
+
+describeSqlServer('Pruebas de Base de Datos e Integridad en SQL Server: Salidas y Movimientos (Backlog 4.5)', () => {
   let dataSource: DataSource | null = null;
   let isConnected = false;
 

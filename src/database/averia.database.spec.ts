@@ -173,7 +173,10 @@ describe('Pruebas de Base de Datos: Migración Averia', () => {
     });
   });
 
-  describe('2. Verificación de esquema físico en SQL Server', () => {
+  const describeSqlServer =
+    process.env.RUN_SQLSERVER_INTEGRATION === 'true' ? describe : describe.skip;
+
+  describeSqlServer('2. Verificación de esquema físico en SQL Server', () => {
     let dataSource: DataSource | null = null;
     let isConnected = false;
 
@@ -202,8 +205,7 @@ describe('Pruebas de Base de Datos: Migración Averia', () => {
 
     const requireSqlServer = (): DataSource => {
       if (!isConnected || !dataSource) {
-        pending('SQL Server no está disponible: esquema físico no verificado');
-        throw new Error('SQL Server no disponible');
+        throw new Error('SQL Server no disponible para esta verificación');
       }
       return dataSource;
     };

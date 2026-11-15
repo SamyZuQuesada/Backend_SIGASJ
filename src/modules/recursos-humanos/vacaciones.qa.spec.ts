@@ -86,13 +86,17 @@ describe('QA Vacaciones — checklist completo (6.3)', () => {
     return res.body as MovimientosVacacionesListado;
   };
 
-  const movimientoJuan = (extra: Record<string, unknown>) => ({
-    colaboradorId: juan.id,
-    tipo: ACUMULADO,
-    cantidadDias: 1,
-    fecha: '2026-01-01',
-    ...extra,
-  });
+  const movimientoJuan = (extra: Record<string, unknown>) => {
+    const tipo = (extra.tipo as string | undefined) ?? ACUMULADO;
+    return {
+      colaboradorId: juan.id,
+      tipo: ACUMULADO,
+      cantidadDias: 1,
+      // DISFRUTADO no puede caer en feriado CR (p. ej. 2026-01-01 = Año Nuevo)
+      fecha: tipo === DISFRUTADO ? '2026-03-10' : '2026-01-01',
+      ...extra,
+    };
+  };
 
   /** Saldo calculado "a mano" desde las filas guardadas, sin pasar por el servicio. */
   const saldoDesdeFilas = async (colaboradorId: number) => {

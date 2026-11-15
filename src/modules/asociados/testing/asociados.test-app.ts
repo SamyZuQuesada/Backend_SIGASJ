@@ -11,6 +11,8 @@ import { HttpExceptionFilter } from '../../../common/filters/http-exception.filt
 import { JwtPayload } from '../../../common/interfaces/jwt-payload.interface';
 import jwtConfig from '../../../config/jwt.config';
 import { AuthModule } from '../../auth/auth.module';
+import { Rol } from '../../usuarios/entities/rol.entity';
+import { Usuario } from '../../usuarios/entities/usuario.entity';
 import { AsociadosModule } from '../asociados.module';
 import { Asociado } from '../entities/asociado.entity';
 
@@ -31,7 +33,7 @@ export async function crearAsociadosTestApp(): Promise<AsociadosTestApp> {
         type: 'sqljs',
         autoSave: false,
         dropSchema: true,
-        entities: [Asociado],
+        entities: [Asociado, Usuario, Rol],
         synchronize: true,
       }),
       AuthModule,

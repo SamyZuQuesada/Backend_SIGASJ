@@ -20,6 +20,7 @@ import { MovimientoInventario } from './entities/movimiento-inventario.entity';
 import { Proveedor } from './entities/proveedor.entity';
 import { InventarioController } from './inventario.controller';
 import { InventarioService } from './inventario.service';
+import { inventarioServiceExtraProviders } from './testing/inventario-unit-test-providers';
 
 describe('QA Criterios de Aceptación — Relación Material con Proveedores', () => {
   let app: INestApplication;
@@ -132,6 +133,7 @@ describe('QA Criterios de Aceptación — Relación Material con Proveedores', (
             findOne: jest.fn().mockResolvedValue(null),
           },
         },
+        ...inventarioServiceExtraProviders,
       ],
     })
       .overrideGuard(JwtAuthGuard)

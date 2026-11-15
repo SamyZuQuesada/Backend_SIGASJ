@@ -34,12 +34,14 @@ export class ReportesController {
     'admin/inventario/reportes',
   ])
   @HttpCode(HttpStatus.OK)
-  @Roles(Role.ADMINISTRADORA)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({
-    summary: 'Consultar reporte consolidado de inventario (Administradora)',
+    summary:
+      'Consultar reporte consolidado de inventario (Administradora / Secretaria)',
     description:
       'Indicadores de materiales, stock bajo, entradas y salidas. Solo lectura.',
   })
+
   @ApiQuery({ name: 'fechaDesde', required: false, type: String })
   @ApiQuery({ name: 'fechaHasta', required: false, type: String })
   @ApiQuery({ name: 'idMaterial', required: false, type: Number })
