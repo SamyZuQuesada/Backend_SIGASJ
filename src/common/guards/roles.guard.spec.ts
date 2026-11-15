@@ -43,4 +43,30 @@ describe('RolesGuard — 401 vs 403', () => {
   it('Administradora autenticada puede continuar', () => {
     expect(guard.canActivate(ctx({ role: Role.ADMINISTRADORA }))).toBe(true);
   });
+
+  it('ruta de Administradora y Secretaria Ejecutiva admite ambos y rechaza Fontanero', () => {
+    (reflector.getAllAndOverride as jest.Mock).mockReturnValue([
+      Role.ADMINISTRADORA,
+      Role.SECRETARIA,
+    ]);
+
+    expect(guard.canActivate(ctx({ role: Role.ADMINISTRADORA }))).toBe(true);
+    expect(guard.canActivate(ctx({ role: Role.SECRETARIA }))).toBe(true);
+    expect(() => guard.canActivate(ctx({ role: Role.FONTANERO }))).toThrow(
+      ForbiddenException,
+    );
+  });
+
+  it('no trata la etiqueta Secretaria Ejecutiva como el rol persistido', () => {
+    (reflector.getAllAndOverride as jest.Mock).mockReturnValue([
+      Role.SECRETARIA,
+    ]);
+
+    expect(() =>
+      guard.canActivate(ctx({ role: 'Secretaria Ejecutiva' as Role })),
+    ).toThrow(ForbiddenException);
+    expect(() =>
+      guard.canActivate(ctx({ role: 'Secretaria' as Role })),
+    ).toThrow(ForbiddenException);
+  });
 });

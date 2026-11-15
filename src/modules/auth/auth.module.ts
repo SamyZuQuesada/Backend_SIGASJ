@@ -5,6 +5,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
+import { PasswordService } from './password.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { Rol } from '../usuarios/entities/rol.entity';
@@ -35,7 +36,7 @@ import { Rol } from '../usuarios/entities/rol.entity';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
-  exports: [AuthService, JwtModule, PassportModule],
+  providers: [AuthService, JwtStrategy, PasswordService],
+  exports: [JwtModule, PassportModule, PasswordService],
 })
 export class AuthModule {}

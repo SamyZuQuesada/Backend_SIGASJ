@@ -50,4 +50,19 @@ export class Usuario {
       this.correo = this.correo.trim().toLowerCase();
     }
   }
+
+  /**
+   * `res.json` / `JSON.stringify` no deben incluir el hash aunque Auth lo
+   * haya cargado con `addSelect('usuario.passwordHash')`.
+   */
+  toJSON(): Record<string, unknown> {
+    return {
+      idUsuario: this.idUsuario,
+      nombre: this.nombre,
+      correo: this.correo,
+      activo: this.activo,
+      idRol: this.idRol,
+      ...(this.rol !== undefined ? { rol: this.rol } : {}),
+    };
+  }
 }

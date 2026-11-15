@@ -1,4 +1,4 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication, Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
@@ -169,7 +169,126 @@ describe('Usuarios y roles persistidos', () => {
       .expect(200);
     const serialized = JSON.stringify(response.body);
     expect(serialized).not.toMatch(/passwordHash/i);
+    expect(serialized).not.toMatch(/"password"/i);
     expect(response.body).toHaveProperty('data');
+    const data = (response.body as { data: Array<Record<string, unknown>> })
+      .data;
+    expect(data.length).toBeGreaterThan(0);
+    const first = data[0];
+    expect(typeof first.id).toBe('number');
+    expect(typeof first.nombre).toBe('string');
+    expect(typeof first.correo).toBe('string');
+    expect(typeof first.activo).toBe('boolean');
+    expect(typeof first.rol).toBe('string');
+    expect(first).not.toHaveProperty('passwordHash');
     expect(jwtService).toBeDefined();
+  });
+
+  it('find() de repositorio no carga passwordHash; Auth sí puede pedirlo', async () => {
+    const listado = await usuarios.findOne({
+      where: { correo: 'admin@asadasanjuan.cr' },
+    });
+    expect(listado).toBeDefined();
+    expect(listado?.passwordHash).toBeUndefined();
+    expect(JSON.stringify(listado)).not.toMatch(/passwordHash/i);
+
+    const conHash = await usuarios
+      .createQueryBuilder('usuario')
+      .addSelect('usuario.passwordHash')
+      .where('LOWER(usuario.correo) = :correo', {
+        correo: 'admin@asadasanjuan.cr',
+      })
+      .getOne();
+    expect(conHash?.passwordHash).toBeDefined();
+    expect(conHash?.passwordHash).not.toBe(PASSWORD_PRUEBA);
+    expect(JSON.stringify(conHash)).not.toMatch(/passwordHash/i);
+  });
+
+  const leerHash = async (id: number): Promise<string | undefined> => {
+    const row = await usuarios
+      .createQueryBuilder('usuario')
+      .addSelect('usuario.passwordHash')
+      .where('usuario.idUsuario = :id', { id })
+      .getOne();
+    return row?.passwordHash;
+  };
+
+  it('POST /usuarios hashea, no persiste plano y permite login; PATCH no hace doble hash', async () => {
+    const logSpy = jest
+      .spyOn(Logger.prototype, 'log')
+      .mockImplementation(() => undefined);
+    const warnSpy = jest
+      .spyOn(Logger.prototype, 'warn')
+      .mockImplementation(() => undefined);
+    const passwordInicial = 'TestPassword123!';
+    const passwordNueva = 'NuevaClave123!';
+
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/usuarios')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        nombre: 'Nuevo Fontanero',
+        correo: 'nuevo.hash@asadasanjuan.cr',
+        password: passwordInicial,
+        rol: Role.FONTANERO,
+      })
+      .expect(201);
+
+    const body = created.body as { id: number; correo: string; rol: string };
+    expect(body.correo).toBe('nuevo.hash@asadasanjuan.cr');
+    expect(body.rol).toBe(Role.FONTANERO);
+    expect(created.body).not.toHaveProperty('passwordHash');
+    expect(created.body).not.toHaveProperty('password');
+    expect(JSON.stringify(created.body)).not.toMatch(
+      /passwordHash|TestPassword123/i,
+    );
+
+    const hashInicial = await leerHash(body.id);
+    expect(hashInicial).toBeDefined();
+    expect(hashInicial).not.toBe(passwordInicial);
+
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({ email: body.correo, password: passwordInicial })
+      .expect(200);
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({ email: body.correo, password: 'WrongPass1' })
+      .expect(401);
+
+    const sinPassword = await request(app.getHttpServer())
+      .patch(`/api/v1/usuarios/${body.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ nombre: 'Nombre actualizado' })
+      .expect(200);
+    expect(JSON.stringify(sinPassword.body)).not.toMatch(/passwordHash/i);
+    expect(await leerHash(body.id)).toBe(hashInicial);
+
+    const conPassword = await request(app.getHttpServer())
+      .patch(`/api/v1/usuarios/${body.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ password: passwordNueva })
+      .expect(200);
+    expect(JSON.stringify(conPassword.body)).not.toMatch(
+      /passwordHash|NuevaClave123/i,
+    );
+    const hashNuevo = await leerHash(body.id);
+    expect(hashNuevo).toBeDefined();
+    expect(hashNuevo).not.toBe(hashInicial);
+    expect(hashNuevo).not.toBe(passwordNueva);
+
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({ email: body.correo, password: passwordInicial })
+      .expect(401);
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({ email: body.correo, password: passwordNueva })
+      .expect(200);
+
+    const logs = `${JSON.stringify(logSpy.mock.calls)} ${JSON.stringify(warnSpy.mock.calls)}`;
+    expect(logs).not.toMatch(/TestPassword123|NuevaClave123|passwordHash/i);
+    logSpy.mockRestore();
+    warnSpy.mockRestore();
   });
 });

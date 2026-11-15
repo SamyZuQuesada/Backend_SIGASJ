@@ -1,5 +1,6 @@
 import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Role } from '../../common/enums/role.enum';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 
@@ -21,7 +22,7 @@ export class AuthController {
         user: {
           id: 5,
           email: 'carlos@asadasanjuan.cr',
-          role: 'FONTANERO',
+          role: Role.FONTANERO,
           name: 'Carlos Pérez',
         },
       },

@@ -157,6 +157,9 @@ describe('Auth persistido (sin login demo)', () => {
     expect(payload.role).toBe(Role.ADMINISTRADORA);
     expect(body.user.id).toBe(administradora.idUsuario);
     expect(body.user.role).toBe(Role.ADMINISTRADORA);
+    expect(body).not.toHaveProperty('passwordHash');
+    expect(body.user).not.toHaveProperty('passwordHash');
+    expect(JSON.stringify(body)).not.toMatch(/passwordHash/i);
     expect(JSON.stringify(payload)).not.toMatch(/passwordHash/i);
   });
 
@@ -179,11 +182,29 @@ describe('Auth persistido (sin login demo)', () => {
   });
 
   it('rechaza inactivo y credenciales inválidas; no usa demo-user-id', async () => {
-    await login('inactivo@asadasanjuan.cr').expect(401);
-    await login('admin@asadasanjuan.cr', 'WrongPass1').expect(401);
-    await login('noexiste@asadasanjuan.cr').expect(401);
+    const inactivo = await login('inactivo@asadasanjuan.cr').expect(401);
+    const invalido = await login('admin@asadasanjuan.cr', 'WrongPass1').expect(
+      401,
+    );
+    const inexistente = await login('noexiste@asadasanjuan.cr').expect(401);
+    expect(JSON.stringify(inactivo.body)).not.toMatch(/passwordHash/i);
+    expect(JSON.stringify(invalido.body)).not.toMatch(/passwordHash/i);
+    expect(JSON.stringify(inexistente.body)).not.toMatch(/passwordHash/i);
+    expect(inactivo.body).toEqual(
+      expect.objectContaining({
+        statusCode: 401,
+        message: 'El usuario se encuentra inactivo.',
+      }),
+    );
+    expect(invalido.body).toEqual(
+      expect.objectContaining({
+        statusCode: 401,
+        message: 'Credenciales inválidas',
+      }),
+    );
     const ok = await login('carlos@asadasanjuan.cr').expect(200);
     expect(JSON.stringify(ok.body)).not.toContain('demo-user-id');
+    expect(JSON.stringify(ok.body)).not.toMatch(/passwordHash/i);
   });
 
   it('no deriva el rol desde el correo', async () => {

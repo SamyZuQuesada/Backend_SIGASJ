@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EstadoSolicitud } from '../../../common/enums/estado-solicitud.enum';
+import { Role } from '../../../common/enums/role.enum';
 
 /**
  * Responsable administrativo del evento (sin correo ni password).
@@ -12,7 +13,7 @@ export class HistorialSolicitudUsuarioDto {
   nombre!: string;
 
   @ApiPropertyOptional({
-    example: 'ADMINISTRADORA',
+    example: Role.ADMINISTRADORA,
     description: 'Nombre del rol si está cargado',
     nullable: true,
   })

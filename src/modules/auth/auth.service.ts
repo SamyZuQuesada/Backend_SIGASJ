@@ -3,10 +3,10 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Role } from '../../common/enums/role.enum';
+import { esRol, Role } from '../../common/enums/role.enum';
 import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
 import { LoginDto } from './dto/login.dto';
-import { verifyPassword } from './password.util';
+import { PasswordService } from './password.service';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 
 const CREDENCIALES_INVALIDAS = 'Credenciales inválidas';
@@ -17,6 +17,7 @@ export class AuthService {
   constructor(
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly passwordService: PasswordService,
     @InjectRepository(Usuario)
     private readonly usuarioRepository: Repository<Usuario>,
   ) {}
@@ -50,13 +51,14 @@ export class AuthService {
         throw new UnauthorizedException(CREDENCIALES_INVALIDAS);
       }
 
-      const passwordOk = await verifyPassword(
+      const passwordOk = await this.passwordService.compare(
         loginDto.password,
         usuario.passwordHash,
       );
       if (!passwordOk) {
         throw new UnauthorizedException(CREDENCIALES_INVALIDAS);
       }
+      delete (usuario as { passwordHash?: string }).passwordHash;
     }
 
     if (!usuario.activo) {
@@ -87,11 +89,6 @@ export class AuthService {
   }
 
   private asRole(nombre: string | undefined): Role | null {
-    if (!nombre) {
-      return null;
-    }
-    return (Object.values(Role) as string[]).includes(nombre)
-      ? (nombre as Role)
-      : null;
+    return esRol(nombre) ? nombre : null;
   }
 }
