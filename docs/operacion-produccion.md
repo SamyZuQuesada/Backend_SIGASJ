@@ -11,8 +11,8 @@ Los documentos `deploy-render-backend.md` y `smoke-test-render.md` describen cor
 
 | Pieza | Dónde | Qué salió | Notas |
 | --- | --- | --- | --- |
-| Frontend | Vercel, proyecto `sigasj-frontend` | `1c47769` de `main` | El proyecto no está conectado a Git. Un push no publica solo. Production se publicó con la CLI desde la raíz del frontend. Bundle `index-Hvo8e7gC.js`. `VITE_API_URL=https://sigasj-api.onrender.com/api/v1`, horneada en el build. |
-| API | Render, servicio `sigasj-api` | `66bb978` de `main` | Plan Free. Se duerme y el primer request puede tardar más de un minuto. El arranque detectó `dbo.ArchivoMedia`. |
+| Frontend | Vercel, proyecto `sigasj-frontend` | `6b94ee2` de `main` | El proyecto no está conectado a Git. Un push no publica solo. Production se publicó con la CLI desde la raíz del frontend. Bundle `index-BwRoeWqu.js`. `VITE_API_URL=https://sigasj-api.onrender.com/api/v1`, horneada en el build. |
+| API | Render, servicio `sigasj-api` | `c27d406` de `main` | Plan Free. Se duerme y el primer request puede tardar más de un minuto. El arranque detectó `dbo.ArchivoMedia`. |
 | Datos | Azure SQL | — | `migrationsRun` está en false. La tabla de archivos ya existe; el usuario de la aplicación no crea tablas. |
 
 El login publicado pide correo y contraseña. Las tres cuentas de la ASADA (administradora, secretaria y fontanero) entran con la clave que la aplicación ya alinea en producción.
@@ -37,7 +37,7 @@ El login publicado pide correo y contraseña. Las tres cuentas de la ASADA (admi
 
 Render no conserva el disco. Las fotos y los PDF sobreviven en `dbo.ArchivoMedia`.
 
-El 2026-11-16 el arranque del API en `66bb978` registró la tabla lista. El usuario `sigasj_app` sigue sin permiso de `CREATE TABLE`; si la tabla se borra, hay que recrearla con un usuario que sí pueda y reiniciar el API. La migración vigente es `1724686410000-CreateArchivoMediaTable` e incluye `tamanoBytes`, `createdAt` y `updatedAt`.
+El 2026-11-16 el arranque del API en `c27d406` registró la tabla lista. El usuario `sigasj_app` sigue sin permiso de `CREATE TABLE`; si la tabla se borra, hay que recrearla con un usuario que sí pueda y reiniciar el API. La migración vigente es `1724686410000-CreateArchivoMediaTable` e incluye `tamanoBytes`, `createdAt` y `updatedAt`.
 
 Comprobado ese día: las cinco fotos de la galería, dos ilustraciones de comunicados, la portada del proyecto y el PDF de arreglo de pago responden 200 con bytes reales.
 
@@ -57,14 +57,14 @@ Comprobado ese día: las cinco fotos de la galería, dos ilustraciones de comuni
 
 ## Resultado
 
-Login, roles y módulos se comprobaron el 2026-11-13 sobre el API que ya estaba en producción. Landing, archivos y recuperación se volvieron a comprobar el 2026-11-16 sobre `66bb978` y `1c47769`.
+Login, roles y módulos se comprobaron el 2026-11-13 sobre el API que ya estaba en producción. Landing, archivos, health y recuperación se volvieron a comprobar el 2026-11-16 sobre `c27d406` y `6b94ee2`.
 
 | Prueba | Resultado |
 | --- | --- |
-| Landing y bundle hacia Render | PASS el 2026-11-16. Bundle `index-Hvo8e7gC.js`. La landing abre comunicados, trámites, galería y el asistente. El login pide correo y contraseña. |
+| Landing y bundle hacia Render | PASS el 2026-11-16. Bundle `index-BwRoeWqu.js`. La landing abre comunicados, trámites, galería y el asistente. El login pide correo y contraseña. |
 | Health, CORS del origen Vercel y `x-request-id` | PASS. Un origen ajeno no se refleja en `access-control-allow-origin`. |
 | Login y roles | PASS. Las tres cuentas entran con su rol y la respuesta no trae `passwordHash`. Clave incorrecta, sin token y token inválido responden 401. Fontanero en usuarios y en proyectos de administración: 403. Secretaria en proyectos de administración: 403. `GET /api/v1/auth/me` de la administradora: 200. |
 | Módulos | PASS de lectura. Públicos: comunicados 4, proyectos 1, galería 5, transparencia, contacto e información. Administración: inventario (4 materiales, 1 categoría, 4 proveedores, 10 movimientos, 1 alerta), asociados 3, averías 6, actividades 4, recursos humanos (1 colaborador, 6 puestos, 2 permisos, 2 solicitudes de ausencia), solicitudes 6 y 6 formularios oficiales. Fontanero: 4 averías, 4 actividades, 5 tipos, 2 ausencias, 5 solicitudes de materiales y saldo de vacaciones. Las pantallas de inventario, recursos humanos, trámites, averías del fontanero, registro de actividades y sus solicitudes abrieron con esos datos. La administradora no entra a las rutas del fontanero. |
 | Archivos persistentes | PASS el 2026-11-16. `dbo.ArchivoMedia` está lista. Galería, comunicados, portada de proyecto y el PDF oficial de arreglo de pago se sirven desde el API. |
-| Recuperación | Confirmado el 2026-11-16 sin bajar el sitio. En Render el deploy vivo es `66bb978` y el anterior, `e8948a0`, tiene Rollback activo. En Vercel el Production anterior, de hace unos 46 minutos, sigue en Ready y se puede promover. No se pulsó ninguna de las dos. |
-| Puesta en producción | Hecha con `main` actual. API `66bb978` y frontend `1c47769`. |
+| Recuperación | Confirmado el 2026-11-16 sin bajar el sitio. En Render el deploy vivo es `c27d406` y el anterior, `66bb978`, queda como destino de Rollback. En Vercel el Production anterior sigue en Ready y se puede promover. No se pulsó ninguna de las dos. |
+| Puesta en producción | Hecha con `main` actual. API `c27d406` y frontend `6b94ee2`. |
