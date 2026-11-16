@@ -308,11 +308,10 @@ describe('Descarga Segura de Archivos Binarios de Documentos (Backend)', () => {
       expect(response.body.message).toBe('Acceso denegado');
     });
 
-    it('debe permitir descarga a ADMINISTRADORA, SECRETARIA y FONTANERO', async () => {
+    it('debe permitir descarga a ADMINISTRADORA y SECRETARIA', async () => {
       for (const role of [
         Role.ADMINISTRADORA,
         Role.SECRETARIA_EJECUTIVA,
-        Role.FONTANERO,
       ]) {
         const token = signAsRole(role);
         await request(app.getHttpServer())
@@ -320,6 +319,26 @@ describe('Descarga Segura de Archivos Binarios de Documentos (Backend)', () => {
           .set('Authorization', `Bearer ${token}`)
           .expect(200);
       }
+    });
+
+    it('debe rechazar descarga con 403 Forbidden al rol FONTANERO en endpoint y alias', async () => {
+      const tokenFontanero = signAsRole(Role.FONTANERO);
+
+      // Endpoint principal con /descargar
+      const resDescargar = await request(app.getHttpServer())
+        .get('/solicitudes/15/documentos/40/descargar')
+        .set('Authorization', `Bearer ${tokenFontanero}`)
+        .expect(403);
+
+      expect(resDescargar.body.message).toBe('Acceso denegado');
+
+      // Alias sin sufijo /descargar
+      const resAlias = await request(app.getHttpServer())
+        .get('/solicitudes/15/documentos/40')
+        .set('Authorization', `Bearer ${tokenFontanero}`)
+        .expect(403);
+
+      expect(resAlias.body.message).toBe('Acceso denegado');
     });
   });
 

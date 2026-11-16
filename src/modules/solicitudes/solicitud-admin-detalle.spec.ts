@@ -216,7 +216,7 @@ describe('Panel Administrativo - Detalle Completo de Solicitud (Tarea 4.12.2)', 
         .expect(403);
     });
 
-    it('debe permitir el acceso a ADMINISTRADORA, SECRETARIA y FONTANERO', async () => {
+    it('debe permitir el acceso a ADMINISTRADORA y SECRETARIA', async () => {
       findOneSolicitud.mockResolvedValue({ ...mockSolicitudBase });
 
       await request(app.getHttpServer())
@@ -228,11 +228,17 @@ describe('Panel Administrativo - Detalle Completo de Solicitud (Tarea 4.12.2)', 
         .get('/solicitudes/1')
         .set('Authorization', `Bearer ${signAs(Role.SECRETARIA_EJECUTIVA)}`)
         .expect(200);
+    });
 
-      await request(app.getHttpServer())
+    it('debe rechazar con 403 Forbidden al rol FONTANERO (Principio de menor privilegio)', async () => {
+      findOneSolicitud.mockResolvedValue({ ...mockSolicitudBase });
+
+      const response = await request(app.getHttpServer())
         .get('/solicitudes/1')
         .set('Authorization', `Bearer ${signAs(Role.FONTANERO)}`)
-        .expect(200);
+        .expect(403);
+
+      expect(response.body.message).toBe('Acceso denegado');
     });
   });
 
