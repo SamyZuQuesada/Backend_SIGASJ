@@ -206,8 +206,8 @@ describe('Seguridad y Control de Acceso RBAC - Solicitudes Administrativas', () 
     });
   });
 
-  describe('2. Criterio: Un usuario sin rol recibe 403 Forbidden', () => {
-    it('debe rechazar con 403 Forbidden a un token válido que no incluye rol en sus claims', async () => {
+  describe('2. Criterio: Control de roles no autorizados y claims inválidos', () => {
+    it('debe rechazar con 401 Unauthorized a un token válido que no incluye rol en sus claims', async () => {
       const tokenSinRol = signToken({
         sub: '99',
         email: 'sinrol@asada.cr',
@@ -218,9 +218,9 @@ describe('Seguridad y Control de Acceso RBAC - Solicitudes Administrativas', () 
       const response = await request(app.getHttpServer())
         .get('/solicitudes')
         .set('Authorization', `Bearer ${tokenSinRol}`)
-        .expect(403);
+        .expect(401);
 
-      expect(response.body.message).toBe('Acceso denegado');
+      expect(response.body.message).toBe('No autenticado');
     });
 
     it('debe rechazar con 403 Forbidden al rol ABONADO en el listado y en el detalle', async () => {
@@ -258,6 +258,25 @@ describe('Seguridad y Control de Acceso RBAC - Solicitudes Administrativas', () 
       await request(app.getHttpServer())
         .get('/solicitudes/10/detalle')
         .set('Authorization', `Bearer ${tokenAyudante}`)
+        .expect(403);
+    });
+
+    it('debe rechazar con 403 Forbidden al rol FONTANERO en el listado y en el detalle (principio de menor privilegio)', async () => {
+      const tokenFontanero = signAsRole(Role.FONTANERO);
+
+      await request(app.getHttpServer())
+        .get('/solicitudes')
+        .set('Authorization', `Bearer ${tokenFontanero}`)
+        .expect(403);
+
+      await request(app.getHttpServer())
+        .get('/solicitudes/10')
+        .set('Authorization', `Bearer ${tokenFontanero}`)
+        .expect(403);
+
+      await request(app.getHttpServer())
+        .get('/solicitudes/10/detalle')
+        .set('Authorization', `Bearer ${tokenFontanero}`)
         .expect(403);
     });
   });
@@ -299,8 +318,8 @@ describe('Seguridad y Control de Acceso RBAC - Solicitudes Administrativas', () 
       expect(resDetalle.body.id).toBe(10);
     });
 
-    it('FONTANERO puede acceder al listado y al detalle de solicitudes para revisión técnica', async () => {
-      const token = signAsRole(Role.FONTANERO);
+    it('SUPER_ADMIN puede acceder al listado y al detalle (bypass administrativo de plataforma)', async () => {
+      const token = signAsRole(Role.SUPER_ADMIN);
 
       const resListado = await request(app.getHttpServer())
         .get('/solicitudes')
@@ -350,6 +369,24 @@ describe('Seguridad y Control de Acceso RBAC - Solicitudes Administrativas', () 
         .expect(403);
 
       expect(response.body.message).toBe('Acceso denegado');
+    });
+
+    it('escribir directamente la URL de detalle o listado con un token de fontanero es rechazado con 403', async () => {
+      const tokenFontanero = signAsRole(Role.FONTANERO);
+
+      const resListado = await request(app.getHttpServer())
+        .get('/solicitudes')
+        .set('Authorization', `Bearer ${tokenFontanero}`)
+        .expect(403);
+
+      expect(resListado.body.message).toBe('Acceso denegado');
+
+      const resDetalle = await request(app.getHttpServer())
+        .get('/solicitudes/10/detalle')
+        .set('Authorization', `Bearer ${tokenFontanero}`)
+        .expect(403);
+
+      expect(resDetalle.body.message).toBe('Acceso denegado');
     });
   });
 
