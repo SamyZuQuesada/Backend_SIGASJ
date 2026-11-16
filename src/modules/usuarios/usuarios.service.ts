@@ -1,9 +1,18 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  OnModuleInit,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Role, ROLE_LABELS, ROLES_SISTEMA } from '../../common/enums/role.enum';
 import { PasswordService } from '../auth/password.service';
+import { CreateUsuarioDto } from './dto/create-usuario.dto';
+import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 import { Rol } from './entities/rol.entity';
 import { Usuario } from './entities/usuario.entity';
 
@@ -258,6 +267,80 @@ export class UsuariosService implements OnModuleInit {
     };
   }
 
+  async crear(dto: CreateUsuarioDto): Promise<UsuarioPublico> {
+    const correo = dto.correo.trim().toLowerCase();
+    const duplicado = await this.usuarioRepository.findOne({
+      where: { correo },
+    });
+    if (duplicado) {
+      throw new ConflictException('Ya existe un usuario con este correo.');
+    }
+
+    const rol = await this.obtenerRol(dto.rol);
+    const passwordHash = await this.passwordService.hashPassword(dto.password);
+    const guardado = await this.usuarioRepository.save(
+      this.usuarioRepository.create({
+        nombre: dto.nombre.trim(),
+        correo,
+        passwordHash,
+        activo: dto.activo ?? true,
+        idRol: rol.idRol,
+        rol,
+      }),
+    );
+    this.logger.log(`Usuario creado: id=${guardado.idUsuario}`);
+    return this.toPublico(guardado);
+  }
+
+  async actualizar(
+    id: number,
+    dto: UpdateUsuarioDto,
+  ): Promise<UsuarioPublico> {
+    const usuario = await this.usuarioRepository.findOne({
+      where: { idUsuario: id },
+      relations: { rol: true },
+    });
+    if (!usuario) {
+      throw new NotFoundException(`No existe un usuario con id ${id}`);
+    }
+
+    const patch: Partial<Usuario> = {};
+    if (dto.nombre !== undefined) {
+      patch.nombre = dto.nombre.trim();
+    }
+    if (dto.activo !== undefined) {
+      patch.activo = dto.activo;
+    }
+    if (dto.rol !== undefined) {
+      const rol = await this.obtenerRol(dto.rol);
+      patch.idRol = rol.idRol;
+      patch.rol = rol;
+    }
+    if (typeof dto.password === 'string' && dto.password.length > 0) {
+      patch.passwordHash = await this.passwordService.hashPassword(dto.password);
+    }
+
+    if (Object.keys(patch).length === 0) {
+      throw new BadRequestException(
+        'Debe enviar al menos un campo para actualizar',
+      );
+    }
+
+    const { rol: _rolRelacion, ...columnas } = patch;
+    void _rolRelacion;
+    await this.usuarioRepository.update(id, columnas);
+
+    const actualizado = await this.usuarioRepository.findOne({
+      where: { idUsuario: id },
+      relations: { rol: true },
+    });
+    if (!actualizado) {
+      throw new NotFoundException(`No existe un usuario con id ${id}`);
+    }
+    this.logger.log(`Usuario actualizado: id=${id}`);
+    return this.toPublico(actualizado);
+  }
+
   toPublico(usuario: Usuario): UsuarioPublico {
     return {
       id: usuario.idUsuario,
@@ -266,5 +349,13 @@ export class UsuariosService implements OnModuleInit {
       activo: usuario.activo,
       rol: usuario.rol.nombre,
     };
+  }
+
+  private async obtenerRol(nombre: Role): Promise<Rol> {
+    const rol = await this.findRolPorNombre(nombre);
+    if (!rol) {
+      throw new BadRequestException(`El rol ${nombre} no existe.`);
+    }
+    return rol;
   }
 }

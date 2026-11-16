@@ -13,6 +13,10 @@ import jwtConfig from '../../../config/jwt.config';
 import { AuthModule } from '../../auth/auth.module';
 import { Rol } from '../../usuarios/entities/rol.entity';
 import { Usuario } from '../../usuarios/entities/usuario.entity';
+import {
+  crearUsuarioPrueba,
+  seedRolesBase,
+} from '../../usuarios/usuarios.test-helpers';
 import { SolicitudAusencia } from '../../solicitudes-ausencia/entities/solicitud-ausencia.entity';
 import { DocumentoSolicitudAusencia } from '../../solicitudes-ausencia/entities/documento-solicitud-ausencia.entity';
 import { Colaborador } from '../entities/colaborador.entity';
@@ -90,12 +94,28 @@ export async function crearColaboradoresTestApp(): Promise<ColaboradoresTestApp>
     getRepositoryToken(Rol),
   );
 
+  // JwtStrategy revalida contra Usuario activo: el token debe usar un id real.
+  const roles = await seedRolesBase(rolRepository);
+  const usuariosPorRol = {} as Record<Role, Usuario>;
+  for (const role of Object.values(Role)) {
+    usuariosPorRol[role] = await crearUsuarioPrueba(
+      usuarioRepository,
+      roles,
+      {
+        nombre: `Usuario ${role}`,
+        correo: `qa.${role.toLowerCase()}@asadasanjuan.cr`,
+        role,
+      },
+    );
+  }
+
   const signAs = (role: Role) => {
+    const usuario = usuariosPorRol[role];
     const payload: JwtPayload = {
-      sub: '1',
-      email: `${role.toLowerCase()}@asadasanjuan.cr`,
+      sub: String(usuario.idUsuario),
+      email: usuario.correo,
       role,
-      name: `Usuario ${role}`,
+      name: usuario.nombre,
     };
     return jwtService.sign(payload);
   };
@@ -113,19 +133,11 @@ export async function crearColaboradoresTestApp(): Promise<ColaboradoresTestApp>
   };
 
   const crearUsuario = async (correo: string): Promise<Usuario> => {
-    let rol = await rolRepository.findOneBy({ nombre: Role.FONTANERO });
-    rol ??= await rolRepository.save(
-      rolRepository.create({ nombre: Role.FONTANERO }),
-    );
-    return usuarioRepository.save(
-      usuarioRepository.create({
-        nombre: 'Fontanero Prueba',
-        correo,
-        passwordHash: 'x',
-        activo: true,
-        idRol: rol.idRol,
-      }),
-    );
+    return crearUsuarioPrueba(usuarioRepository, roles, {
+      nombre: 'Fontanero Prueba',
+      correo,
+      role: Role.FONTANERO,
+    });
   };
 
   return {

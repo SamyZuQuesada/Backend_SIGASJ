@@ -1,4 +1,5 @@
 import {
+  AfterLoad,
   BeforeInsert,
   BeforeUpdate,
   Column,
@@ -12,8 +13,14 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { JornadaLaboral } from '../../../common/enums/jornada-laboral.enum';
+import { ModalidadPago } from '../../../common/enums/modalidad-pago.enum';
 import { SolicitudAusencia } from '../../solicitudes-ausencia/entities/solicitud-ausencia.entity';
 import { Usuario } from '../../usuarios/entities/usuario.entity';
+import {
+  AntiguedadLaboral,
+  calcularAntiguedad,
+} from '../antiguedad-laboral';
 import { Incapacidad } from './incapacidad.entity';
 import { MovimientoVacaciones } from './movimiento-vacaciones.entity';
 import { PermisoColaborador } from './permiso-colaborador.entity';
@@ -123,6 +130,47 @@ export class Colaborador {
   })
   usuario: Usuario | null;
 
+  @ApiPropertyOptional({
+    example: '2020-03-15',
+    nullable: true,
+    description:
+      'Fecha real de ingreso laboral (YYYY-MM-DD). Distinta de createdAt. Nullable para registros legacy.',
+  })
+  // varchar(10): evita el desfase de un día del driver mssql con columnas DATE.
+  @Column({ type: 'varchar', length: 10, nullable: true })
+  fechaIngreso: string | null;
+
+  @ApiPropertyOptional({
+    enum: JornadaLaboral,
+    nullable: true,
+    description: 'Jornada laboral aplicable al colaborador',
+  })
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  jornadaLaboral: JornadaLaboral | null;
+
+  @ApiPropertyOptional({
+    example: 5,
+    nullable: true,
+    description: 'Cantidad habitual de días laborales por semana (1–7)',
+  })
+  @Column({ type: 'smallint', nullable: true })
+  diasLaboralesHabituales: number | null;
+
+  @ApiPropertyOptional({
+    enum: ModalidadPago,
+    nullable: true,
+    description: 'Modalidad de pago habitual (base para política de vacaciones)',
+  })
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  modalidadPago: ModalidadPago | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description:
+      'Antigüedad calculada desde fechaIngreso (no persistida). Null si no hay fecha de ingreso.',
+  })
+  antiguedad: AntiguedadLaboral | null;
+
   @OneToMany(() => PermisoColaborador, (permiso) => permiso.colaborador)
   permisos: PermisoColaborador[];
 
@@ -154,6 +202,11 @@ export class Colaborador {
     }
   }
 
+  @AfterLoad()
+  hidratarAntiguedad(): void {
+    this.antiguedad = calcularAntiguedad(this.fechaIngreso);
+  }
+
   @BeforeInsert()
   @BeforeUpdate()
   normalizar(): void {
@@ -171,6 +224,10 @@ export class Colaborador {
     }
     if (this.cargo) {
       this.cargo = this.cargo.trim();
+    }
+    if (typeof this.fechaIngreso === 'string') {
+      const limpia = this.fechaIngreso.trim();
+      this.fechaIngreso = limpia === '' ? null : limpia;
     }
   }
 }
