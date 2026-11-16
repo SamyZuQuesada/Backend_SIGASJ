@@ -80,6 +80,17 @@ export class ContenidoPublicoController {
     return streamPublicMedia(folder, filename);
   }
 
+  @Get('uploads/:folder/:filename')
+  @ApiOperation({
+    summary: 'Servir archivo público desde /api/v1/uploads/:folder/:filename',
+  })
+  getUploadsMedia(
+    @Param('folder') folder: string,
+    @Param('filename') filename: string,
+  ) {
+    return streamPublicMedia(folder, filename);
+  }
+
   @Get('admin/informacion')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)

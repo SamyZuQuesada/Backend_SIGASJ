@@ -1,6 +1,8 @@
 import { Injectable, NestMiddleware } from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
-import { readStoredMedia } from './media-blob.store';
+import { existsSync } from 'fs';
+import { join } from 'path';
+import { mediaStorageKey, readStoredMedia } from './media-blob.store';
 
 @Injectable()
 export class MediaBlobMiddleware implements NestMiddleware {
@@ -29,7 +31,11 @@ export class MediaBlobMiddleware implements NestMiddleware {
       normalized.includes('/api/v1/uploads/solicitudes/') ||
       normalized.includes('/api/v1/uploads/solicitudes-ausencia/') ||
       normalized.includes('/api/v1/uploads/movimientos-inventario/') ||
-      normalized.includes('/api/v1/uploads/actividades-fontanero/');
+      normalized.includes('/api/v1/uploads/actividades-fontanero/') ||
+      normalized.endsWith('/uploads/solicitudes') ||
+      normalized.endsWith('/uploads/solicitudes-ausencia') ||
+      normalized.endsWith('/uploads/movimientos-inventario') ||
+      normalized.endsWith('/uploads/actividades-fontanero');
 
     if (isPrivateFolder) {
       res.status(403).json({
@@ -41,7 +47,20 @@ export class MediaBlobMiddleware implements NestMiddleware {
       return;
     }
 
-    void readStoredMedia(requestPath)
+    const safePath = mediaStorageKey(requestPath);
+    if (!safePath) {
+      next();
+      return;
+    }
+
+    // Si el archivo físico existe en disco local (desarrollo / caché temporal), delegar a Express Static
+    const diskPath = join(process.cwd(), safePath.replace(/^\/+/, ''));
+    if (existsSync(diskPath)) {
+      next();
+      return;
+    }
+
+    void readStoredMedia(safePath)
       .then((stored) => {
         if (!stored || res.headersSent) {
           next();

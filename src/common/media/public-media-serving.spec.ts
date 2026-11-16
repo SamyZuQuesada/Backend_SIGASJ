@@ -1,4 +1,7 @@
-import { normalizeMediaUrl } from './public-media';
+import { normalizeMediaUrl, streamPublicMedia } from './public-media';
+import { bindMediaDataSource } from './media-blob.store';
+import { NotFoundException } from '@nestjs/common';
+import type { DataSource } from 'typeorm';
 
 describe('Media URL Normalization & Serving Rules', () => {
   it('convierte rutas internas de Windows a rutas públicas con /', () => {
@@ -67,5 +70,74 @@ describe('Media URL Normalization & Serving Rules', () => {
     expect(normalizeMediaUrl(undefined)).toBeNull();
     expect(normalizeMediaUrl('')).toBeNull();
     expect(normalizeMediaUrl('   ')).toBeNull();
+  });
+
+  describe('streamPublicMedia - Recuperación y Protección de Rutas', () => {
+    let mockQuery: jest.Mock;
+
+    beforeEach(() => {
+      mockQuery = jest.fn();
+      const mockDataSource = {
+        options: { type: 'mssql' },
+        query: mockQuery,
+      } as unknown as DataSource;
+      bindMediaDataSource(mockDataSource);
+    });
+
+    it('rechaza carpetas privadas como solicitudes con NotFoundException', async () => {
+      await expect(
+        streamPublicMedia('solicitudes', 'cedula.pdf'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('rechaza carpetas privadas como solicitudes-ausencia con NotFoundException', async () => {
+      await expect(
+        streamPublicMedia('solicitudes-ausencia', 'incapacidad.pdf'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('rechaza intentos de path traversal con .. o rutas maliciosas', async () => {
+      await expect(
+        streamPublicMedia('galeria', '../secretos.txt'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('recupera medios de comunicados desde dbo.ArchivoMedia cuando no están en disco', async () => {
+      mockQuery.mockResolvedValueOnce([
+        {
+          mime: 'image/jpeg',
+          contenido: Buffer.from('contenido-jpeg-remoto'),
+        },
+      ]);
+
+      const streamable = await streamPublicMedia(
+        'comunicados',
+        'archivo-inexistente-local.jpg',
+      );
+      expect(streamable).toBeDefined();
+      expect(mockQuery).toHaveBeenCalledTimes(1);
+      expect(mockQuery.mock.calls[0][1]).toEqual([
+        '/uploads/comunicados/archivo-inexistente-local.jpg',
+      ]);
+    });
+
+    it('recupera fotos de proyectos desde dbo.ArchivoMedia cuando no están en disco', async () => {
+      mockQuery.mockResolvedValueOnce([
+        {
+          mime: 'image/jpeg',
+          contenido: Buffer.from('contenido-proyecto-remoto'),
+        },
+      ]);
+
+      const streamable = await streamPublicMedia(
+        'proyectos',
+        '1_cover_remoto.jpg',
+      );
+      expect(streamable).toBeDefined();
+      expect(mockQuery).toHaveBeenCalledTimes(1);
+      expect(mockQuery.mock.calls[0][1]).toEqual([
+        '/uploads/proyectos/1_cover_remoto.jpg',
+      ]);
+    });
   });
 });
