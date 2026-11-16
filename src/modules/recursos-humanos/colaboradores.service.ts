@@ -182,6 +182,7 @@ export class ColaboradoresService {
 
     const qb = this.colaboradorRepository
       .createQueryBuilder('c')
+      .leftJoinAndSelect('c.usuario', 'usuario')
       .setParameter('likeEscape', '\\');
 
     if (query.search) {
