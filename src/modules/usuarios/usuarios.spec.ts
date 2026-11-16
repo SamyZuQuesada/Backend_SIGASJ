@@ -69,13 +69,13 @@ describe('Usuarios y roles persistidos', () => {
     rolesMap = await seedRolesBase(roles);
 
     await crearUsuarioPrueba(usuarios, rolesMap, {
-      nombre: 'Administradora',
-      correo: 'admin@asadasanjuan.cr',
-      role: Role.ADMINISTRADORA,
+      nombre: 'Super Admin',
+      correo: 'superadmin@asadasanjuan.cr',
+      role: Role.SUPER_ADMIN,
     });
     const login = await request(app.getHttpServer())
       .post('/api/v1/auth/login')
-      .send({ email: 'admin@asadasanjuan.cr', password: PASSWORD_PRUEBA });
+      .send({ email: 'superadmin@asadasanjuan.cr', password: PASSWORD_PRUEBA });
     adminToken = (login.body as { accessToken: string }).accessToken;
   });
 
@@ -83,7 +83,7 @@ describe('Usuarios y roles persistidos', () => {
     await app.close();
   });
 
-  it('persiste los 4 roles base con nombre único', async () => {
+  it('persiste los roles de sistema con nombre único', async () => {
     const persistidos = await roles.find({ order: { nombre: 'ASC' } });
     expect(persistidos.map((rol) => rol.nombre).sort()).toEqual(
       [...ROLES_SISTEMA].sort(),

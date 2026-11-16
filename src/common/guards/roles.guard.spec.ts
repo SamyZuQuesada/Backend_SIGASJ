@@ -44,6 +44,18 @@ describe('RolesGuard — 401 vs 403 + multi-rol', () => {
     expect(guard.canActivate(ctx({ role: Role.ADMINISTRADORA }))).toBe(true);
   });
 
+  it('Super Admin hereda acceso a cualquier endpoint con @Roles', () => {
+    expect(guard.canActivate(ctx({ role: Role.SUPER_ADMIN }))).toBe(true);
+    (reflector.getAllAndOverride as jest.Mock).mockReturnValue([
+      Role.FONTANERO,
+    ]);
+    expect(guard.canActivate(ctx({ role: Role.SUPER_ADMIN }))).toBe(true);
+    (reflector.getAllAndOverride as jest.Mock).mockReturnValue([
+      Role.SUPER_ADMIN,
+    ]);
+    expect(guard.canActivate(ctx({ role: Role.SUPER_ADMIN }))).toBe(true);
+  });
+
   it('Secretaria Ejecutiva (valor JWT SECRETARIA) en ruta exclusiva Admin → 403', () => {
     expect(() =>
       guard.canActivate(ctx({ role: Role.SECRETARIA_EJECUTIVA })),

@@ -11,6 +11,8 @@
  * Abonado, Ayudante.
  */
 export enum Role {
+  /** Operador de plataforma: usuarios/roles + acceso total al panel staff. */
+  SUPER_ADMIN = 'SUPER_ADMIN',
   ADMINISTRADORA = 'ADMINISTRADORA',
   /**
    * Secretaria Ejecutiva.
@@ -31,6 +33,7 @@ export const RoleSecretaria = Role.SECRETARIA_EJECUTIVA;
 
 /** Etiquetas de dominio (no usar para autorización). */
 export const ROLE_LABELS: Readonly<Record<Role, string>> = {
+  [Role.SUPER_ADMIN]: 'Super Admin',
   [Role.ADMINISTRADORA]: 'Administradora',
   [Role.SECRETARIA_EJECUTIVA]: 'Secretaria Ejecutiva',
   [Role.FONTANERO]: 'Fontanero',
@@ -47,6 +50,7 @@ export const ROLES_OPERATIVOS_ASADA: readonly Role[] = [
 
 /** Catálogo completo a sembrar en tabla `Rol` (idempotente). */
 export const ROLES_SISTEMA: readonly Role[] = [
+  Role.SUPER_ADMIN,
   Role.ADMINISTRADORA,
   Role.SECRETARIA_EJECUTIVA,
   Role.FONTANERO,

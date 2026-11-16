@@ -39,6 +39,11 @@ const CUENTAS_LOGIN_DESARROLLO: ReadonlyArray<{
   rol: Role;
 }> = [
   {
+    nombre: ROLE_LABELS[Role.SUPER_ADMIN],
+    correo: 'superadmin@asadasanjuan.cr',
+    rol: Role.SUPER_ADMIN,
+  },
+  {
     nombre: ROLE_LABELS[Role.ADMINISTRADORA],
     correo: 'admin@asadasanjuan.cr',
     rol: Role.ADMINISTRADORA,
@@ -304,6 +309,20 @@ export class UsuariosService implements OnModuleInit {
       throw new NotFoundException(`No existe un usuario con id ${id}`);
     }
 
+    const rolActual = usuario.rol?.nombre;
+    const desactivaSuperAdmin =
+      rolActual === Role.SUPER_ADMIN &&
+      usuario.activo &&
+      dto.activo === false;
+    const degradaSuperAdmin =
+      rolActual === Role.SUPER_ADMIN &&
+      dto.rol !== undefined &&
+      dto.rol !== Role.SUPER_ADMIN;
+
+    if (desactivaSuperAdmin || degradaSuperAdmin) {
+      await this.assertNoEsUltimoSuperAdminActivo();
+    }
+
     const patch: Partial<Usuario> = {};
     if (dto.nombre !== undefined) {
       patch.nombre = dto.nombre.trim();
@@ -339,6 +358,22 @@ export class UsuariosService implements OnModuleInit {
     }
     this.logger.log(`Usuario actualizado: id=${id}`);
     return this.toPublico(actualizado);
+  }
+
+  /** Impide dejar el sistema sin al menos un Super Admin activo. */
+  private async assertNoEsUltimoSuperAdminActivo(): Promise<void> {
+    const superAdminsActivos = await this.usuarioRepository
+      .createQueryBuilder('usuario')
+      .innerJoin('usuario.rol', 'rol')
+      .where('rol.nombre = :rol', { rol: Role.SUPER_ADMIN })
+      .andWhere('usuario.activo = true')
+      .getCount();
+
+    if (superAdminsActivos <= 1) {
+      throw new BadRequestException(
+        'No se puede desactivar ni degradar al último Super Admin activo.',
+      );
+    }
   }
 
   toPublico(usuario: Usuario): UsuarioPublico {

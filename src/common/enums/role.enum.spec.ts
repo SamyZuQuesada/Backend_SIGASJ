@@ -11,6 +11,7 @@ import {
 describe('Role — fuente única de roles', () => {
   it('incluye exactamente los roles de sistema aprobados (+ adicionales legítimos)', () => {
     expect(ROLES_SISTEMA).toEqual([
+      Role.SUPER_ADMIN,
       Role.ADMINISTRADORA,
       Role.SECRETARIA_EJECUTIVA,
       Role.FONTANERO,
@@ -26,15 +27,18 @@ describe('Role — fuente única de roles', () => {
       Role.SECRETARIA_EJECUTIVA,
       Role.FONTANERO,
     ]);
+    expect(ROLES_OPERATIVOS_ASADA).not.toContain(Role.SUPER_ADMIN);
   });
 
   it('valores persistidos/JWT son estables (UPPER_SNAKE)', () => {
+    expect(Role.SUPER_ADMIN).toBe('SUPER_ADMIN');
     expect(Role.ADMINISTRADORA).toBe('ADMINISTRADORA');
     expect(Role.SECRETARIA_EJECUTIVA).toBe('SECRETARIA');
     expect(Role.FONTANERO).toBe('FONTANERO');
   });
 
   it('labels de dominio no se usan como valor de autorización', () => {
+    expect(ROLE_LABELS[Role.SUPER_ADMIN]).toBe('Super Admin');
     expect(ROLE_LABELS[Role.ADMINISTRADORA]).toBe('Administradora');
     expect(ROLE_LABELS[Role.SECRETARIA_EJECUTIVA]).toBe('Secretaria Ejecutiva');
     expect(ROLE_LABELS[Role.FONTANERO]).toBe('Fontanero');

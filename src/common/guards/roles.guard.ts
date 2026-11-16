@@ -32,6 +32,11 @@ export class RolesGuard implements CanActivate {
       throw new UnauthorizedException('No autenticado');
     }
 
+    // Super Admin de plataforma: acceso total a endpoints staff con @Roles.
+    if (user.role === Role.SUPER_ADMIN) {
+      return true;
+    }
+
     if (!user.role || !requiredRoles.includes(user.role)) {
       throw new ForbiddenException('Acceso denegado');
     }

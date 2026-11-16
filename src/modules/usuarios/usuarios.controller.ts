@@ -25,33 +25,33 @@ export class UsuariosController {
   constructor(private readonly usuariosService: UsuariosService) {}
 
   @Get()
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
+  @Roles(Role.SUPER_ADMIN)
   @ApiOperation({
     summary: 'Obtener lista de usuarios del sistema',
     description:
-      'Devuelve `{ data: [{ id, nombre, correo, activo, rol }] }`. El rol es el valor de `Role` persistido en Rol (p. ej. ADMINISTRADORA, SECRETARIA, FONTANERO). No incluye passwordHash ni secretos.',
+      'Solo Super Admin. Devuelve `{ data: [{ id, nombre, correo, activo, rol }] }`. El rol es el valor de `Role` persistido en Rol (p. ej. SUPER_ADMIN, ADMINISTRADORA, SECRETARIA, FONTANERO). No incluye passwordHash ni secretos.',
   })
   findAll() {
     return this.usuariosService.findAll();
   }
 
   @Post()
-  @Roles(Role.ADMINISTRADORA)
+  @Roles(Role.SUPER_ADMIN)
   @ApiOperation({
     summary: 'Crear un usuario del sistema',
     description:
-      'Hashea la contraseña con el servicio centralizado y persiste solo passwordHash. La respuesta no incluye el hash ni la contraseña.',
+      'Solo Super Admin. Hashea la contraseña con el servicio centralizado y persiste solo passwordHash. La respuesta no incluye el hash ni la contraseña.',
   })
   create(@Body() dto: CreateUsuarioDto) {
     return this.usuariosService.crear(dto);
   }
 
   @Patch(':id')
-  @Roles(Role.ADMINISTRADORA)
+  @Roles(Role.SUPER_ADMIN)
   @ApiOperation({
     summary: 'Actualizar un usuario del sistema',
     description:
-      'Si se envía password, se genera un hash nuevo. Si no se envía, el hash existente no se modifica. La respuesta no incluye passwordHash.',
+      'Solo Super Admin. Si se envía password, se genera un hash nuevo. Si no se envía, el hash existente no se modifica. No permite dejar el sistema sin Super Admin activo. La respuesta no incluye passwordHash.',
   })
   update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateUsuarioDto) {
     return this.usuariosService.actualizar(id, dto);
