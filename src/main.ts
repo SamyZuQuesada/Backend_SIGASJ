@@ -7,6 +7,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { AppModule } from './app.module';
+import { MediaBlobMiddleware } from './common/media/media-blob.middleware';
 import {
   CORS_ALLOWED_HEADERS,
   CORS_METHODS,
@@ -43,6 +44,12 @@ async function bootstrap() {
     if (!existsSync(subDir)) {
       mkdirSync(subDir, { recursive: true });
     }
+  });
+
+  // Almacenamiento persistente en Azure SQL dbo.ArchivoMedia para /uploads y /api/v1/uploads
+  const mediaBlobMiddleware = app.get(MediaBlobMiddleware);
+  app.use(['/uploads', '/api/v1/uploads'], (req: any, res: any, next: any) => {
+    mediaBlobMiddleware.use(req, res, next);
   });
 
   // Estáticos: CORP cross-origin; ACAO lo define enableCors (allowlist), no wildcard.

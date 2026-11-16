@@ -143,18 +143,44 @@ describe('MediaBlob Store & Middleware Integration Unit Tests', () => {
       expect(res.status).toHaveBeenCalledWith(403);
     });
 
-    it('permite servir medios públicos como /uploads/comunicados/ y /uploads/galeria/', async () => {
+    it('bloquea con 403 Forbidden acceso público directo a /uploads/actividades-fontanero/', () => {
+      req = {
+        method: 'GET',
+        originalUrl: '/uploads/actividades-fontanero/1/foto.jpg',
+        url: '/uploads/actividades-fontanero/1/foto.jpg',
+      };
+
+      middleware.use(req as Request, res as Response, next);
+
+      expect(next).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(403);
+    });
+
+    it('bloquea con 403 Forbidden acceso a través de /api/v1/uploads/solicitudes/', () => {
+      req = {
+        method: 'GET',
+        originalUrl: '/api/v1/uploads/solicitudes/19/documento.pdf',
+        url: '/api/v1/uploads/solicitudes/19/documento.pdf',
+      };
+
+      middleware.use(req as Request, res as Response, next);
+
+      expect(next).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(403);
+    });
+
+    it('permite servir medios públicos como /uploads/comunicados/ desde dbo.ArchivoMedia cuando no están en disco', async () => {
       mockQuery.mockResolvedValueOnce([
         {
           mime: 'image/jpeg',
-          contenido: Buffer.from('imagen-bytes'),
+          contenido: Buffer.from('imagen-comunicado-bytes'),
         },
       ]);
 
       req = {
         method: 'GET',
-        originalUrl: '/uploads/comunicados/aviso.jpg',
-        url: '/uploads/comunicados/aviso.jpg',
+        originalUrl: '/uploads/comunicados/1789018161592-test.jpg',
+        url: '/uploads/comunicados/1789018161592-test.jpg',
       };
 
       middleware.use(req as Request, res as Response, next);
@@ -163,7 +189,94 @@ describe('MediaBlob Store & Middleware Integration Unit Tests', () => {
 
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'image/jpeg');
-      expect(res.end).toHaveBeenCalledWith(Buffer.from('imagen-bytes'));
+      expect(res.setHeader).toHaveBeenCalledWith('Cross-Origin-Resource-Policy', 'cross-origin');
+      expect(res.end).toHaveBeenCalledWith(Buffer.from('imagen-comunicado-bytes'));
+    });
+
+    it('permite servir fotos de /uploads/proyectos/ desde dbo.ArchivoMedia', async () => {
+      mockQuery.mockResolvedValueOnce([
+        {
+          mime: 'image/jpeg',
+          contenido: Buffer.from('proyecto-cover-bytes'),
+        },
+      ]);
+
+      req = {
+        method: 'GET',
+        originalUrl: '/uploads/proyectos/1_cover_test.jpg',
+        url: '/uploads/proyectos/1_cover_test.jpg',
+      };
+
+      middleware.use(req as Request, res as Response, next);
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'image/jpeg');
+      expect(res.end).toHaveBeenCalledWith(Buffer.from('proyecto-cover-bytes'));
+    });
+
+    it('permite servir medios solicitados con prefijo /api/v1/uploads/ desde dbo.ArchivoMedia', async () => {
+      mockQuery.mockResolvedValueOnce([
+        {
+          mime: 'image/png',
+          contenido: Buffer.from('galeria-png-bytes'),
+        },
+      ]);
+
+      req = {
+        method: 'GET',
+        originalUrl: '/api/v1/uploads/galeria/1787372809687-test.png',
+        url: '/api/v1/uploads/galeria/1787372809687-test.png',
+      };
+
+      middleware.use(req as Request, res as Response, next);
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'image/png');
+      expect(res.end).toHaveBeenCalledWith(Buffer.from('galeria-png-bytes'));
+    });
+
+    it('responde correctamente a peticiones HEAD sin enviar el cuerpo binario', async () => {
+      mockQuery.mockResolvedValueOnce([
+        {
+          mime: 'image/jpeg',
+          contenido: Buffer.from('bytes-para-head'),
+        },
+      ]);
+
+      req = {
+        method: 'HEAD',
+        originalUrl: '/uploads/comunicados/archivo-head-remoto.jpg',
+        url: '/uploads/comunicados/archivo-head-remoto.jpg',
+      };
+
+      middleware.use(req as Request, res as Response, next);
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'image/jpeg');
+      expect(res.end).toHaveBeenCalledWith(); // Sin argumentos (sin body)
+    });
+
+    it('llama a next() cuando el archivo no existe en dbo.ArchivoMedia ni en disco', async () => {
+      mockQuery.mockResolvedValueOnce([]); // no rows found
+
+      req = {
+        method: 'GET',
+        originalUrl: '/uploads/comunicados/no-existe.jpg',
+        url: '/uploads/comunicados/no-existe.jpg',
+      };
+
+      middleware.use(req as Request, res as Response, next);
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(next).toHaveBeenCalled();
+      expect(res.status).not.toHaveBeenCalledWith(200);
     });
   });
 });

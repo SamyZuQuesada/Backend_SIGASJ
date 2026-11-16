@@ -30,7 +30,12 @@ function rememberUploadedMedia(
 }
 
 export type PublicMediaFolder =
-  'comunicados' | 'galeria' | 'transparencia' | 'proyectos';
+  | 'comunicados'
+  | 'galeria'
+  | 'transparencia'
+  | 'proyectos'
+  | 'formularios-oficiales'
+  | 'formularios-descargables';
 
 export type UploadedImageFile = {
   originalname: string;
@@ -59,7 +64,9 @@ const isAllowedFolder = (folder: string): folder is PublicMediaFolder =>
   folder === 'comunicados' ||
   folder === 'galeria' ||
   folder === 'transparencia' ||
-  folder === 'proyectos';
+  folder === 'proyectos' ||
+  folder === 'formularios-oficiales' ||
+  folder === 'formularios-descargables';
 
 export function normalizeMediaUrl(
   rawUrl: string | null | undefined,
