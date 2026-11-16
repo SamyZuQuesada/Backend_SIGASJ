@@ -8,6 +8,7 @@ import {
   createReadStream,
   existsSync,
   mkdirSync,
+  readFileSync,
   renameSync,
   unlinkSync,
   writeFileSync,
@@ -891,11 +892,11 @@ export function validateSolicitudDocument(
  * uploads/solicitudes/pendientes/<timestamp>-<uuid>.<ext>.
  * Evita colisiones y sobrescrituras usando timestamp + UUID.
  */
-export function saveSolicitudDocumentPending(file: SolicitudDocumentFile): {
+export async function saveSolicitudDocumentPending(file: SolicitudDocumentFile): Promise<{
   rutaReferenciaArchivo: string;
   filename: string;
   absolutePath: string;
-} {
+}> {
   validateSolicitudDocument(file);
   const suppliedExt = extname(file.originalname).toLowerCase();
   const extension =
@@ -923,7 +924,14 @@ export function saveSolicitudDocumentPending(file: SolicitudDocumentFile): {
   writeFileSync(absolutePath, file.buffer);
 
   const rutaReferenciaArchivo = `/uploads/solicitudes/pendientes/${filename}`;
-  rememberUploadedMedia(rutaReferenciaArchivo, file.mimetype, file.buffer);
+  try {
+    await persistUploadedMedia(rutaReferenciaArchivo, file.mimetype, file.buffer);
+  } catch (err) {
+    if (existsSync(absolutePath)) {
+      unlinkSync(absolutePath);
+    }
+    throw err;
+  }
 
   return {
     rutaReferenciaArchivo,
@@ -935,11 +943,13 @@ export function saveSolicitudDocumentPending(file: SolicitudDocumentFile): {
 /**
  * Mueve un adjunto pendiente a la carpeta definitiva de la solicitud.
  * Protege contra path traversal y sobrescrituras.
+ * Admite recuperación desde dbo.ArchivoMedia si el archivo temporal en disco
+ * se perdió por ciclo de vida efímero del servidor (Render).
  */
-export function linkSolicitudDocumentFile(
+export async function linkSolicitudDocumentFile(
   solicitudId: number,
   pendingRutaReferenciaArchivo: string,
-): { rutaReferenciaArchivo: string; filename: string } {
+): Promise<{ rutaReferenciaArchivo: string; filename: string }> {
   if (!Number.isSafeInteger(solicitudId) || solicitudId <= 0) {
     throw new BadRequestException('ID de solicitud no válido.');
   }
@@ -974,12 +984,6 @@ export function linkSolicitudDocumentFile(
     throw new BadRequestException('Ruta de origen no permitida.');
   }
 
-  if (!existsSync(sourcePath)) {
-    throw new NotFoundException(
-      'El archivo del documento no existe en el almacenamiento.',
-    );
-  }
-
   const targetFolder = join(UPLOAD_ROOT, 'solicitudes', String(solicitudId));
   mkdirSync(targetFolder, { recursive: true });
 
@@ -997,15 +1001,46 @@ export function linkSolicitudDocumentFile(
     throw new BadRequestException('Ruta de destino no permitida.');
   }
 
-  try {
-    renameSync(sourcePath, targetPath);
-  } catch {
-    copyFileSync(sourcePath, targetPath);
-    if (existsSync(sourcePath)) unlinkSync(sourcePath);
+  const finalPublicPath = `/uploads/solicitudes/${solicitudId}/${targetName}`;
+  let fileBytes: Buffer | null = null;
+  let fileMime = 'application/octet-stream';
+
+  if (existsSync(sourcePath)) {
+    try {
+      fileBytes = readFileSync(sourcePath);
+      renameSync(sourcePath, targetPath);
+    } catch {
+      copyFileSync(sourcePath, targetPath);
+      if (existsSync(sourcePath)) unlinkSync(sourcePath);
+    }
+  } else {
+    // Si no existe físicamente en disco (ej. contenedor reiniciado en Render),
+    // recuperarlo desde el almacenamiento persistente en Azure SQL dbo.ArchivoMedia
+    const stored = await readStoredMedia(pendingRutaReferenciaArchivo);
+    if (!stored || !stored.bytes || stored.bytes.length === 0) {
+      throw new NotFoundException(
+        'El archivo del documento no existe en el almacenamiento.',
+      );
+    }
+    fileBytes = stored.bytes;
+    fileMime = stored.mime;
+    writeFileSync(targetPath, fileBytes);
   }
 
-  const finalPublicPath = `/uploads/solicitudes/${solicitudId}/${targetName}`;
-  void relocateUploadedMedia(pendingRutaReferenciaArchivo, finalPublicPath);
+  // Persistir o reubicar en dbo.ArchivoMedia de forma segura y consistente
+  try {
+    const relocated = await relocateUploadedMedia(
+      pendingRutaReferenciaArchivo,
+      finalPublicPath,
+    );
+    if (!relocated && fileBytes) {
+      await persistUploadedMedia(finalPublicPath, fileMime, fileBytes);
+    }
+  } catch {
+    if (fileBytes) {
+      await persistUploadedMedia(finalPublicPath, fileMime, fileBytes);
+    }
+  }
 
   return {
     rutaReferenciaArchivo: finalPublicPath,

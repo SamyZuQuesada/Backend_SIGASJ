@@ -130,6 +130,8 @@ export class SolicitudesController {
             'plano-catastrado',
             'poder',
             'plano-agrimensura',
+            'comprobante-pago',
+            'otro',
           ],
         },
       },

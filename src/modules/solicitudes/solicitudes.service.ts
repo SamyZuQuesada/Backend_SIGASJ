@@ -41,6 +41,7 @@ import {
   DOCUMENTOS_INFRA_OBLIGATORIOS,
   DOCUMENTOS_INFRA_REUNION_FINCAS,
   isTipoDocumentoSolicitud,
+  normalizarTipoDocumentoSolicitud,
   TipoDocumentoSolicitud,
 } from '../../common/enums/tipo-documento-solicitud.enum';
 import { TipoSolicitudSlug } from '../../common/enums/tipo-solicitud-slug.enum';
@@ -154,7 +155,7 @@ export class SolicitudesService {
     file: SolicitudDocumentFile,
     tipoDocumentoRaw: string,
   ): Promise<DocumentoSolicitudUploadResponse> {
-    const tipoDocumento = tipoDocumentoRaw?.trim();
+    const tipoDocumento = normalizarTipoDocumentoSolicitud(tipoDocumentoRaw);
     if (!tipoDocumento || !isTipoDocumentoSolicitud(tipoDocumento)) {
       throw new BadRequestException(
         `El tipo de documento no es válido. Opciones: ${Object.values(TipoDocumentoSolicitud).join(', ')}`,
@@ -162,7 +163,7 @@ export class SolicitudesService {
     }
 
     const { rutaReferenciaArchivo, filename } =
-      saveSolicitudDocumentPending(file);
+      await saveSolicitudDocumentPending(file);
     const tokenReclamo = randomUUID().replace(/-/g, '');
 
     try {
@@ -1149,7 +1150,7 @@ export class SolicitudesService {
     const documentosVinculados: DocumentoSolicitud[] = [];
 
     for (const pendiente of documentosPendientes) {
-      const linked = linkSolicitudDocumentFile(
+      const linked = await linkSolicitudDocumentFile(
         solicitudId,
         pendiente.rutaReferenciaArchivo,
       );
@@ -1566,21 +1567,13 @@ export class SolicitudesService {
           });
           const detalleGuardado = await detalleRepo.save(nuevoDetalle);
 
-          const documentosVinculados: DocumentoSolicitud[] = [];
-          for (const pendiente of documentosPendientes) {
-            const linked = linkSolicitudDocumentFile(
+          const documentosGuardados =
+            await this.vincularDocumentosEnTransaccion(
+              manager,
               solicitudGuardada.id,
-              pendiente.rutaReferenciaArchivo,
+              documentosPendientes,
+              linkedPaths,
             );
-            linkedPaths.push(linked.rutaReferenciaArchivo);
-            pendiente.solicitudId = solicitudGuardada.id;
-            pendiente.rutaReferenciaArchivo = linked.rutaReferenciaArchivo;
-            pendiente.ubicacion = linked.rutaReferenciaArchivo;
-            pendiente.nombreInterno = linked.filename;
-            // Token consumido: evita reutilizar el mismo adjunto en otra solicitud.
-            pendiente.tokenReclamo = `used:${pendiente.id}:${randomUUID().replace(/-/g, '').slice(0, 16)}`;
-            documentosVinculados.push(await documentoRepo.save(pendiente));
-          }
 
           const eventoInicial = await this.registrarEventoHistorialInicial(
             manager,
@@ -1589,7 +1582,9 @@ export class SolicitudesService {
           );
 
           solicitudGuardada.detalleInfraestructuraLinderos = detalleGuardado;
-          solicitudGuardada.documentos = documentosVinculados;
+          if (documentosGuardados.length > 0) {
+            solicitudGuardada.documentos = documentosGuardados;
+          }
           if (eventoInicial) {
             solicitudGuardada.historial = [eventoInicial];
           }
@@ -1866,20 +1861,13 @@ export class SolicitudesService {
           });
           const detalleGuardado = await detalleRepo.save(nuevoDetalle);
 
-          const documentosVinculados: DocumentoSolicitud[] = [];
-          for (const pendiente of documentosPendientes) {
-            const linked = linkSolicitudDocumentFile(
+          const documentosGuardados =
+            await this.vincularDocumentosEnTransaccion(
+              manager,
               solicitudGuardada.id,
-              pendiente.rutaReferenciaArchivo,
+              documentosPendientes,
+              linkedPaths,
             );
-            linkedPaths.push(linked.rutaReferenciaArchivo);
-            pendiente.solicitudId = solicitudGuardada.id;
-            pendiente.rutaReferenciaArchivo = linked.rutaReferenciaArchivo;
-            pendiente.ubicacion = linked.rutaReferenciaArchivo;
-            pendiente.nombreInterno = linked.filename;
-            pendiente.tokenReclamo = `used:${pendiente.id}:${randomUUID().replace(/-/g, '').slice(0, 16)}`;
-            documentosVinculados.push(await documentoRepo.save(pendiente));
-          }
 
           const eventoInicial = await this.registrarEventoHistorialInicial(
             manager,
@@ -1888,7 +1876,9 @@ export class SolicitudesService {
           );
 
           solicitudGuardada.detalleDisponibilidadServicios = detalleGuardado;
-          solicitudGuardada.documentos = documentosVinculados;
+          if (documentosGuardados.length > 0) {
+            solicitudGuardada.documentos = documentosGuardados;
+          }
           if (eventoInicial) {
             solicitudGuardada.historial = [eventoInicial];
           }
@@ -2034,21 +2024,13 @@ export class SolicitudesService {
           });
           const detalleGuardado = await detalleRepo.save(nuevoDetalle);
 
-          const documentosVinculados: DocumentoSolicitud[] = [];
-          for (const pendiente of documentosPendientes) {
-            const linked = linkSolicitudDocumentFile(
+          const documentosGuardados =
+            await this.vincularDocumentosEnTransaccion(
+              manager,
               solicitudGuardada.id,
-              pendiente.rutaReferenciaArchivo,
+              documentosPendientes,
+              linkedPaths,
             );
-            linkedPaths.push(linked.rutaReferenciaArchivo);
-            pendiente.solicitudId = solicitudGuardada.id;
-            pendiente.rutaReferenciaArchivo = linked.rutaReferenciaArchivo;
-            pendiente.ubicacion = linked.rutaReferenciaArchivo;
-            pendiente.nombreInterno = linked.filename;
-            // Token consumido: evita reutilizar el mismo adjunto en otra solicitud.
-            pendiente.tokenReclamo = `used:${pendiente.id}:${randomUUID().replace(/-/g, '').slice(0, 16)}`;
-            documentosVinculados.push(await documentoRepo.save(pendiente));
-          }
 
           const eventoInicial = await this.registrarEventoHistorialInicial(
             manager,
@@ -2058,7 +2040,9 @@ export class SolicitudesService {
 
           solicitudGuardada.detalleConstanciaServicio = detalleGuardado;
           solicitudGuardada.detalleServicioExistente = detalleGuardado;
-          solicitudGuardada.documentos = documentosVinculados;
+          if (documentosGuardados.length > 0) {
+            solicitudGuardada.documentos = documentosGuardados;
+          }
           if (eventoInicial) {
             solicitudGuardada.historial = [eventoInicial];
           }

@@ -8,6 +8,8 @@ export enum TipoDocumentoSolicitud {
   PLANO_CATASTRADO = 'plano-catastrado',
   PODER = 'poder',
   PLANO_AGRIMENSURA = 'plano-agrimensura',
+  COMPROBANTE_PAGO = 'comprobante-pago',
+  OTRO = 'otro',
 }
 
 export const TIPOS_DOCUMENTO_SOLICITUD = Object.values(
@@ -18,6 +20,41 @@ export function isTipoDocumentoSolicitud(
   valor: string,
 ): valor is TipoDocumentoSolicitud {
   return TIPOS_DOCUMENTO_SOLICITUD.includes(valor as TipoDocumentoSolicitud);
+}
+
+/**
+ * Normaliza variantes enviadas por clientes (ej: 'comprobante', 'recibo', 'cedula')
+ * al tipo oficial correspondiente del enum.
+ */
+export function normalizarTipoDocumentoSolicitud(
+  valor: string | null | undefined,
+): TipoDocumentoSolicitud | null {
+  if (!valor) return null;
+  const limpio = valor.trim().toLowerCase();
+  if (isTipoDocumentoSolicitud(limpio)) {
+    return limpio as TipoDocumentoSolicitud;
+  }
+  if (limpio === 'comprobante' || limpio === 'recibo' || limpio === 'recibo-pago' || limpio === 'comprobante_pago') {
+    return TipoDocumentoSolicitud.COMPROBANTE_PAGO;
+  }
+  if (limpio === 'cedula' || limpio === 'identidad' || limpio === 'dimex') {
+    return TipoDocumentoSolicitud.IDENTIFICACION;
+  }
+  if (limpio === 'plano' || limpio === 'catastro') {
+    return TipoDocumentoSolicitud.PLANO_CATASTRADO;
+  }
+  if (
+    limpio === 'documento' ||
+    limpio === 'adjunto' ||
+    limpio === 'anexo' ||
+    limpio === 'escritura' ||
+    limpio === 'titulo' ||
+    limpio === 'posesion' ||
+    limpio === 'propiedad'
+  ) {
+    return TipoDocumentoSolicitud.OTRO;
+  }
+  return null;
 }
 
 /** Adjuntos binarios siempre exigidos en infraestructura/linderos. */

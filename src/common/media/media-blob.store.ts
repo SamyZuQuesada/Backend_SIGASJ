@@ -102,17 +102,17 @@ export async function persistUploadedMedia(
   publicPath: string,
   mime: string,
   bytes: Buffer,
-): Promise<void> {
+): Promise<boolean> {
   const ruta = mediaStorageKey(publicPath);
   if (!ruta || !dataSource || dataSource.options.type !== 'mssql') {
-    return;
+    return false;
   }
 
   try {
     if (!tableReady) {
       const ready = await ensureMediaBlobTable();
       if (!ready) {
-        return;
+        return false;
       }
     }
     const hex = bytes.toString('hex');
@@ -130,10 +130,12 @@ export async function persistUploadedMedia(
          VALUES (@0, @1, CONVERT(VARBINARY(MAX), @2, 2), @3, SYSUTCDATETIME())`,
       [ruta, mime, hex, tamano],
     );
+    return true;
   } catch (error) {
     logger.error(
       `No se pudo guardar ${ruta} en dbo.ArchivoMedia: ${error instanceof Error ? error.message : 'error'}`,
     );
+    throw error;
   }
 }
 
@@ -161,19 +163,21 @@ export async function relocateUploadedMedia(
       }
     }
 
-    await dataSource.query(
+    const rows = await dataSource.query(
       `UPDATE dbo.ArchivoMedia
           SET ruta = @1,
               updatedAt = SYSUTCDATETIME()
-        WHERE ruta = @0`,
+        WHERE ruta = @0;
+       SELECT @@ROWCOUNT AS affectedRows;`,
       [oldRuta, newRuta],
     );
-    return true;
+    const affected = rows?.[0]?.affectedRows ?? 1;
+    return affected > 0;
   } catch (error) {
     logger.error(
       `No se pudo reubicar ${oldRuta} hacia ${newRuta}: ${error instanceof Error ? error.message : 'error'}`,
     );
-    return false;
+    throw error;
   }
 }
 

@@ -223,9 +223,9 @@ describe('Recepción Segura de Documentos de Solicitud (Tarea 2 - Backlog 4.10.1
       }
     });
 
-    it('genera nombre interno único y devuelve ruta relativa segura sin exponer rutas internas del sistema', () => {
+    it('genera nombre interno único y devuelve ruta relativa segura sin exponer rutas internas del sistema', async () => {
       const pdf = makeFile('mi_cedula.pdf', 'application/pdf', validPdfBuffer);
-      const resultado = saveSolicitudDocumentPending(pdf);
+      const resultado = await saveSolicitudDocumentPending(pdf);
       savedRuta = resultado.rutaReferenciaArchivo;
 
       expect(resultado.filename).toMatch(/^\d+-[a-f0-9-]+\.pdf$/);
@@ -243,12 +243,12 @@ describe('Recepción Segura de Documentos de Solicitud (Tarea 2 - Backlog 4.10.1
       expect(existsSync(resultado.absolutePath)).toBe(true);
     });
 
-    it('dos archivos con el mismo nombre original reciben nombres internos distintos (evita colisiones y sobrescrituras)', () => {
+    it('dos archivos con el mismo nombre original reciben nombres internos distintos (evita colisiones y sobrescrituras)', async () => {
       const pdf1 = makeFile('cedula.pdf', 'application/pdf', validPdfBuffer);
       const pdf2 = makeFile('cedula.pdf', 'application/pdf', validPdfBuffer);
 
-      const res1 = saveSolicitudDocumentPending(pdf1);
-      const res2 = saveSolicitudDocumentPending(pdf2);
+      const res1 = await saveSolicitudDocumentPending(pdf1);
+      const res2 = await saveSolicitudDocumentPending(pdf2);
 
       try {
         expect(res1.filename).not.toBe(res2.filename);
@@ -261,11 +261,11 @@ describe('Recepción Segura de Documentos de Solicitud (Tarea 2 - Backlog 4.10.1
       }
     });
 
-    it('vincula el archivo pendiente a la carpeta definitiva de la solicitud y previene path traversal', () => {
+    it('vincula el archivo pendiente a la carpeta definitiva de la solicitud y previene path traversal', async () => {
       const pdf = makeFile('doc.pdf', 'application/pdf', validPdfBuffer);
-      const pending = saveSolicitudDocumentPending(pdf);
+      const pending = await saveSolicitudDocumentPending(pdf);
 
-      const linked = linkSolicitudDocumentFile(
+      const linked = await linkSolicitudDocumentFile(
         99,
         pending.rutaReferenciaArchivo,
       );
@@ -284,17 +284,17 @@ describe('Recepción Segura de Documentos de Solicitud (Tarea 2 - Backlog 4.10.1
       }
     });
 
-    it('rechaza linkSolicitudDocumentFile con rutas pendientes inválidas o maliciosas', () => {
-      expect(() =>
+    it('rechaza linkSolicitudDocumentFile con rutas pendientes inválidas o maliciosas', async () => {
+      await expect(
         linkSolicitudDocumentFile(1, '/uploads/otra_carpeta/archivo.pdf'),
-      ).toThrow('La ruta del documento pendiente no es válida.');
+      ).rejects.toThrow('La ruta del documento pendiente no es válida.');
 
-      expect(() =>
+      await expect(
         linkSolicitudDocumentFile(
           1,
           '/uploads/solicitudes/pendientes/../secreto.txt',
         ),
-      ).toThrow('Nombre de archivo pendiente inválido.');
+      ).rejects.toThrow('Nombre de archivo pendiente inválido.');
     });
   });
 });
