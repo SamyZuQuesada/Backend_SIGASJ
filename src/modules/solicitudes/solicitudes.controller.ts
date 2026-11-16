@@ -391,6 +391,11 @@ export class SolicitudesController {
       `inline; filename*=UTF-8''${encodeURIComponent(documento.nombreOriginal)}`,
     );
 
+    if ((documento as any).buffer) {
+      response.setHeader('Content-Length', String((documento as any).buffer.length));
+      return response.end((documento as any).buffer);
+    }
+
     return response.sendFile(documento.rutaAbsoluta);
   }
 

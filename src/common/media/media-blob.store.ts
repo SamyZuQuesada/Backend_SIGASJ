@@ -5,7 +5,6 @@ const logger = new Logger('MediaBlob');
 
 let dataSource: DataSource | null = null;
 let tableReady = false;
-let schemaDenied = false;
 
 export type StoredMedia = {
   mime: string;
@@ -14,6 +13,14 @@ export type StoredMedia = {
 
 export function bindMediaDataSource(source: DataSource): void {
   dataSource = source;
+}
+
+export function isMediaBlobTableReady(): boolean {
+  return tableReady;
+}
+
+export function setMediaBlobTableReadyForTesting(ready: boolean): void {
+  tableReady = ready;
 }
 
 export function mediaStorageKey(publicPath: string): string | null {
@@ -57,7 +64,7 @@ export function mediaStorageKey(publicPath: string): string | null {
 }
 
 export async function ensureMediaBlobTable(): Promise<boolean> {
-  if (schemaDenied || !dataSource || dataSource.options.type !== 'mssql') {
+  if (!dataSource || dataSource.options.type !== 'mssql') {
     return false;
   }
   if (tableReady) {
@@ -65,24 +72,27 @@ export async function ensureMediaBlobTable(): Promise<boolean> {
   }
 
   try {
-    await dataSource.query(`
-      IF OBJECT_ID(N'dbo.ArchivoMedia', N'U') IS NULL
-      BEGIN
-        CREATE TABLE dbo.ArchivoMedia (
-          id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-          ruta VARCHAR(500) NOT NULL,
-          mime VARCHAR(120) NOT NULL,
-          contenido VARBINARY(MAX) NOT NULL,
-          CONSTRAINT UQ_ArchivoMedia_ruta UNIQUE (ruta)
-        );
-      END
+    const rows = await dataSource.query(`
+      SELECT OBJECT_ID(N'dbo.ArchivoMedia', N'U') AS tableId
     `);
-    tableReady = true;
-    return true;
+    const exists = Boolean(rows?.[0]?.tableId);
+    if (exists) {
+      tableReady = true;
+      logger.log(
+        '[MediaBlob] Tabla dbo.ArchivoMedia detectada y lista para almacenamiento persistente.',
+      );
+      return true;
+    }
+
+    logger.warn(
+      '[MediaBlob] DIAGNÓSTICO: La tabla dbo.ArchivoMedia NO existe en la base de datos. ' +
+        'El backend no ejecutará CREATE TABLE automáticamente por directriz de mínimos privilegios (sigasj_app). ' +
+        'Aplique la migración TypeORM correspondiente o cree la tabla mediante sigasj_sqladmin.',
+    );
+    return false;
   } catch (error) {
-    schemaDenied = true;
     logger.error(
-      `No se pudo preparar ArchivoMedia: ${error instanceof Error ? error.message : 'error'}`,
+      `[MediaBlob] No se pudo verificar la existencia de dbo.ArchivoMedia: ${error instanceof Error ? error.message : 'error'}`,
     );
     return false;
   }
@@ -106,20 +116,64 @@ export async function persistUploadedMedia(
       }
     }
     const hex = bytes.toString('hex');
+    const tamano = bytes.length;
     await dataSource.query(
       `IF EXISTS (SELECT 1 FROM dbo.ArchivoMedia WHERE ruta = @0)
          UPDATE dbo.ArchivoMedia
-            SET mime = @1, contenido = CONVERT(VARBINARY(MAX), @2, 2)
+            SET mime = @1,
+                contenido = CONVERT(VARBINARY(MAX), @2, 2),
+                tamanoBytes = @3,
+                updatedAt = SYSUTCDATETIME()
           WHERE ruta = @0
        ELSE
-         INSERT INTO dbo.ArchivoMedia (ruta, mime, contenido)
-         VALUES (@0, @1, CONVERT(VARBINARY(MAX), @2, 2))`,
-      [ruta, mime, hex],
+         INSERT INTO dbo.ArchivoMedia (ruta, mime, contenido, tamanoBytes, createdAt)
+         VALUES (@0, @1, CONVERT(VARBINARY(MAX), @2, 2), @3, SYSUTCDATETIME())`,
+      [ruta, mime, hex, tamano],
     );
   } catch (error) {
     logger.error(
-      `No se pudo guardar ${ruta} en la base: ${error instanceof Error ? error.message : 'error'}`,
+      `No se pudo guardar ${ruta} en dbo.ArchivoMedia: ${error instanceof Error ? error.message : 'error'}`,
     );
+  }
+}
+
+export async function relocateUploadedMedia(
+  oldPublicPath: string,
+  newPublicPath: string,
+): Promise<boolean> {
+  const oldRuta = mediaStorageKey(oldPublicPath);
+  const newRuta = mediaStorageKey(newPublicPath);
+  if (
+    !oldRuta ||
+    !newRuta ||
+    oldRuta === newRuta ||
+    !dataSource ||
+    dataSource.options.type !== 'mssql'
+  ) {
+    return false;
+  }
+
+  try {
+    if (!tableReady) {
+      const ready = await ensureMediaBlobTable();
+      if (!ready) {
+        return false;
+      }
+    }
+
+    await dataSource.query(
+      `UPDATE dbo.ArchivoMedia
+          SET ruta = @1,
+              updatedAt = SYSUTCDATETIME()
+        WHERE ruta = @0`,
+      [oldRuta, newRuta],
+    );
+    return true;
+  } catch (error) {
+    logger.error(
+      `No se pudo reubicar ${oldRuta} hacia ${newRuta}: ${error instanceof Error ? error.message : 'error'}`,
+    );
+    return false;
   }
 }
 

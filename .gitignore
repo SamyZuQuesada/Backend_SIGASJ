@@ -17,6 +17,9 @@ npm-debug.log*
 .env.production
 .env.development.local
 .env.test.local
+.env.azure-media
+.env.azure-media.*
+!.env.azure-media.example
 # .env.example SÍ se versiona (solo nombres + placeholders)
 
 # IDE / OS

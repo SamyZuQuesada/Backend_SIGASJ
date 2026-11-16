@@ -61,6 +61,7 @@ import {
   saveSolicitudDocumentPending,
   type SolicitudDocumentFile,
 } from '../../common/media/public-media';
+import { readStoredMedia } from '../../common/media/media-blob.store';
 import {
   formatearCodigoSeguimiento,
   generarTokenAlfanumerico,
@@ -378,6 +379,7 @@ export class SolicitudesService {
     mimeType: string;
     tamanio: number;
     rutaAbsoluta: string;
+    buffer?: Buffer;
   }> {
     // 1. Validar existencia de la solicitud base
     const solicitud = await this.solicitudRepo.findOne({
@@ -447,10 +449,27 @@ export class SolicitudesService {
       throw new ForbiddenException('Ruta de documento inválida');
     }
 
-    // 4. Existencia del archivo físico en disco
+    // 4. Existencia del archivo físico en disco o fallback a Azure SQL dbo.ArchivoMedia
     if (!existsSync(absolutePath)) {
+      const stored = await readStoredMedia(documento.ubicacion);
+      if (stored) {
+        return {
+          id: documento.id,
+          solicitudId,
+          nombreOriginal: documento.nombreOriginal || 'documento',
+          mimeType:
+            stored.mime ||
+            documento.mimeType ||
+            documento.tipoArchivo ||
+            'application/octet-stream',
+          tamanio: stored.bytes.length,
+          rutaAbsoluta: '',
+          buffer: stored.bytes,
+        };
+      }
+
       this.logger.error(
-        `Archivo físico ausente en servidor para documento ${documentoId} (Solicitud ${solicitudId}) en ruta: ${absolutePath}`,
+        `Archivo físico y persistente ausente en servidor para documento ${documentoId} (Solicitud ${solicitudId}) en ruta: ${absolutePath}`,
       );
       throw new NotFoundException(
         'El archivo físico del documento no fue encontrado en el servidor.',

@@ -18,6 +18,7 @@ import {
   forgetUploadedMedia,
   persistUploadedMedia,
   readStoredMedia,
+  relocateUploadedMedia,
 } from './media-blob.store';
 
 function rememberUploadedMedia(
@@ -996,8 +997,11 @@ export function linkSolicitudDocumentFile(
     if (existsSync(sourcePath)) unlinkSync(sourcePath);
   }
 
+  const finalPublicPath = `/uploads/solicitudes/${solicitudId}/${targetName}`;
+  void relocateUploadedMedia(pendingRutaReferenciaArchivo, finalPublicPath);
+
   return {
-    rutaReferenciaArchivo: `/uploads/solicitudes/${solicitudId}/${targetName}`,
+    rutaReferenciaArchivo: finalPublicPath,
     filename: targetName,
   };
 }
@@ -1011,6 +1015,7 @@ export function deleteSolicitudDocumentFile(
   ) {
     return;
   }
+  forgetUploadedMedia(rutaReferenciaArchivo);
   const relative = rutaReferenciaArchivo.substring('/uploads/'.length);
   const absolutePath = join(UPLOAD_ROOT, ...relative.split('/'));
   const normalizedRoot = join(UPLOAD_ROOT, 'solicitudes');

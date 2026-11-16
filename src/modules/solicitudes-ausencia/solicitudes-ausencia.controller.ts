@@ -90,10 +90,18 @@ export class SolicitudesAusenciaController {
     @Param('id', ParseIntPipe) id: number,
     @Param('filename') filename: string,
   ): Promise<StreamableFile> {
-    const { absolutePath, mimeType, documento } =
+    const { absolutePath, mimeType, documento, buffer } =
       await this.solicitudesService.obtenerArchivoDocumento(id, filename, {
         rolAdministradora: true,
       });
+
+    if (buffer) {
+      return new StreamableFile(buffer, {
+        type: mimeType,
+        disposition: `inline; filename="${encodeURIComponent(documento.nombreOriginal)}"`,
+      });
+    }
+
     return new StreamableFile(createReadStream(absolutePath), {
       type: mimeType,
       disposition: `inline; filename="${encodeURIComponent(documento.nombreOriginal)}"`,
