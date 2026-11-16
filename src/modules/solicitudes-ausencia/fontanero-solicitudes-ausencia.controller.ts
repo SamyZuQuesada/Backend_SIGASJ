@@ -159,10 +159,18 @@ export class FontaneroSolicitudesAusenciaController {
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<StreamableFile> {
     const usuarioId = user.idUsuario ?? Number(user.userId);
-    const { absolutePath, mimeType, documento } =
+    const { absolutePath, mimeType, documento, buffer } =
       await this.solicitudesService.obtenerArchivoDocumento(id, filename, {
         usuarioId,
       });
+
+    if (buffer) {
+      return new StreamableFile(buffer, {
+        type: mimeType,
+        disposition: `inline; filename="${encodeURIComponent(documento.nombreOriginal)}"`,
+      });
+    }
+
     return new StreamableFile(createReadStream(absolutePath), {
       type: mimeType,
       disposition: `inline; filename="${encodeURIComponent(documento.nombreOriginal)}"`,

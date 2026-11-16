@@ -949,8 +949,15 @@ export class InventarioController {
     @Param('id', ParseIntPipe) id: number,
     @Param('filename') filename: string,
   ): Promise<StreamableFile> {
-    const { absolutePath, mimeType, documento } =
+    const { absolutePath, buffer, mimeType, documento } =
       await this.inventarioService.obtenerArchivoDocumento(id, filename);
+
+    if (buffer) {
+      return new StreamableFile(buffer, {
+        type: mimeType,
+        disposition: `inline; filename="${encodeURIComponent(documento.nombreOriginal)}"`,
+      });
+    }
 
     return new StreamableFile(createReadStream(absolutePath), {
       type: mimeType,

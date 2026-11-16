@@ -30,12 +30,15 @@ import { CreateMaterialDto } from './dto/create-material.dto';
 import { CreateProveedorDto } from './dto/create-proveedor.dto';
 import { QueryCategoriasDto } from './dto/query-categorias.dto';
 import { QueryMaterialesDto } from './dto/query-materiales.dto';
+import { existsSync } from 'fs';
+import { basename, extname, join } from 'path';
 import {
   deleteMovimientoDocument,
   getMovimientoDocumentFilePath,
   saveMovimientoDocument,
   type MovimientoDocumentFile,
 } from '../../common/media/public-media';
+import { readStoredMedia } from '../../common/media/media-blob.store';
 import { QueryProveedoresDto } from './dto/query-proveedores.dto';
 import { QueryAlertasReposicionDto } from './dto/query-alertas-reposicion.dto';
 import { CreateReposicionDesdeAlertaDto } from './dto/create-reposicion-desde-alerta.dto';
@@ -2976,6 +2979,7 @@ export class InventarioService {
     absolutePath: string;
     mimeType: string;
     documento: DocumentoMovimientoInventario;
+    buffer?: Buffer;
   }> {
     if (!movimientoId || isNaN(movimientoId) || movimientoId <= 0) {
       throw new BadRequestException('ID de movimiento inválido');
@@ -2993,10 +2997,10 @@ export class InventarioService {
       );
     }
 
-    const { absolutePath, mimeType } = getMovimientoDocumentFilePath(
-      movimientoId,
-      filename,
-    );
+    const safeName = basename(filename);
+    if (!safeName || safeName !== filename || safeName.includes('..')) {
+      throw new BadRequestException('Nombre de archivo inválido.');
+    }
 
     const suffix = `/documentos/${filename}`;
     const documentos = await withDbRetry(() =>
@@ -3015,11 +3019,40 @@ export class InventarioService {
       );
     }
 
-    return {
-      absolutePath,
-      mimeType,
-      documento: docEncontrado,
-    };
+    const localPath = join(
+      process.cwd(),
+      'uploads',
+      'movimientos-inventario',
+      String(movimientoId),
+      safeName,
+    );
+
+    if (existsSync(localPath)) {
+      const { absolutePath, mimeType } = getMovimientoDocumentFilePath(
+        movimientoId,
+        filename,
+      );
+      return {
+        absolutePath,
+        mimeType,
+        documento: docEncontrado,
+      };
+    }
+
+    // Fallback a almacenamiento persistente Azure SQL dbo.ArchivoMedia
+    const stored = await readStoredMedia(
+      `/uploads/movimientos-inventario/${movimientoId}/${safeName}`,
+    );
+    if (stored) {
+      return {
+        absolutePath: '',
+        buffer: stored.bytes,
+        mimeType: stored.mime || 'application/octet-stream',
+        documento: docEncontrado,
+      };
+    }
+
+    throw new NotFoundException('Documento no encontrado en el servidor.');
   }
 
   /**

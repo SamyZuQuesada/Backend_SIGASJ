@@ -28,6 +28,8 @@ import {
   BalanceVacaciones,
   VacacionesService,
 } from '../recursos-humanos/vacaciones.service';
+import { existsSync } from 'fs';
+import { basename, join } from 'path';
 import {
   deleteAusenciaDocument,
   getAusenciaDocumentFilePath,
@@ -35,6 +37,7 @@ import {
   type ActividadDocumentFile,
   validateActividadDocument,
 } from '../../common/media/public-media';
+import { readStoredMedia } from '../../common/media/media-blob.store';
 import {
   fusionarDocumentosAusencia,
   type AdjuntoSolicitudAusencia,
@@ -233,6 +236,7 @@ export class SolicitudesAusenciaService {
     absolutePath: string;
     mimeType: string;
     documento: DocumentoSolicitudAusencia;
+    buffer?: Buffer;
   }> {
     const solicitud = await this.solicitudRepository.findOne({
       where: { id: solicitudId },
@@ -267,17 +271,45 @@ export class SolicitudesAusenciaService {
       }
     }
 
-    const { absolutePath, mimeType } = getAusenciaDocumentFilePath(
-      solicitudId,
-      filename,
+    const safeName = basename(filename);
+    const localPath = join(
+      process.cwd(),
+      'uploads',
+      'solicitudes-ausencia',
+      String(solicitudId),
+      safeName,
     );
-    return {
-      absolutePath,
-      mimeType,
-      documento: {
-        nombreOriginal: match.nombreOriginal,
-      } as DocumentoSolicitudAusencia,
-    };
+
+    if (existsSync(localPath)) {
+      const { absolutePath, mimeType } = getAusenciaDocumentFilePath(
+        solicitudId,
+        filename,
+      );
+      return {
+        absolutePath,
+        mimeType,
+        documento: {
+          nombreOriginal: match.nombreOriginal,
+        } as DocumentoSolicitudAusencia,
+      };
+    }
+
+    // Fallback a almacenamiento persistente Azure SQL dbo.ArchivoMedia
+    const stored = await readStoredMedia(
+      `/uploads/solicitudes-ausencia/${solicitudId}/${safeName}`,
+    );
+    if (stored) {
+      return {
+        absolutePath: '',
+        buffer: stored.bytes,
+        mimeType: stored.mime || 'application/octet-stream',
+        documento: {
+          nombreOriginal: match.nombreOriginal,
+        } as DocumentoSolicitudAusencia,
+      };
+    }
+
+    throw new NotFoundException('Documento de evidencia no encontrado');
   }
 
   /**

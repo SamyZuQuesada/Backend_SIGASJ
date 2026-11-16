@@ -11,6 +11,36 @@ export class MediaBlobMiddleware implements NestMiddleware {
     }
 
     const requestPath = req.originalUrl || req.url;
+    let normalized = (requestPath || '').toLowerCase().replace(/\\/g, '/');
+    try {
+      normalized = decodeURIComponent(normalized);
+    } catch {
+      // Si el URI es inválido, continuar con el string en bruto
+    }
+
+    // Documentos privados bajo solicitudes, ausencias, inventario o actividades de fontanero:
+    // NUNCA se sirven por middleware público ni por Express Static.
+    // Solo accesibles mediante sus respectivos controladores protegidos (JwtAuthGuard y RolesGuard).
+    const isPrivateFolder =
+      normalized.includes('/uploads/solicitudes/') ||
+      normalized.includes('/uploads/solicitudes-ausencia/') ||
+      normalized.includes('/uploads/movimientos-inventario/') ||
+      normalized.includes('/uploads/actividades-fontanero/') ||
+      normalized.includes('/api/v1/uploads/solicitudes/') ||
+      normalized.includes('/api/v1/uploads/solicitudes-ausencia/') ||
+      normalized.includes('/api/v1/uploads/movimientos-inventario/') ||
+      normalized.includes('/api/v1/uploads/actividades-fontanero/');
+
+    if (isPrivateFolder) {
+      res.status(403).json({
+        statusCode: 403,
+        error: 'Forbidden',
+        message:
+          'Acceso denegado: los documentos privados no se exponen mediante rutas estáticas. Utilice los endpoints autenticados y autorizados de la API.',
+      });
+      return;
+    }
+
     void readStoredMedia(requestPath)
       .then((stored) => {
         if (!stored || res.headersSent) {
