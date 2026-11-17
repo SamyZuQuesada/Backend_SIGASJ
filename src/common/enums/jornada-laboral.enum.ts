@@ -1,6 +1,6 @@
 /**
  * Modalidad de jornada del colaborador (expediente laboral).
- * Configurable por colaborador; no implica aún el cálculo de 50 semanas.
+ * Con diasLaboralesHabituales alimenta la adquisición (2 semanas / 50 semanas).
  */
 export enum JornadaLaboral {
   COMPLETA = 'COMPLETA',

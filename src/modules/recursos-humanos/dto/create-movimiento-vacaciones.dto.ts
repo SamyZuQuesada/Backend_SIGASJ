@@ -111,4 +111,16 @@ export class CreateMovimientoVacacionesDto {
     message: 'Las observaciones no pueden exceder 500 caracteres',
   })
   observaciones?: string | null;
+
+  @ApiPropertyOptional({
+    example: 'P1',
+    nullable: true,
+    description:
+      'Solo ACUMULADO: identificador único del periodo de adquisición (p. ej. P1).',
+  })
+  @Transform(trimOptionalString)
+  @IsOptional()
+  @IsString({ message: 'El periodoId debe ser una cadena de texto' })
+  @MaxLength(40, { message: 'El periodoId no puede exceder 40 caracteres' })
+  periodoId?: string | null;
 }

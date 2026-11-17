@@ -27,12 +27,20 @@ import { Colaborador } from './entities/colaborador.entity';
 import { MovimientoVacaciones } from './entities/movimiento-vacaciones.entity';
 import { PermisoColaborador } from './entities/permiso-colaborador.entity';
 import { compararFechasIso, esFechaCalendario } from './fecha-permiso';
+import {
+  AlertaVacaciones,
+  buildAlertasPeriodos,
+  calcularPeriodosAdquiridos,
+  diasPorPeriodoVacaciones,
+  periodosCubiertosPorLegacy,
+} from './adquisicion-vacaciones';
 import { calcularSaldoVacaciones, SaldoVacaciones } from './saldo-vacaciones';
 
 export type RegistrarMovimientoVacacionesInput =
   CreateMovimientoVacacionesDto & {
     signoAjuste?: 1 | -1 | null;
     registradoPorUsuarioId?: number | null;
+    periodoId?: string | null;
   };
 
 export type SaldoVacacionesColaborador = SaldoVacaciones & {
@@ -48,6 +56,15 @@ export type ColaboradorResumen = Pick<
 /** Balance de vacaciones que se expone por el API. */
 export type BalanceVacaciones = SaldoVacacionesColaborador & {
   colaborador: ColaboradorResumen;
+  /** Periodos adquiridos (50 semanas) ya acreditados en el ledger. */
+  periodosAdquiridos: Array<{
+    periodoId: string;
+    fechaAdquisicion: string;
+    cantidadDias: number;
+  }>;
+  /** Alertas de disfrute pendiente / plazo legal (art. 156). */
+  alertas: AlertaVacaciones[];
+  diasPorPeriodo: number;
 };
 
 export type MovimientosVacacionesListado = {
@@ -187,6 +204,23 @@ export class VacacionesService {
       }
 
       const repo = manager.getRepository(MovimientoVacaciones);
+      const periodoId =
+        input.tipo === TipoMovimientoVacaciones.ACUMULADO
+          ? (input.periodoId?.trim() || null)
+          : null;
+      if (periodoId) {
+        const existePeriodo = await repo.exists({
+          where: {
+            colaboradorId: input.colaboradorId,
+            periodoId,
+          },
+        });
+        if (existePeriodo) {
+          throw new ConflictException(
+            `Ya existe una adquisición con periodoId "${periodoId}" para este colaborador`,
+          );
+        }
+      }
       const movimiento = repo.create({
         colaboradorId: input.colaboradorId,
         tipo: input.tipo,
@@ -197,6 +231,7 @@ export class VacacionesService {
             : null,
         fecha: input.fecha,
         observaciones: input.observaciones ?? null,
+        periodoId,
         registradoPorUsuarioId: input.registradoPorUsuarioId ?? null,
       });
       return repo.save(movimiento);
@@ -298,8 +333,92 @@ export class VacacionesService {
   }
 
   /**
+   * Acredita periodos de 50 semanas faltantes como ACUMULADO con periodoId.
+   * No reescribe historial ni duplica periodos cubiertos por ACUMULADO legacy.
+   */
+  async asegurarAdquisicionesPorAntiguedad(
+    colaboradorId: number,
+    managerExterno?: EntityManager,
+  ): Promise<number> {
+    const manager =
+      managerExterno ?? this.movimientoRepository.manager;
+    const colaborador = await manager.getRepository(Colaborador).findOne({
+      where: { id: colaboradorId },
+      select: {
+        id: true,
+        fechaIngreso: true,
+        diasLaboralesHabituales: true,
+      },
+    });
+    if (!colaborador?.fechaIngreso) {
+      return 0;
+    }
+
+    const periodos = calcularPeriodosAdquiridos(
+      colaborador.fechaIngreso,
+      colaborador.diasLaboralesHabituales,
+    );
+    if (periodos.length === 0) {
+      return 0;
+    }
+
+    const diasPorPeriodo = diasPorPeriodoVacaciones(
+      colaborador.diasLaboralesHabituales,
+    );
+    const existentes = await manager.getRepository(MovimientoVacaciones).find({
+      where: {
+        colaboradorId,
+        tipo: TipoMovimientoVacaciones.ACUMULADO,
+      },
+      select: {
+        id: true,
+        cantidadDias: true,
+        periodoId: true,
+      },
+    });
+    const periodoIds = new Set(
+      existentes
+        .map((m) => m.periodoId)
+        .filter((id): id is string => typeof id === 'string' && id.length > 0),
+    );
+    const legacyDias = existentes
+      .filter((m) => !m.periodoId)
+      .reduce((acc, m) => acc + m.cantidadDias, 0);
+    const cubiertosLegacy = periodosCubiertosPorLegacy(
+      legacyDias,
+      diasPorPeriodo,
+    );
+
+    let creados = 0;
+    for (const periodo of periodos) {
+      if (periodo.indice <= cubiertosLegacy) {
+        continue;
+      }
+      if (periodoIds.has(periodo.periodoId)) {
+        continue;
+      }
+      await this.registrarMovimiento(
+        {
+          colaboradorId,
+          tipo: TipoMovimientoVacaciones.ACUMULADO,
+          cantidadDias: periodo.cantidadDias,
+          fecha: periodo.fechaAdquisicion,
+          observaciones: `Adquisición automática periodo ${periodo.periodoId} (50 semanas CT CR)`,
+          periodoId: periodo.periodoId,
+          registradoPorUsuarioId: null,
+        },
+        managerExterno,
+      );
+      periodoIds.add(periodo.periodoId);
+      creados += 1;
+    }
+    return creados;
+  }
+
+  /**
    * Balance que se expone por el API: saldo derivado del historial más un
    * resumen del colaborador. 404 si el colaborador no existe.
+   * Acredita periodos 50 semanas pendientes antes de calcular el saldo.
    */
   async obtenerBalance(colaboradorId: number): Promise<BalanceVacaciones> {
     const colaborador = await this.colaboradorRepository.findOne({
@@ -311,6 +430,8 @@ export class VacacionesService {
         cedula: true,
         cargo: true,
         activo: true,
+        fechaIngreso: true,
+        diasLaboralesHabituales: true,
       },
     });
     if (!colaborador) {
@@ -319,9 +440,40 @@ export class VacacionesService {
       );
     }
 
+    await this.asegurarAdquisicionesPorAntiguedad(colaboradorId);
+
     const saldo = await this.obtenerSaldo(colaboradorId);
+    const diasPorPeriodo = diasPorPeriodoVacaciones(
+      colaborador.diasLaboralesHabituales,
+    );
+    const acumuladosConPeriodo = await this.movimientoRepository.find({
+      where: {
+        colaboradorId,
+        tipo: TipoMovimientoVacaciones.ACUMULADO,
+      },
+      select: {
+        periodoId: true,
+        fecha: true,
+        cantidadDias: true,
+      },
+      order: { fecha: 'ASC', id: 'ASC' },
+    });
+    const periodosAdquiridos = acumuladosConPeriodo
+      .filter((m) => m.periodoId)
+      .map((m) => ({
+        periodoId: m.periodoId as string,
+        fechaAdquisicion: m.fecha,
+        cantidadDias: m.cantidadDias,
+      }));
+
     return {
       ...saldo,
+      diasPorPeriodo,
+      periodosAdquiridos,
+      alertas: buildAlertasPeriodos(
+        periodosAdquiridos,
+        saldo.diasDisponibles,
+      ),
       colaborador: {
         id: colaborador.id,
         nombre: colaborador.nombre,
