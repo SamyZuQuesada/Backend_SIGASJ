@@ -201,14 +201,13 @@ describe('Panel Administrativo - Consulta y Filtrado de Solicitudes', () => {
       expect(response.body.total).toBe(1);
     });
 
-    it('debe permitir el acceso a usuarios con rol FONTANERO', async () => {
+    it('debe rechazar con 403 Forbidden a usuarios con rol FONTANERO (Principio de menor privilegio)', async () => {
       const response = await request(app.getHttpServer())
         .get('/solicitudes')
         .set('Authorization', `Bearer ${signAs(Role.FONTANERO)}`)
-        .expect(200);
+        .expect(403);
 
-      expect(response.body.solicitudes).toBeDefined();
-      expect(response.body.total).toBe(1);
+      expect(response.body.message).toBe('Acceso denegado');
     });
   });
 

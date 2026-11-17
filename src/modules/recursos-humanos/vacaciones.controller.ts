@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
@@ -39,7 +40,7 @@ import {
 export class VacacionesController {
   constructor(private readonly vacacionesService: VacacionesService) {}
 
-  @Get('mias/balance')
+  @Get(['mias/balance', 'mi-balance'])
   @Roles(Role.FONTANERO)
   @ApiOperation({
     summary: 'Saldo de vacaciones del Fontanero autenticado (solo lectura)',
@@ -62,8 +63,8 @@ export class VacacionesController {
   @ApiOperation({
     summary: 'Registrar ACUMULADO, DISFRUTADO o AJUSTE',
     description:
-      'AJUSTE requiere motivo (observaciones), signoAjuste y deja auditoría del usuario. ' +
-      'Roles: ADMINISTRADORA o SECRETARIA.',
+      'ACUMULADO y DISFRUTADO: solo ADMINISTRADORA. ' +
+      'AJUSTE: ADMINISTRADORA o SECRETARIA (motivo + auditoría).',
   })
   @ApiResponse({
     status: 201,
@@ -74,6 +75,16 @@ export class VacacionesController {
     @Body() dto: CreateMovimientoVacacionesDto,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<MovimientoVacaciones> {
+    const rol = String(user.role ?? '').toUpperCase();
+    if (
+      (dto.tipo === 'ACUMULADO' || dto.tipo === 'DISFRUTADO') &&
+      rol !== Role.ADMINISTRADORA &&
+      rol !== Role.SUPER_ADMIN
+    ) {
+      throw new ForbiddenException(
+        'Solo la Administradora puede registrar adquisiciones o disfrutes de vacaciones',
+      );
+    }
     const registradoPorUsuarioId = user.idUsuario ?? Number(user.userId);
     return this.vacacionesService.registrarMovimiento({
       ...dto,

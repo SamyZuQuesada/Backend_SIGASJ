@@ -44,10 +44,10 @@ import {
 } from './adjuntos-ausencia';
 import { rangosCalendarioSeSolapan } from './solape-ausencia.util';
 import {
-  diasVacacionesNetos,
   resumenDiasVacaciones,
   type ResumenDiasVacaciones,
 } from './dias-periodo-ausencia';
+import { diasVacacionesNetosPorJornada } from './dias-laborales-vacaciones';
 import {
   diasAusenciaSinFeriados,
   esFeriadoCostaRica,
@@ -125,6 +125,15 @@ export class SolicitudesAusenciaService {
     throw new ForbiddenException(
       'No hay un colaborador activo vinculado a su cuenta',
     );
+  }
+
+  /**
+   * Resuelve el saldo de vacaciones del colaborador del Fontanero autenticado.
+   */
+  async obtenerBalanceVacaciones(
+    usuarioId: number,
+  ): Promise<BalanceVacaciones> {
+    return this.vacacionesService.obtenerBalancePorUsuarioId(usuarioId);
   }
 
   /**
@@ -437,15 +446,25 @@ export class SolicitudesAusenciaService {
   }): Promise<{ solicitud: SolicitudAusencia; creada: boolean }> {
     this.validarFechas(input.fechaInicio, input.fechaFin);
     if (input.tipo === TipoSolicitudAusencia.VACACIONES) {
-      const cantidadDias = diasVacacionesNetos(
+      const colaborador = await input.manager.getRepository(Colaborador).findOne({
+        where: { id: input.colaboradorId },
+        select: { id: true, diasLaboralesHabituales: true },
+      });
+      const cantidadDias = diasVacacionesNetosPorJornada(
         input.fechaInicio,
         input.fechaFin,
+        colaborador?.diasLaboralesHabituales,
       );
       if (cantidadDias < 1) {
         throw new BadRequestException(
-          'El periodo de vacaciones no produce días válidos tras descontar feriados',
+          'El periodo de vacaciones no produce días válidos según la jornada habitual (tras feriados)',
         );
       }
+      // Acredita periodos 50 semanas antes de validar saldo.
+      await this.vacacionesService.asegurarAdquisicionesPorAntiguedad(
+        input.colaboradorId,
+        input.manager,
+      );
       const saldo = await this.vacacionesService.calcularSaldo(
         input.colaboradorId,
       );
@@ -662,15 +681,24 @@ export class SolicitudesAusenciaService {
             registroGeneradoTipo: TipoRegistroGeneradoAusencia.PERMISO,
           });
         } else if (solicitud.tipo === TipoSolicitudAusencia.VACACIONES) {
-          const cantidadDias = diasVacacionesNetos(
+          const colaborador = await manager.getRepository(Colaborador).findOne({
+            where: { id: solicitud.colaboradorId },
+            select: { id: true, diasLaboralesHabituales: true },
+          });
+          const cantidadDias = diasVacacionesNetosPorJornada(
             solicitud.fechaInicio,
             solicitud.fechaFin,
+            colaborador?.diasLaboralesHabituales,
           );
           if (cantidadDias < 1) {
             throw new BadRequestException(
-              'El periodo de vacaciones no produce días válidos tras descontar feriados',
+              'El periodo de vacaciones no produce días válidos según la jornada habitual (tras feriados)',
             );
           }
+          await this.vacacionesService.asegurarAdquisicionesPorAntiguedad(
+            solicitud.colaboradorId,
+            manager,
+          );
           // Saldo se revalida en VacacionesService al momento de aprobar.
           const movimiento = await this.vacacionesService.registrarMovimiento(
             {

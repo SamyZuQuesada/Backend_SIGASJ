@@ -26,6 +26,7 @@ import { Colaborador } from './colaborador.entity';
 @Entity('MovimientoVacaciones')
 @Index('IX_MovimientoVacaciones_colaboradorId', ['colaboradorId'])
 @Index('IX_MovimientoVacaciones_colaborador_fecha', ['colaboradorId', 'fecha'])
+@Index('IX_MovimientoVacaciones_colaborador_periodo', ['colaboradorId', 'periodoId'])
 export class MovimientoVacaciones {
   @ApiProperty({
     example: 1,
@@ -89,6 +90,15 @@ export class MovimientoVacaciones {
   })
   @Column({ type: 'varchar', length: 500, nullable: true })
   observaciones: string | null;
+
+  @ApiPropertyOptional({
+    example: 'P1',
+    nullable: true,
+    description:
+      'Identificador único del periodo de adquisición (solo ACUMULADO automático/manual con periodo).',
+  })
+  @Column({ type: 'varchar', length: 40, nullable: true })
+  periodoId: string | null;
 
   @ApiPropertyOptional({
     example: 2,

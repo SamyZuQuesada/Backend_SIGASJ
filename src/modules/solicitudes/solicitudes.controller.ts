@@ -341,7 +341,7 @@ export class SolicitudesController {
   ])
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA, Role.FONTANERO)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({
     summary:
       'Descargar o visualizar archivo binario de un documento de solicitud (Protegido)',
@@ -404,7 +404,7 @@ export class SolicitudesController {
   @Get(':id/detalle')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA, Role.FONTANERO)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({
     summary:
       'Obtener toda la información necesaria para revisar una solicitud específica (Detalle administrativo)',
@@ -426,7 +426,7 @@ export class SolicitudesController {
   @Get(':id')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA, Role.FONTANERO)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({
     summary: 'Consultar detalle de solicitud por ID interno (Protegido)',
     description:
@@ -510,7 +510,7 @@ export class SolicitudesController {
   @Get()
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA, Role.FONTANERO)
+  @Roles(Role.ADMINISTRADORA, Role.SECRETARIA_EJECUTIVA)
   @ApiOperation({
     summary:
       'Listar solicitudes digitales con filtros administrativos (Protegido)',
