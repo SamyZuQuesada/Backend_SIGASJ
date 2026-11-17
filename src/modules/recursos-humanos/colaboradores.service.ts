@@ -59,6 +59,20 @@ const esViolacionUnicidad = (error: unknown): boolean => {
   );
 };
 
+export const COLABORADOR_BASE_SELECT = {
+  id: true,
+  nombre: true,
+  apellidos: true,
+  cedula: true,
+  correoElectronico: true,
+  cargo: true,
+  puestoId: true,
+  activo: true,
+  usuarioId: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
 @Injectable()
 export class ColaboradoresService {
   private readonly logger = new Logger(ColaboradoresService.name);
@@ -86,6 +100,7 @@ export class ColaboradoresService {
 
     const porUsuario = await this.colaboradorRepository.findOne({
       where: { usuarioId: id, activo: true },
+      select: COLABORADOR_BASE_SELECT,
     });
     if (porUsuario) {
       return porUsuario;
@@ -98,6 +113,7 @@ export class ColaboradoresService {
     if (correo) {
       const porCorreo = await this.colaboradorRepository.findOne({
         where: { correoElectronico: correo, activo: true },
+        select: COLABORADOR_BASE_SELECT,
       });
       if (porCorreo && !porCorreo.usuarioId) {
         porCorreo.usuarioId = id;
@@ -114,6 +130,7 @@ export class ColaboradoresService {
 
     const sinCuenta = await this.colaboradorRepository.find({
       where: { usuarioId: IsNull(), activo: true },
+      select: COLABORADOR_BASE_SELECT,
     });
     const fontanerosSueltos = sinCuenta.filter((item) =>
       /fontanero/i.test(`${item.cargo} ${item.nombre}`),
