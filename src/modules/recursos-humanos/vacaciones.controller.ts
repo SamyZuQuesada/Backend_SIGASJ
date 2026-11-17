@@ -39,7 +39,7 @@ import {
 export class VacacionesController {
   constructor(private readonly vacacionesService: VacacionesService) {}
 
-  @Get('mias/balance')
+  @Get(['mias/balance', 'mi-balance'])
   @Roles(Role.FONTANERO)
   @ApiOperation({
     summary: 'Saldo de vacaciones del Fontanero autenticado (solo lectura)',

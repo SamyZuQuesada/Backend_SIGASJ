@@ -146,14 +146,17 @@ describe('MediaBlob Store & Middleware Integration Unit Tests', () => {
     it('bloquea con 403 Forbidden acceso público directo a /uploads/actividades-fontanero/', () => {
       req = {
         method: 'GET',
-        originalUrl: '/uploads/actividades-fontanero/1/foto.jpg',
-        url: '/uploads/actividades-fontanero/1/foto.jpg',
+        originalUrl: '/uploads/actividades-fontanero/6/1794877087725-test.png',
+        url: '/uploads/actividades-fontanero/6/1794877087725-test.png',
       };
 
       middleware.use(req as Request, res as Response, next);
 
       expect(next).not.toHaveBeenCalled();
       expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({ statusCode: 403, error: 'Forbidden' }),
+      );
     });
 
     it('bloquea con 403 Forbidden acceso a través de /api/v1/uploads/solicitudes/', () => {

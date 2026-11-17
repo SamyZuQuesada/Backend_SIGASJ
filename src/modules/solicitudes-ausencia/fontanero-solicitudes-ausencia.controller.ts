@@ -177,6 +177,25 @@ export class FontaneroSolicitudesAusenciaController {
     });
   }
 
+  @Get(['balance', 'mi-balance'])
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Balance de vacaciones del Fontanero autenticado',
+    description: 'Alias de consulta del saldo de vacaciones propio.',
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Balance propio.' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Sin JWT.' })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Rol incorrecto o sin Colaborador vinculado.',
+  })
+  obtenerBalancePropio(
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const usuarioId = user.idUsuario ?? Number(user.userId);
+    return this.solicitudesService.obtenerBalanceVacaciones(usuarioId);
+  }
+
   @Get(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

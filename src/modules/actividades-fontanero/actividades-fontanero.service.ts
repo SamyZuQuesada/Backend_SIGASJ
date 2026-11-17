@@ -6,7 +6,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { existsSync } from 'fs';
+import { basename, extname, join } from 'path';
 import { Repository, SelectQueryBuilder } from 'typeorm';
+import { readStoredMedia } from '../../common/media/media-blob.store';
 import {
   ESTADOS_HISTORIAL_FONTANERO,
   EstadoActividadFontanero,
@@ -578,6 +581,130 @@ export class ActividadesFontaneroService {
       tamanio: saved.tamanio,
       fechaCarga: saved.fechaCarga,
     };
+  }
+
+  async obtenerArchivoDocumento(
+    actividadId: number,
+    filename: string,
+    user?: AuthenticatedUser,
+  ): Promise<{
+    absolutePath: string;
+    mimeType: string;
+    documento: DocumentoActividadFontanero;
+    buffer?: Buffer;
+  }> {
+    if (!actividadId || isNaN(actividadId) || actividadId <= 0) {
+      throw new BadRequestException(ACTIVIDADES_MSG.invalidId);
+    }
+
+    const actividad = await withDbRetry(() =>
+      this.actividadRepository.findOne({
+        where: { id: actividadId },
+        relations: { documentos: true, fontanero: true },
+      }),
+    );
+
+    if (!actividad) {
+      throw new NotFoundException(ACTIVIDADES_MSG.actividadNotFound);
+    }
+
+    if (!user) {
+      throw new ForbiddenException(ACTIVIDADES_MSG.forbidden);
+    }
+
+    if (user.role === Role.FONTANERO) {
+      const isOwner =
+        actividad.fontaneroId === user.userId ||
+        (user.idUsuario && actividad.fontaneroId === String(user.idUsuario)) ||
+        (actividad.fontanero &&
+          ((user.idUsuario &&
+            actividad.fontanero.idUsuario === user.idUsuario) ||
+            String(actividad.fontanero.idUsuario) === user.userId));
+
+      if (!isOwner) {
+        throw new ForbiddenException(ACTIVIDADES_MSG.forbidden);
+      }
+    } else if (user.role !== Role.ADMINISTRADORA) {
+      throw new ForbiddenException(ACTIVIDADES_MSG.forbidden);
+    }
+
+    let decodedFilename = filename;
+    try {
+      decodedFilename = decodeURIComponent(filename);
+    } catch {
+      // conservar original
+    }
+
+    const safeName = basename(decodedFilename);
+    if (
+      !safeName ||
+      decodedFilename.includes('..') ||
+      safeName.includes('..') ||
+      decodedFilename.includes('/') ||
+      decodedFilename.includes('\\')
+    ) {
+      throw new BadRequestException('Identificador o nombre de archivo inválido.');
+    }
+
+    const docEncontrado = (actividad.documentos ?? []).find(
+      (d) =>
+        String(d.id) === safeName ||
+        d.nombreOriginal === decodedFilename ||
+        d.nombreOriginal === safeName ||
+        d.rutaReferenciaArchivo.endsWith(`/${decodedFilename}`) ||
+        d.rutaReferenciaArchivo.endsWith(`/${safeName}`),
+    );
+
+    if (!docEncontrado) {
+      throw new NotFoundException('Documento no encontrado.');
+    }
+
+    const physicalFileName = basename(docEncontrado.rutaReferenciaArchivo);
+    const localPath = join(
+      process.cwd(),
+      'uploads',
+      'actividades-fontanero',
+      String(actividadId),
+      physicalFileName,
+    );
+
+    if (existsSync(localPath)) {
+      const ext = extname(physicalFileName).toLowerCase();
+      let mimeType = docEncontrado.tipoArchivo || 'application/octet-stream';
+      if (ext === '.png') mimeType = 'image/png';
+      else if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
+      else if (ext === '.webp') mimeType = 'image/webp';
+      else if (ext === '.pdf') mimeType = 'application/pdf';
+
+      return {
+        absolutePath: localPath,
+        mimeType,
+        documento: docEncontrado,
+      };
+    }
+
+    // Fallback persistente a Azure SQL dbo.ArchivoMedia
+    const stored = await readStoredMedia(docEncontrado.rutaReferenciaArchivo);
+    if (stored && stored.bytes && stored.bytes.length > 0) {
+      const ext = extname(physicalFileName).toLowerCase();
+      let mimeType =
+        stored.mime || docEncontrado.tipoArchivo || 'application/octet-stream';
+      if (!mimeType || mimeType === 'application/octet-stream') {
+        if (ext === '.png') mimeType = 'image/png';
+        else if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
+        else if (ext === '.webp') mimeType = 'image/webp';
+        else if (ext === '.pdf') mimeType = 'application/pdf';
+      }
+
+      return {
+        absolutePath: '',
+        buffer: stored.bytes,
+        mimeType,
+        documento: docEncontrado,
+      };
+    }
+
+    throw new NotFoundException('Archivo de evidencia no disponible.');
   }
 
   async corregirPropia(

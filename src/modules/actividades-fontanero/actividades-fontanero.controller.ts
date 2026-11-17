@@ -13,11 +13,13 @@ import {
   Patch,
   Post,
   Query,
+  StreamableFile,
   UploadedFile,
   UploadedFiles,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { createReadStream } from 'fs';
 import type { Observable } from 'rxjs';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import {
@@ -431,5 +433,58 @@ export class ActividadesFontaneroController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.actividadesFontaneroService.consultarDetalle(id, user);
+  }
+
+  // ── Descarga / Visualización de Documentos de Evidencia ───────────────────
+
+  @Get([
+    'admin/actividades/:id/documentos/:filename',
+    'admin/actividades-fontanero/:id/documentos/:filename',
+    'fontanero/actividades/:id/documentos/:filename',
+    'actividades-fontanero/:id/documentos/:filename',
+    'actividades/:id/documentos/:filename',
+    'admin/actividades/:id/documentos/:filename/descargar',
+    'admin/actividades-fontanero/:id/documentos/:filename/descargar',
+    'fontanero/actividades/:id/documentos/:filename/descargar',
+    'actividades-fontanero/:id/documentos/:filename/descargar',
+    'actividades/:id/documentos/:filename/descargar',
+    'admin/actividades/:id/fotos/:filename',
+    'admin/actividades-fontanero/:id/fotos/:filename',
+    'fontanero/actividades/:id/fotos/:filename',
+    'actividades-fontanero/:id/fotos/:filename',
+    'actividades/:id/fotos/:filename',
+  ])
+  @HttpCode(HttpStatus.OK)
+  @Roles(Role.ADMINISTRADORA, Role.FONTANERO)
+  @ApiOperation({
+    summary:
+      'Descargar o visualizar documento de evidencia de una actividad (Fontanero y Administradora)',
+    description:
+      'Transmite el archivo de evidencia de la actividad. El Fontanero solo puede consultar actividades propias. ' +
+      'La Administradora puede consultar cualquier actividad.',
+  })
+  async descargarDocumento(
+    @Param('id', ActividadIdPipe) id: number,
+    @Param('filename') filename: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<StreamableFile> {
+    const { absolutePath, buffer, mimeType, documento } =
+      await this.actividadesFontaneroService.obtenerArchivoDocumento(
+        id,
+        filename,
+        user,
+      );
+
+    if (buffer) {
+      return new StreamableFile(buffer, {
+        type: mimeType,
+        disposition: `inline; filename="${encodeURIComponent(documento.nombreOriginal)}"`,
+      });
+    }
+
+    return new StreamableFile(createReadStream(absolutePath), {
+      type: mimeType,
+      disposition: `inline; filename="${encodeURIComponent(documento.nombreOriginal)}"`,
+    });
   }
 }

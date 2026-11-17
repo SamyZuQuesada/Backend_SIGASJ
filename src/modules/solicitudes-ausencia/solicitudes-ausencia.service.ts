@@ -128,6 +128,15 @@ export class SolicitudesAusenciaService {
   }
 
   /**
+   * Resuelve el saldo de vacaciones del colaborador del Fontanero autenticado.
+   */
+  async obtenerBalanceVacaciones(
+    usuarioId: number,
+  ): Promise<BalanceVacaciones> {
+    return this.vacacionesService.obtenerBalancePorUsuarioId(usuarioId);
+  }
+
+  /**
    * Listado propio del Fontanero (solo lectura).
    * Filtro de propietario en SQL; orden estable más reciente → más antigua.
    * Sin paginación: el PBI no la exige y no hay volumen obligatorio.
