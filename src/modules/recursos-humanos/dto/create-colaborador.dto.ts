@@ -127,78 +127,54 @@ export class CreateColaboradorDto {
   @Min(1, { message: 'El usuario debe ser un identificador válido' })
   usuarioId?: number;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     example: '2020-03-15',
-    nullable: true,
     description:
-      'Fecha real de ingreso laboral (YYYY-MM-DD). No puede ser futura. Distinta de la fecha de registro en SIGASJ.',
+      'Fecha real de ingreso laboral (YYYY-MM-DD). Obligatoria en altas nuevas. No puede ser futura.',
   })
   @Transform(({ value }: { value: unknown }) => {
-    if (value === undefined) return undefined;
-    if (value === null || value === '') return null;
+    if (value === null || value === '') return value;
     return typeof value === 'string' ? value.trim() : value;
   })
-  @IsOptional()
-  @ValidateIf((_, value) => value !== null && value !== undefined)
+  @IsString({ message: 'La fecha de ingreso es obligatoria' })
   @Matches(/^\d{4}-\d{2}-\d{2}$/, {
     message: 'La fecha de ingreso debe tener formato YYYY-MM-DD',
   })
   @IsFechaActividadValida({
     message: 'La fecha de ingreso no es válida o no puede ser futura',
   })
-  fechaIngreso?: string | null;
+  fechaIngreso: string;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     enum: JornadaLaboral,
-    nullable: true,
-    description: 'Jornada laboral aplicable',
+    description: 'Jornada laboral aplicable (obligatoria en altas nuevas)',
   })
-  @Transform(({ value }: { value: unknown }) => {
-    if (value === undefined) return undefined;
-    if (value === null || value === '') return null;
-    return value;
-  })
-  @IsOptional()
-  @ValidateIf((_, value) => value !== null && value !== undefined)
   @IsEnum(JornadaLaboral, {
     message: 'La jornada laboral no es válida',
   })
-  jornadaLaboral?: JornadaLaboral | null;
+  jornadaLaboral: JornadaLaboral;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     example: 5,
-    nullable: true,
-    description: 'Días laborales habituales por semana (1–7)',
+    description: 'Días laborales habituales por semana (1–7), obligatorios',
   })
   @Transform(({ value }: { value: unknown }) => {
-    if (value === undefined) return undefined;
-    if (value === null || value === '') return null;
     if (typeof value === 'string' && value.trim() !== '') {
       return Number(value);
     }
     return value;
   })
-  @IsOptional()
-  @ValidateIf((_, value) => value !== null && value !== undefined)
   @IsInt({ message: 'Los días laborales deben ser un número entero' })
   @Min(1, { message: 'Los días laborales deben estar entre 1 y 7' })
   @Max(7, { message: 'Los días laborales deben estar entre 1 y 7' })
-  diasLaboralesHabituales?: number | null;
+  diasLaboralesHabituales: number;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     enum: ModalidadPago,
-    nullable: true,
-    description: 'Modalidad de pago habitual',
+    description: 'Modalidad de pago habitual (obligatoria en altas nuevas)',
   })
-  @Transform(({ value }: { value: unknown }) => {
-    if (value === undefined) return undefined;
-    if (value === null || value === '') return null;
-    return value;
-  })
-  @IsOptional()
-  @ValidateIf((_, value) => value !== null && value !== undefined)
   @IsEnum(ModalidadPago, {
     message: 'La modalidad de pago no es válida',
   })
-  modalidadPago?: ModalidadPago | null;
+  modalidadPago: ModalidadPago;
 }

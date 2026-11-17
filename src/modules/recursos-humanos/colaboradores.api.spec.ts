@@ -27,6 +27,10 @@ describe('POST /api/v1/rrhh/colaboradores', () => {
     cedula: '1-1234-0567',
     correoElectronico: 'carlos.perez@asadasanjuan.cr',
     puestoId: puesto.id,
+    fechaIngreso: '2024-01-15',
+    jornadaLaboral: 'COMPLETA',
+    diasLaboralesHabituales: 5,
+    modalidadPago: 'MENSUAL',
     ...extra,
   });
 
@@ -145,27 +149,34 @@ describe('POST /api/v1/rrhh/colaboradores', () => {
       );
     });
 
-    it('permite omitir expediente laboral (compatibilidad legacy)', async () => {
-      const res = await post(body({ cedula: '1-9999-0001' }));
-      expect(res.status).toBe(201);
-      expect(colaboradorDe(res).fechaIngreso).toBeNull();
-      expect(colaboradorDe(res).jornadaLaboral).toBeNull();
-      expect(colaboradorDe(res).diasLaboralesHabituales).toBeNull();
-      expect(colaboradorDe(res).modalidadPago).toBeNull();
-      expect(colaboradorDe(res).antiguedad).toBeNull();
+    it('rechaza altas sin expediente laboral (400)', async () => {
+      const data = body({ cedula: '1-9999-0001' });
+      delete (data as Record<string, unknown>).fechaIngreso;
+      delete (data as Record<string, unknown>).jornadaLaboral;
+      delete (data as Record<string, unknown>).diasLaboralesHabituales;
+      delete (data as Record<string, unknown>).modalidadPago;
+      const res = await post(data);
+      expect(res.status).toBe(400);
     });
   });
 
   describe('Datos inválidos', () => {
-    it.each(['nombre', 'apellidos', 'cedula', 'correoElectronico', 'puestoId'])(
-      'rechaza si falta %s (400)',
-      async (campo) => {
-        const data = body();
-        delete (data as Record<string, unknown>)[campo];
-        const res = await post(data);
-        expect(res.status).toBe(400);
-      },
-    );
+    it.each([
+      'nombre',
+      'apellidos',
+      'cedula',
+      'correoElectronico',
+      'puestoId',
+      'fechaIngreso',
+      'jornadaLaboral',
+      'diasLaboralesHabituales',
+      'modalidadPago',
+    ])('rechaza si falta %s (400)', async (campo) => {
+      const data = body();
+      delete (data as Record<string, unknown>)[campo];
+      const res = await post(data);
+      expect(res.status).toBe(400);
+    });
 
     it('rechaza puesto inexistente (400)', async () => {
       const res = await post(body({ puestoId: 99999 }));
