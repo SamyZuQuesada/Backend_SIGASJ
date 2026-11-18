@@ -65,6 +65,16 @@ export class Averia {
   @Column({ type: 'varchar', length: 500 })
   ubicacion: string;
 
+  /**
+   * Coordenadas GPS opcionales del reporte (WGS84).
+   * Nulas si el reportante no compartió ubicación o el dispositivo no pudo leerla.
+   */
+  @Column({ type: 'float', nullable: true })
+  latitud: number | null;
+
+  @Column({ type: 'float', nullable: true })
+  longitud: number | null;
+
   @Column({ type: 'varchar', length: 150 })
   sectorComunidad: string;
 

@@ -1,11 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform, type TransformFnParams } from 'class-transformer';
+import { Transform, Type, type TransformFnParams } from 'class-transformer';
 import {
   IsEmail,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
+  Min,
+  ValidateIf,
 } from 'class-validator';
 
 const rawValue = ({ value, obj, key }: TransformFnParams): unknown => {
@@ -32,6 +36,14 @@ const trimOptionalEmail = (params: TransformFnParams): unknown => {
 
   const trimmed = raw.trim();
   return trimmed === '' ? undefined : trimmed.toLowerCase();
+};
+
+const optionalCoord = (params: TransformFnParams): unknown => {
+  const raw = rawValue(params);
+  if (raw === undefined || raw === null || raw === '') {
+    return undefined;
+  }
+  return raw;
 };
 
 /**
@@ -108,6 +120,32 @@ export class CreatePublicAveriaDto {
     message: 'La ubicación no puede exceder 500 caracteres',
   })
   ubicacion: string;
+
+  @ApiPropertyOptional({
+    example: 10.2188017,
+    description:
+      'Latitud WGS84 opcional del punto reportado. Si se envía, también debe enviarse longitud.',
+  })
+  @Transform(optionalCoord)
+  @ValidateIf((_, value) => value !== undefined && value !== null)
+  @Type(() => Number)
+  @IsNumber({}, { message: 'La latitud debe ser un número válido' })
+  @Min(-90, { message: 'La latitud debe estar entre -90 y 90' })
+  @Max(90, { message: 'La latitud debe estar entre -90 y 90' })
+  latitud?: number | null;
+
+  @ApiPropertyOptional({
+    example: -85.5565018,
+    description:
+      'Longitud WGS84 opcional del punto reportado. Si se envía, también debe enviarse latitud.',
+  })
+  @Transform(optionalCoord)
+  @ValidateIf((_, value) => value !== undefined && value !== null)
+  @Type(() => Number)
+  @IsNumber({}, { message: 'La longitud debe ser un número válido' })
+  @Min(-180, { message: 'La longitud debe estar entre -180 y 180' })
+  @Max(180, { message: 'La longitud debe estar entre -180 y 180' })
+  longitud?: number | null;
 
   @ApiProperty({
     example: 'San Juan',

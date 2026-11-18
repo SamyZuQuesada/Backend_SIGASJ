@@ -127,6 +127,68 @@ describe('POST /api/v1/public/averias — registro público', () => {
     expect(persistida?.nombreReportante).toBe('María Rodríguez');
   });
 
+  it('persiste sector + latitud/longitud cuando el reporte las envía', async () => {
+    const response = await postAveria({
+      ...payloadMinimo,
+      sectorComunidad: 'Sector Norte',
+      latitud: 10.2188017,
+      longitud: -85.5565018,
+    }).expect(201);
+    const body = response.body as PublicResponse;
+    const persistida = await averias.findOneBy({
+      codigoSeguimiento: body.data?.codigoSeguimiento,
+    });
+    expect(persistida?.sectorComunidad).toBe('Sector Norte');
+    expect(persistida?.latitud).toBeCloseTo(10.2188017, 5);
+    expect(persistida?.longitud).toBeCloseTo(-85.5565018, 5);
+  });
+
+  it.each([
+    ['Sector Centro', 10.2188, -85.5565],
+    ['Las Palmas', 10.2192, -85.5548],
+    ['El Cruce', 10.2175, -85.5555],
+  ] as const)(
+    'persiste sector "%s" con sus coordenadas',
+    async (sector, latitud, longitud) => {
+      const response = await postAveria({
+        ...payloadMinimo,
+        sectorComunidad: sector,
+        latitud,
+        longitud,
+      }).expect(201);
+      const body = response.body as PublicResponse;
+      const persistida = await averias.findOneBy({
+        codigoSeguimiento: body.data?.codigoSeguimiento,
+      });
+      expect(persistida?.sectorComunidad).toBe(sector);
+      expect(persistida?.latitud).toBeCloseTo(latitud, 5);
+      expect(persistida?.longitud).toBeCloseTo(longitud, 5);
+    },
+  );
+
+  it('deja latitud/longitud nulas si el reporte no las envía', async () => {
+    const sinCoords = await postAveria(payloadMinimo).expect(201);
+    const sin = await averias.findOneBy({
+      codigoSeguimiento: (sinCoords.body as PublicResponse).data
+        ?.codigoSeguimiento,
+    });
+    expect(sin?.latitud ?? null).toBeNull();
+    expect(sin?.longitud ?? null).toBeNull();
+  });
+
+  it('ignora el par incompleto y no guarda solo latitud', async () => {
+    const incompleto = await postAveria({
+      ...payloadMinimo,
+      latitud: 10.22,
+    }).expect(201);
+    const parcial = await averias.findOneBy({
+      codigoSeguimiento: (incompleto.body as PublicResponse).data
+        ?.codigoSeguimiento,
+    });
+    expect(parcial?.latitud ?? null).toBeNull();
+    expect(parcial?.longitud ?? null).toBeNull();
+  });
+
   it('exige cédula y acepta correo opcional válido', async () => {
     const sinCedula = await postAveria({
       ...payloadMinimo,
