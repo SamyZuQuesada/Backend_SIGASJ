@@ -164,6 +164,8 @@ export type AveriaAdminDetail = {
   abonado: AveriaAdminAbonado | null;
   sectorComunidad: string;
   ubicacion: string;
+  latitud: number | null;
+  longitud: number | null;
   descripcion: string;
   estado: EstadoAveria;
   tipoAveria: string | null;
@@ -184,6 +186,8 @@ export type AveriaAdminListItem = {
   nombreReportante: string;
   sectorComunidad: string;
   ubicacion: string;
+  latitud: number | null;
+  longitud: number | null;
   descripcion: string;
   estado: EstadoAveria;
   tipoAveria: string | null;
@@ -379,6 +383,8 @@ export type AveriaFontaneroListItem = {
   estado: EstadoAveria;
   sectorComunidad: string;
   ubicacion: string;
+  latitud: number | null;
+  longitud: number | null;
   descripcion: string;
   tipoAveria: string;
   prioridad: string;
@@ -402,6 +408,8 @@ export type AveriaFontaneroDetail = {
   estado: EstadoAveria;
   sectorComunidad: string;
   ubicacion: string;
+  latitud: number | null;
+  longitud: number | null;
   descripcion: string;
   nombreReportante: string;
   telefonoReportante: string;
@@ -484,7 +492,38 @@ function toAdminAyudante(averia: Averia): AveriaAdminFontanero | null {
   };
 }
 
+/** Normaliza float/decimal de SQL Server a number | null. */
+export function toNullableCoord(
+  value: number | string | null | undefined,
+): number | null {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Acepta el par lat/lng solo si ambos son números finitos válidos.
+ * Si falta uno, ambos quedan nulos (evita pines a medias).
+ */
+export function resolveReportCoords(
+  latitud: number | string | null | undefined,
+  longitud: number | string | null | undefined,
+): { latitud: number | null; longitud: number | null } {
+  const lat = toNullableCoord(latitud);
+  const lng = toNullableCoord(longitud);
+  if (lat == null || lng == null) {
+    return { latitud: null, longitud: null };
+  }
+  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+    return { latitud: null, longitud: null };
+  }
+  return { latitud: lat, longitud: lng };
+}
+
 function toAdminListItem(averia: Averia): AveriaAdminListItem {
+  const coords = resolveReportCoords(averia.latitud, averia.longitud);
   return {
     id: averia.id,
     codigoSeguimiento: averia.codigoSeguimiento,
@@ -492,6 +531,8 @@ function toAdminListItem(averia: Averia): AveriaAdminListItem {
     nombreReportante: averia.nombreReportante,
     sectorComunidad: averia.sectorComunidad,
     ubicacion: averia.ubicacion,
+    latitud: coords.latitud,
+    longitud: coords.longitud,
     descripcion: averia.descripcion,
     estado: averia.estado,
     tipoAveria: averia.tipoAveria ?? null,
@@ -521,6 +562,7 @@ export function toAdminDetail(
   averia: Averia,
   observaciones: AveriaObservacionItem[] = [],
 ): AveriaAdminDetail {
+  const coords = resolveReportCoords(averia.latitud, averia.longitud);
   return {
     id: averia.id,
     codigoSeguimiento: averia.codigoSeguimiento,
@@ -532,6 +574,8 @@ export function toAdminDetail(
     abonado: averia.idAbonado != null ? { id: averia.idAbonado } : null,
     sectorComunidad: averia.sectorComunidad,
     ubicacion: averia.ubicacion,
+    latitud: coords.latitud,
+    longitud: coords.longitud,
     descripcion: averia.descripcion,
     estado: averia.estado,
     tipoAveria: averia.tipoAveria ?? null,
@@ -556,6 +600,7 @@ export function resolveAuthenticatedUsuarioId(user: AuthenticatedUser): number {
 }
 
 export function toFontaneroListItem(averia: Averia): AveriaFontaneroListItem {
+  const coords = resolveReportCoords(averia.latitud, averia.longitud);
   return {
     id: averia.id,
     codigoSeguimiento: averia.codigoSeguimiento,
@@ -563,6 +608,8 @@ export function toFontaneroListItem(averia: Averia): AveriaFontaneroListItem {
     estado: averia.estado,
     sectorComunidad: averia.sectorComunidad,
     ubicacion: averia.ubicacion,
+    latitud: coords.latitud,
+    longitud: coords.longitud,
     descripcion: averia.descripcion,
     tipoAveria: averia.tipoAveria?.trim() || TIPO_AVERIA_SIN_CLASIFICAR,
     prioridad: averia.prioridad?.trim() || PRIORIDAD_AVERIA_SIN_ASIGNAR,
@@ -575,6 +622,7 @@ export function toFontaneroDetail(
   observaciones: AveriaObservacionItem[] = [],
 ): AveriaFontaneroDetail {
   const observacionesAtencion = averia.observacionesAtencion?.trim();
+  const coords = resolveReportCoords(averia.latitud, averia.longitud);
   return {
     id: averia.id,
     codigoSeguimiento: averia.codigoSeguimiento,
@@ -583,6 +631,8 @@ export function toFontaneroDetail(
     estado: averia.estado,
     sectorComunidad: averia.sectorComunidad,
     ubicacion: averia.ubicacion,
+    latitud: coords.latitud,
+    longitud: coords.longitud,
     descripcion: averia.descripcion,
     nombreReportante: averia.nombreReportante,
     telefonoReportante: averia.telefonoReportante,
@@ -610,6 +660,8 @@ export function buildFindOneFontaneroQuery(
       'averia.estado',
       'averia.sectorComunidad',
       'averia.ubicacion',
+      'averia.latitud',
+      'averia.longitud',
       'averia.descripcion',
       'averia.nombreReportante',
       'averia.telefonoReportante',
@@ -642,6 +694,8 @@ export function buildFindOneAdminQuery(
       'averia.idAbonado',
       'averia.sectorComunidad',
       'averia.ubicacion',
+      'averia.latitud',
+      'averia.longitud',
       'averia.descripcion',
       'averia.estado',
       'averia.tipoAveria',
@@ -861,6 +915,8 @@ export class AveriasService {
             'averia.nombreReportante',
             'averia.sectorComunidad',
             'averia.ubicacion',
+            'averia.latitud',
+            'averia.longitud',
             'averia.descripcion',
             'averia.estado',
             'averia.tipoAveria',
@@ -1532,6 +1588,8 @@ export class AveriasService {
             'averia.estado',
             'averia.sectorComunidad',
             'averia.ubicacion',
+            'averia.latitud',
+            'averia.longitud',
             'averia.descripcion',
             'averia.tipoAveria',
             'averia.prioridad',
@@ -2127,6 +2185,7 @@ export class AveriasService {
     codigoSeguimiento: string,
     fechaReporte: Date,
   ): Averia {
+    const coords = resolveReportCoords(dto.latitud, dto.longitud);
     return this.averiaRepository.create({
       codigoSeguimiento,
       fechaReporte,
@@ -2135,6 +2194,8 @@ export class AveriasService {
       telefonoReportante: dto.telefonoReportante,
       correoReportante: dto.correoReportante ?? null,
       ubicacion: dto.ubicacion,
+      latitud: coords.latitud,
+      longitud: coords.longitud,
       sectorComunidad: dto.sectorComunidad,
       descripcion: dto.descripcion,
       estado: EstadoAveria.RECIBIDA,

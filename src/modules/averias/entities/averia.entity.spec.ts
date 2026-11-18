@@ -143,6 +143,8 @@ describe('Averia Entity (Gestión de Averías)', () => {
         true,
       );
       expect(byName.get('correoReportante')?.options.nullable).toBe(true);
+      expect(byName.get('latitud')?.options.nullable).toBe(true);
+      expect(byName.get('longitud')?.options.nullable).toBe(true);
       expect(byName.get('idAbonado')?.options.nullable).toBe(true);
       expect(byName.get('tipoAveria')?.options.nullable).toBe(true);
       expect(byName.get('prioridad')?.options.nullable).toBe(true);

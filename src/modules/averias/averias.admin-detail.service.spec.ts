@@ -36,6 +36,8 @@ describe('AveriasService.findOneAdmin — mapeo y consulta', () => {
       identificacionReportante: null,
       correoReportante: null,
       abonado: null,
+      latitud: null,
+      longitud: null,
       tipoAveria: null,
       prioridad: null,
       observaciones: [],
