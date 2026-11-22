@@ -32,6 +32,14 @@ export class Usuario {
   @Column({ type: 'varchar', length: 255, select: false })
   passwordHash: string;
 
+  @ApiProperty({
+    example: '/uploads/perfiles/123-uuid.jpg',
+    required: false,
+    nullable: true,
+  })
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  fotoPerfilUrl: string | null;
+
   @ApiProperty({ example: true })
   @Column({ default: true })
   activo: boolean;
@@ -66,6 +74,7 @@ export class Usuario {
       correo: this.correo,
       activo: this.activo,
       idRol: this.idRol,
+      fotoPerfilUrl: this.fotoPerfilUrl ?? null,
       ...(this.rol !== undefined ? { rol: this.rol } : {}),
     };
   }

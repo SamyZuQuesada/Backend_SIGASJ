@@ -47,6 +47,16 @@ describe('Usuario entity — contrato de autenticación', () => {
     expect(columnByProperty.password).toBeUndefined();
   });
 
+  it('expone fotoPerfilUrl nullable para avatar self-service', () => {
+    expect(columnByProperty.fotoPerfilUrl?.options).toEqual(
+      expect.objectContaining({
+        type: 'varchar',
+        length: 500,
+        nullable: true,
+      }),
+    );
+  });
+
   it('tiene activo e idRol (relación con Rol)', () => {
     expect(columnByProperty.activo?.options).toEqual(
       expect.objectContaining({ default: true }),

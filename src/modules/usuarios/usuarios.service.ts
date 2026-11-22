@@ -5,10 +5,16 @@ import {
   Logger,
   NotFoundException,
   OnModuleInit,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import {
+  deletePhysicalMediaFile,
+  savePublicImage,
+  type UploadedImageFile,
+} from '../../common/media/public-media';
 import { Role, ROLE_LABELS, ROLES_SISTEMA } from '../../common/enums/role.enum';
 import { PasswordService } from '../auth/password.service';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
@@ -384,6 +390,135 @@ export class UsuariosService implements OnModuleInit {
       activo: usuario.activo,
       rol: usuario.rol.nombre,
     };
+  }
+
+  /**
+   * Self-service: actualiza el nombre del usuario autenticado.
+   * Devuelve la entidad fresca (con rol) para mapear a AuthLoginUser.
+   */
+  async updateOwnNombre(idUsuario: number, nombre: string): Promise<Usuario> {
+    const trimmed = nombre.trim();
+    if (!trimmed) {
+      throw new BadRequestException('El nombre es obligatorio.');
+    }
+    if (trimmed.length > 150) {
+      throw new BadRequestException(
+        'El nombre no puede superar 150 caracteres.',
+      );
+    }
+
+    const usuario = await this.findByIdForAuth(idUsuario);
+    if (!usuario) {
+      throw new NotFoundException(`No existe un usuario con id ${idUsuario}`);
+    }
+    if (!usuario.activo) {
+      throw new UnauthorizedException('El usuario se encuentra inactivo.');
+    }
+
+    await this.usuarioRepository.update(idUsuario, { nombre: trimmed });
+    const actualizado = await this.findByIdForAuth(idUsuario);
+    if (!actualizado) {
+      throw new NotFoundException(`No existe un usuario con id ${idUsuario}`);
+    }
+    return actualizado;
+  }
+
+  /**
+   * Self-service: cambia contraseña verificando la actual.
+   */
+  async changeOwnPassword(
+    idUsuario: number,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void> {
+    if (!newPassword || newPassword.length < 6) {
+      throw new BadRequestException(
+        'La nueva contraseña debe tener al menos 6 caracteres.',
+      );
+    }
+
+    const usuario = await this.usuarioRepository
+      .createQueryBuilder('usuario')
+      .leftJoinAndSelect('usuario.rol', 'rol')
+      .addSelect('usuario.passwordHash')
+      .where('usuario.idUsuario = :idUsuario', { idUsuario })
+      .getOne();
+
+    if (!usuario) {
+      throw new NotFoundException(`No existe un usuario con id ${idUsuario}`);
+    }
+    if (!usuario.activo) {
+      throw new UnauthorizedException('El usuario se encuentra inactivo.');
+    }
+    if (!usuario.passwordHash) {
+      throw new UnauthorizedException('La contraseña actual no es correcta.');
+    }
+
+    const ok = await this.passwordService.comparePassword(
+      currentPassword,
+      usuario.passwordHash,
+    );
+    if (!ok) {
+      throw new UnauthorizedException('La contraseña actual no es correcta.');
+    }
+
+    const passwordHash =
+      await this.passwordService.hashPassword(newPassword);
+    await this.usuarioRepository.update(idUsuario, { passwordHash });
+    this.logger.log(`Contraseña actualizada: id=${idUsuario}`);
+  }
+
+  /**
+   * Self-service: sube o reemplaza foto de perfil.
+   */
+  async updateOwnFoto(
+    idUsuario: number,
+    file: UploadedImageFile,
+  ): Promise<Usuario> {
+    const usuario = await this.findByIdForAuth(idUsuario);
+    if (!usuario) {
+      throw new NotFoundException(`No existe un usuario con id ${idUsuario}`);
+    }
+    if (!usuario.activo) {
+      throw new UnauthorizedException('El usuario se encuentra inactivo.');
+    }
+
+    const previous = usuario.fotoPerfilUrl;
+    const fotoPerfilUrl = savePublicImage('perfiles', file);
+    await this.usuarioRepository.update(idUsuario, { fotoPerfilUrl });
+    if (previous && previous !== fotoPerfilUrl) {
+      deletePhysicalMediaFile(previous);
+    }
+
+    const actualizado = await this.findByIdForAuth(idUsuario);
+    if (!actualizado) {
+      throw new NotFoundException(`No existe un usuario con id ${idUsuario}`);
+    }
+    return actualizado;
+  }
+
+  /**
+   * Self-service: quita la foto de perfil (idempotente).
+   */
+  async clearOwnFoto(idUsuario: number): Promise<Usuario> {
+    const usuario = await this.findByIdForAuth(idUsuario);
+    if (!usuario) {
+      throw new NotFoundException(`No existe un usuario con id ${idUsuario}`);
+    }
+    if (!usuario.activo) {
+      throw new UnauthorizedException('El usuario se encuentra inactivo.');
+    }
+
+    if (usuario.fotoPerfilUrl) {
+      deletePhysicalMediaFile(usuario.fotoPerfilUrl);
+      await this.usuarioRepository.update(idUsuario, { fotoPerfilUrl: null });
+    }
+
+    const actualizado = await this.findByIdForAuth(idUsuario);
+    if (!actualizado) {
+      throw new NotFoundException(`No existe un usuario con id ${idUsuario}`);
+    }
+    return actualizado;
   }
 
   private async obtenerRol(nombre: Role): Promise<Rol> {

@@ -36,7 +36,8 @@ export type PublicMediaFolder =
   | 'transparencia'
   | 'proyectos'
   | 'formularios-oficiales'
-  | 'formularios-descargables';
+  | 'formularios-descargables'
+  | 'perfiles';
 
 export type UploadedImageFile = {
   originalname: string;
@@ -67,7 +68,8 @@ const isAllowedFolder = (folder: string): folder is PublicMediaFolder =>
   folder === 'transparencia' ||
   folder === 'proyectos' ||
   folder === 'formularios-oficiales' ||
-  folder === 'formularios-descargables';
+  folder === 'formularios-descargables' ||
+  folder === 'perfiles';
 
 export function normalizeMediaUrl(
   rawUrl: string | null | undefined,

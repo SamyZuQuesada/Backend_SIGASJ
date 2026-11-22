@@ -1,10 +1,18 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import type { UploadedImageFile } from '../../common/media/public-media';
 import { parseRole, Role } from '../../common/enums/role.enum';
 import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
 import { UsuariosService } from '../usuarios/usuarios.service';
+import type { Usuario } from '../usuarios/entities/usuario.entity';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { LoginDto } from './dto/login.dto';
+import { UpdateMeDto } from './dto/update-me.dto';
 import { PasswordService } from './password.service';
 
 /** Misma respuesta para usuario inexistente y password incorrecta (anti-enumeración). */
@@ -17,6 +25,8 @@ export type AuthLoginUser = {
   email: string;
   role: Role;
   name: string;
+  /** Ruta pública de foto de perfil, o null si no hay. */
+  avatar: string | null;
 };
 
 export type AuthLoginResult = {
@@ -101,11 +111,16 @@ export class AuthService {
     }
 
     // Objeto explícito: nunca spread de Entity (evitar passwordHash).
+    return this.toAuthUser(usuario, role);
+  }
+
+  private toAuthUser(usuario: Usuario, role: Role): AuthLoginUser {
     return {
       id: usuario.idUsuario,
       email: usuario.correo,
       role,
       name: usuario.nombre,
+      avatar: usuario.fotoPerfilUrl?.trim() || null,
     };
   }
 
@@ -147,11 +162,54 @@ export class AuthService {
       throw new UnauthorizedException('Token inválido');
     }
 
-    return {
-      id: usuario.idUsuario,
-      email: usuario.correo,
-      role,
-      name: usuario.nombre,
-    };
+    return this.toAuthUser(usuario, role);
+  }
+
+  async updateMe(userId: number, dto: UpdateMeDto): Promise<AuthLoginUser> {
+    const usuario = await this.usuariosService.updateOwnNombre(
+      userId,
+      dto.name,
+    );
+    const role = parseRole(usuario.rol?.nombre);
+    if (!role) {
+      throw new UnauthorizedException('Token inválido');
+    }
+    return this.toAuthUser(usuario, role);
+  }
+
+  async changePassword(
+    userId: number,
+    dto: ChangePasswordDto,
+  ): Promise<{ ok: true }> {
+    await this.usuariosService.changeOwnPassword(
+      userId,
+      dto.currentPassword,
+      dto.newPassword,
+    );
+    return { ok: true };
+  }
+
+  async updateAvatar(
+    userId: number,
+    file: UploadedImageFile | undefined,
+  ): Promise<AuthLoginUser> {
+    if (!file) {
+      throw new BadRequestException('Debe adjuntar una imagen de perfil.');
+    }
+    const usuario = await this.usuariosService.updateOwnFoto(userId, file);
+    const role = parseRole(usuario.rol?.nombre);
+    if (!role) {
+      throw new UnauthorizedException('Token inválido');
+    }
+    return this.toAuthUser(usuario, role);
+  }
+
+  async clearAvatar(userId: number): Promise<AuthLoginUser> {
+    const usuario = await this.usuariosService.clearOwnFoto(userId);
+    const role = parseRole(usuario.rol?.nombre);
+    if (!role) {
+      throw new UnauthorizedException('Token inválido');
+    }
+    return this.toAuthUser(usuario, role);
   }
 }

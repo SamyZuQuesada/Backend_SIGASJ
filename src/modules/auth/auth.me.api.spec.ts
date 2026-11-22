@@ -87,6 +87,7 @@ describe('GET /auth/me — sesión JWT', () => {
       email: 'fontanero@asadasanjuan.cr',
       role: Role.FONTANERO,
       name: 'Fontanero',
+      avatar: null,
     });
     expect(response.body).not.toHaveProperty('passwordHash');
     expect(response.body).not.toHaveProperty('password');

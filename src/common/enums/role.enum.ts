@@ -5,7 +5,7 @@
  * Labels de dominio (UI) viven en `ROLE_LABELS`, no en el valor del enum.
  *
  * Roles operativos ASADA (backlog centralización):
- * Administradora, Secretaria Ejecutiva, Fontanero.
+ * Administrador, Secretario Ejecutivo, Fontanero.
  *
  * Roles adicionales legítimos del sistema (no eliminar sin confirmación):
  * Abonado, Ayudante.
@@ -15,7 +15,7 @@ export enum Role {
   SUPER_ADMIN = 'SUPER_ADMIN',
   ADMINISTRADORA = 'ADMINISTRADORA',
   /**
-   * Secretaria Ejecutiva.
+   * Secretario Ejecutivo.
    * Valor histórico en BD/JWT: `SECRETARIA` (no renombrar sin migration).
    */
   SECRETARIA_EJECUTIVA = 'SECRETARIA',
@@ -31,11 +31,11 @@ export enum Role {
  */
 export const RoleSecretaria = Role.SECRETARIA_EJECUTIVA;
 
-/** Etiquetas de dominio (no usar para autorización). */
+/** Etiquetas de dominio en masculino (no usar para autorización). */
 export const ROLE_LABELS: Readonly<Record<Role, string>> = {
   [Role.SUPER_ADMIN]: 'Super Admin',
-  [Role.ADMINISTRADORA]: 'Administradora',
-  [Role.SECRETARIA_EJECUTIVA]: 'Secretaria Ejecutiva',
+  [Role.ADMINISTRADORA]: 'Administrador',
+  [Role.SECRETARIA_EJECUTIVA]: 'Secretario Ejecutivo',
   [Role.FONTANERO]: 'Fontanero',
   [Role.ABONADO]: 'Abonado',
   [Role.AYUDANTE]: 'Ayudante',

@@ -39,10 +39,10 @@ describe('Role — fuente única de roles', () => {
 
   it('labels de dominio no se usan como valor de autorización', () => {
     expect(ROLE_LABELS[Role.SUPER_ADMIN]).toBe('Super Admin');
-    expect(ROLE_LABELS[Role.ADMINISTRADORA]).toBe('Administradora');
-    expect(ROLE_LABELS[Role.SECRETARIA_EJECUTIVA]).toBe('Secretaria Ejecutiva');
+    expect(ROLE_LABELS[Role.ADMINISTRADORA]).toBe('Administrador');
+    expect(ROLE_LABELS[Role.SECRETARIA_EJECUTIVA]).toBe('Secretario Ejecutivo');
     expect(ROLE_LABELS[Role.FONTANERO]).toBe('Fontanero');
-    expect(Role.SECRETARIA_EJECUTIVA).not.toBe('Secretaria Ejecutiva');
+    expect(Role.SECRETARIA_EJECUTIVA).not.toBe('Secretario Ejecutivo');
     expect(Role.SECRETARIA_EJECUTIVA).not.toBe('Secretaria');
   });
 
